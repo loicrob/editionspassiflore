@@ -1,0 +1,770 @@
+[
+    {
+        "key": "group_69ea16cde9aef",
+        "title": "Participants",
+        "fields": [
+            {
+                "key": "field_69ef27b3289cf",
+                "label": "Passiflore participe",
+                "name": "passiflore_participe",
+                "type": "true_false"
+            },
+            {
+                "key": "field_69ea16ce4da82",
+                "label": "Personnes participant à l'événement",
+                "name": "personnes_participant_a_l'evenement",
+                "type": "repeater",
+                "sub_fields": [
+                    {
+                        "name": "assignation",
+                        "type": "radio",
+                        "choices": {
+                            "fiche-auteur": "Fiche auteur",
+                            "champ-texte": "Champ texte"
+                        },
+                        "default_value": "fiche-auteur",
+                        "return_format": "value"
+                    },
+                    {
+                        "name": "fiche_auteur",
+                        "type": "taxonomy",
+                        "taxonomy": "auteur",
+                        "return_format": "id",
+                        "field_type": "select",
+                        "conditional_logic": [
+                            [
+                                {
+                                    "field": "field_69ea2b85c8ede",
+                                    "operator": "==",
+                                    "value": "fiche-auteur"
+                                }
+                            ]
+                        ]
+                    },
+                    {
+                        "name": "nom_de_la_personne",
+                        "type": "text",
+                        "conditional_logic": [
+                            [
+                                {
+                                    "field": "field_69ea2b85c8ede",
+                                    "operator": "==",
+                                    "value": "champ-texte"
+                                }
+                            ]
+                        ]
+                    }
+                ]
+            }
+        ],
+        "_note": "Books are no longer an SCF field. Stored as _pf_event_books post meta (array of product IDs, ordered). Managed via inc/event-admin.php custom meta box.",
+        "location": [
+            [
+                {
+                    "param": "post_type",
+                    "operator": "==",
+                    "value": "tribe_events"
+                }
+            ]
+        ]
+    },
+    {
+        "key": "group_69c2ca10aa3d2",
+        "title": "Fiche d'auteur",
+        "fields": [
+            {
+                "key": "field_69c408991802c",
+                "name": "nom",
+                "type": "text",
+                "required": 1
+            },
+            {
+                "key": "field_69c4088b1802b",
+                "name": "prenom",
+                "type": "text"
+            },
+            {
+                "key": "field_69c3b4b8e1671",
+                "name": "genre",
+                "type": "radio",
+                "choices": {
+                    "feminin": "Féminin",
+                    "masculin": "Masculin"
+                },
+                "return_format": "label",
+                "required": 1
+            },
+            {
+                "key": "field_69c2cb4ece4c1",
+                "name": "photo",
+                "type": "image",
+                "return_format": "id",
+                "required": 1
+            },
+            {
+                "key": "field_69c408347cb03",
+                "name": "biographie_synthetique",
+                "type": "textarea",
+                "required": 1
+            },
+            {
+                "key": "field_69c2cc85ce4c2",
+                "name": "biographie_complete",
+                "type": "wysiwyg",
+                "required": 1
+            }
+        ],
+        "location": [
+            [
+                {
+                    "param": "taxonomy",
+                    "operator": "==",
+                    "value": "auteur"
+                }
+            ]
+        ]
+    },
+    {
+        "key": "group_69c7d37956f1c",
+        "title": "Informations du livre",
+        "fields": [
+            {
+                "_tab": "Informations principales",
+                "fields": [
+                    {
+                        "key": "field_69c7d379b3faa",
+                        "name": "sous-titre",
+                        "type": "text"
+                    },
+                    {
+                        "key": "field_69ca3174cd2ff",
+                        "name": "distinctions",
+                        "type": "repeater",
+                        "sub_fields": [
+                            {
+                                "name": "distinction",
+                                "type": "text"
+                            }
+                        ]
+                    },
+                    {
+                        "key": "field_69c7ea777ff5f",
+                        "name": "extrait",
+                        "type": "file",
+                        "return_format": "id",
+                        "mime_types": "PDF"
+                    }
+                ]
+            },
+            {
+                "_tab": "Contributions",
+                "fields": [
+                    {
+                        "key": "field_69c7d477b3fad",
+                        "name": "contributions",
+                        "type": "repeater",
+                        "sub_fields": [
+                            {
+                                "name": "type",
+                                "type": "select",
+                                "choices": {
+                                    "auteur": "Auteur / Autrice",
+                                    "textes": "Textes",
+                                    "photographies": "Photographies",
+                                    "illustrations": "Illustrations",
+                                    "dessins": "Dessins",
+                                    "traduction": "Traduction",
+                                    "notes": "Notes"
+                                },
+                                "default_value": "auteur",
+                                "return_format": "value"
+                            },
+                            {
+                                "name": "assignation",
+                                "type": "radio",
+                                "choices": {
+                                    "fiche-auteur": "Fiche auteur",
+                                    "champ-texte": "Champ texte"
+                                },
+                                "default_value": "fiche-auteur",
+                                "return_format": "value"
+                            },
+                            {
+                                "name": "fiche-auteur",
+                                "type": "taxonomy",
+                                "taxonomy": "auteur",
+                                "return_format": "id",
+                                "field_type": "multi_select",
+                                "bidirectional": 1,
+                                "conditional_logic": [
+                                    [
+                                        {
+                                            "field": "field_69cd31e1156ae",
+                                            "operator": "==",
+                                            "value": "fiche-auteur"
+                                        }
+                                    ]
+                                ]
+                            },
+                            {
+                                "name": "nom_de_l'auteur",
+                                "type": "text",
+                                "conditional_logic": [
+                                    [
+                                        {
+                                            "field": "field_69cd31e1156ae",
+                                            "operator": "==",
+                                            "value": "champ-texte"
+                                        }
+                                    ]
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "key": "field_69c7e79e24ea8",
+                        "name": "nom_de_plume",
+                        "type": "text"
+                    },
+                    {
+                        "key": "field_69c7e9f27ff5d",
+                        "name": "illustration_de_couverture",
+                        "type": "text"
+                    }
+                ]
+            },
+            {
+                "_tab": "Autres images",
+                "fields": [
+                    {
+                        "key": "field_69c7d3e0b3fab",
+                        "name": "quatrieme_de_couverture",
+                        "type": "image",
+                        "return_format": "id"
+                    },
+                    {
+                        "key": "field_69c7d465b3fac",
+                        "name": "tranche",
+                        "type": "image",
+                        "return_format": "id"
+                    },
+                    {
+                        "key": "field_69cbf8e658909",
+                        "name": "autres",
+                        "type": "repeater",
+                        "sub_fields": [
+                            {
+                                "name": "image",
+                                "type": "image",
+                                "return_format": "id"
+                            }
+                        ]
+                    }
+                ]
+            },
+            {
+                "_tab": "Caractéristiques",
+                "fields": [
+                    {
+                        "key": "field_69ca312ecd2fe",
+                        "name": "nouveaute",
+                        "type": "true_false"
+                    },
+                    {
+                        "key": "field_69ca30b9cd2fd",
+                        "name": "date_de_parution",
+                        "type": "date_picker",
+                        "display_format": "d/m/Y",
+                        "return_format": "Ymd"
+                    },
+                    {
+                        "key": "field_69ca3388cd306",
+                        "name": "disponibilite",
+                        "type": "radio",
+                        "choices": {
+                            "disponible": "Disponible",
+                            "a-paraitre": "À paraître",
+                            "bientot-disponible": "Bientôt disponible",
+                            "bientot-epuise": "Bientôt épuisé",
+                            "epuise": "Épuisé"
+                        },
+                        "default_value": "a-paraitre",
+                        "return_format": "value"
+                    },
+                    {
+                        "key": "field_69c7e9737ff5b",
+                        "name": "public",
+                        "type": "radio",
+                        "choices": {
+                            "tout-public": "Tout public",
+                            "adulte": "Adulte",
+                            "jeunesse": "Jeunesse"
+                        },
+                        "return_format": "value",
+                        "other_choice": 1
+                    },
+                    {
+                        "key": "field_69dca51e01d05",
+                        "name": "nombre_de_pages",
+                        "type": "number"
+                    },
+                    {
+                        "key": "field_69ca4932f8174",
+                        "name": "type",
+                        "type": "radio",
+                        "choices": {
+                            "roman": "Roman",
+                            "nouvelles": "Nouvelles",
+                            "bande-dessinee": "Bande Dessinée",
+                            "beau-livre": "Beau-livre",
+                            "album-illustre": "Album illustré",
+                            "textes-courts": "Textes courts",
+                            "chroniques": "Chroniques",
+                            "recit": "Récit",
+                            "conte": "Conte",
+                            "biographie": "Biographie",
+                            "documentaire": "Documentaire"
+                        },
+                        "return_format": "value",
+                        "other_choice": 1
+                    },
+                    {
+                        "key": "field_69c7e9047ff5a",
+                        "name": "type_de_reliure",
+                        "type": "radio",
+                        "choices": {
+                            "broche": "Broché",
+                            "cousu": "Cousu"
+                        },
+                        "return_format": "value",
+                        "other_choice": 1
+                    },
+                    {
+                        "key": "field_69c7e7d37ff58",
+                        "name": "langues",
+                        "type": "checkbox",
+                        "choices": {
+                            "francais": "Français",
+                            "anglais": "Anglais",
+                            "espagnol": "Espagnol",
+                            "allemand": "Allemand",
+                            "occitan-gascon": "Occitan / Gascon",
+                            "basque": "Basque"
+                        },
+                        "default_value": [
+                            "francais"
+                        ],
+                        "return_format": "value",
+                        "allow_custom": 1
+                    }
+                ]
+            },
+            {
+                "_tab": "Liens et fichiers",
+                "fields": [
+                    {
+                        "key": "field_69cb86d1d4600",
+                        "name": "lien_place_des_libraires",
+                        "type": "url"
+                    },
+                    {
+                        "key": "field_69ca5ed3e53ce",
+                        "name": "articles_de_presse",
+                        "type": "repeater",
+                        "sub_fields": [
+                            {
+                                "name": "titre",
+                                "type": "text"
+                            },
+                            {
+                                "name": "description",
+                                "type": "textarea"
+                            },
+                            {
+                                "name": "type",
+                                "type": "radio",
+                                "choices": {
+                                    "lien": "Lien",
+                                    "fichier": "Fichier"
+                                },
+                                "default_value": "fichier"
+                            },
+                            {
+                                "name": "lien",
+                                "type": "url",
+                                "conditional_logic": [
+                                    [
+                                        {
+                                            "operator": "==",
+                                            "value": "lien"
+                                        }
+                                    ]
+                                ]
+                            },
+                            {
+                                "name": "fichier",
+                                "type": "file",
+                                "return_format": "id",
+                                "conditional_logic": [
+                                    [
+                                        {
+                                            "operator": "==",
+                                            "value": "fichier"
+                                        }
+                                    ]
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "key": "field_69cb842b869a3",
+                        "name": "videos",
+                        "type": "repeater",
+                        "sub_fields": [
+                            {
+                                "name": "titre",
+                                "type": "text"
+                            },
+                            {
+                                "name": "description",
+                                "type": "text"
+                            },
+                            {
+                                "key": "field_6a2e71460a5fe",
+                                "name": "type",
+                                "type": "radio",
+                                "choices": {
+                                    "lien": "Lien",
+                                    "fichier-video": "Fichier vidéo"
+                                },
+                                "default_value": "lien",
+                                "return_format": "value"
+                            },
+                            {
+                                "name": "lien",
+                                "type": "url",
+                                "conditional_logic": [
+                                    [
+                                        {
+                                            "operator": "==",
+                                            "value": "lien"
+                                        }
+                                    ]
+                                ]
+                            },
+                            {
+                                "key": "field_6a2e72090a5ff",
+                                "name": "fichier_video",
+                                "type": "file",
+                                "return_format": "id",
+                                "conditional_logic": [
+                                    [
+                                        {
+                                            "operator": "==",
+                                            "value": "fichier-video"
+                                        }
+                                    ]
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "key": "field_69cb848a869ad",
+                        "name": "podcasts",
+                        "type": "repeater",
+                        "sub_fields": [
+                            {
+                                "name": "titre",
+                                "type": "text"
+                            },
+                            {
+                                "name": "description",
+                                "type": "text"
+                            },
+                            {
+                                "name": "type",
+                                "type": "radio",
+                                "choices": {
+                                    "lien": "Lien",
+                                    "fichier-audio": "Fichier audio"
+                                },
+                                "return_format": "value"
+                            },
+                            {
+                                "name": "lien",
+                                "type": "url",
+                                "conditional_logic": [
+                                    [
+                                        {
+                                            "operator": "==",
+                                            "value": "lien"
+                                        }
+                                    ]
+                                ]
+                            },
+                            {
+                                "name": "fichier_audio",
+                                "type": "file",
+                                "return_format": "id",
+                                "conditional_logic": [
+                                    [
+                                        {
+                                            "operator": "==",
+                                            "value": "fichier-audio"
+                                        }
+                                    ]
+                                ]
+                            }
+                        ]
+                    }
+                ]
+            },
+            {
+                "_tab": "Avis",
+                "fields": [
+                    {
+                        "key": "field_69cb8538d45f6",
+                        "name": "avis_des_lecteurs",
+                        "type": "repeater",
+                        "sub_fields": [
+                            {
+                                "name": "titre",
+                                "type": "text"
+                            },
+                            {
+                                "name": "auteur",
+                                "type": "text"
+                            },
+                            {
+                                "name": "date_de_publication",
+                                "type": "date_picker",
+                                "return_format": "d/m/Y"
+                            },
+                            {
+                                "name": "avis",
+                                "type": "textarea"
+                            }
+                        ]
+                    },
+                    {
+                        "key": "field_69cb8663d45fb",
+                        "name": "avis_des_libraires",
+                        "type": "repeater",
+                        "sub_fields": [
+                            {
+                                "name": "titre",
+                                "type": "text"
+                            },
+                            {
+                                "name": "auteur",
+                                "type": "text"
+                            },
+                            {
+                                "name": "date_de_publication",
+                                "type": "date_picker",
+                                "return_format": "d/m/Y"
+                            },
+                            {
+                                "name": "avis",
+                                "type": "textarea"
+                            }
+                        ]
+                    }
+                ]
+            }
+        ],
+        "location": [
+            [
+                {
+                    "param": "post_type",
+                    "operator": "==",
+                    "value": "product"
+                }
+            ]
+        ]
+    },
+    {
+        "key": "group_6a1b1c9de461a",
+        "title": "Accueil",
+        "fields": [
+            {
+                "key": "field_6a1b2a1e84af8",
+                "name": "hero_image",
+                "label": "Image de fond principale",
+                "type": "image",
+                "return_format": "id"
+            },
+            {
+                "key": "field_6a1b1c9edc905",
+                "name": "actualites",
+                "type": "repeater",
+                "sub_fields": [
+                    {
+                        "key": "field_6a1b1d5ddc908",
+                        "name": "titre",
+                        "type": "text"
+                    },
+                    {
+                        "key": "field_6a1b1d31dc907",
+                        "name": "image",
+                        "type": "image",
+                        "return_format": "id"
+                    },
+                    {
+                        "key": "field_6a1b1d71dc909",
+                        "name": "contenu",
+                        "label": "Description",
+                        "type": "wysiwyg"
+                    },
+                    {
+                        "key": "field_6a1b1d90dc90a",
+                        "name": "lien",
+                        "label": "URL",
+                        "type": "url"
+                    },
+                    {
+                        "key": "field_6a1b1dacdc90b",
+                        "name": "label_lien",
+                        "type": "text"
+                    }
+                ]
+            },
+            {
+                "key": "field_6a47b23d07c08",
+                "name": "paragraphe_de_presentation",
+                "type": "textarea",
+                "new_lines": ""
+            }
+        ],
+        "_note": "Rendu dans le hero par front-page.php ($hero_image_id, $hero_presentation, $slides = actualités). paragraphe_de_presentation est un textarea brut (new_lines='') : les retours à la ligne saisis dans le champ deviennent des <br> via nl2br(esc_html()) côté template (#pf-hero-presentation). UI d'édition : page admin dédiée top-level 'Accueil' (slug pf-actualites-edit, callback passiflore_render_accueil_admin_page() dans inc/accueil.php) qui affiche ce groupe via acf_form() ; la boîte méta native est masquée sur l'écran d'édition standard de la page (remove_meta_box('acf-group_6a1b1c9de461a', 'page', 'normal')) pour n'avoir qu'une seule UI d'édition. ⚠️ Ce groupe est localisé sur 'page == 71' (l'ID de la page Accueil) : si la page d'accueil venait à être recréée avec un autre ID, la règle de localisation doit être mise à jour dans Custom Fields → Groupes de champs → Accueil.",
+        "location": [
+            [
+                {
+                    "param": "post_type",
+                    "operator": "==",
+                    "value": "page"
+                },
+                {
+                    "param": "page",
+                    "operator": "==",
+                    "value": "71"
+                }
+            ]
+        ]
+    },
+    {
+        "key": "group_6a4ba1e58c0bd",
+        "title": "Menu déroulant Catalogues PDF",
+        "fields": [
+            {
+                "key": "field_6a4ba1e6321c4",
+                "label": "Catalogues",
+                "name": "catalogues",
+                "aria-label": "",
+                "type": "repeater",
+                "instructions": "",
+                "required": 0,
+                "conditional_logic": 0,
+                "wrapper": {
+                    "width": "",
+                    "class": "",
+                    "id": ""
+                },
+                "layout": "table",
+                "pagination": 0,
+                "min": 0,
+                "max": 0,
+                "collapsed": "",
+                "button_label": "Ajouter un catalogue",
+                "rows_per_page": 20,
+                "sub_fields": [
+                    {
+                        "key": "field_6a4ba246321c5",
+                        "label": "Libellé",
+                        "name": "libelle",
+                        "aria-label": "",
+                        "type": "text",
+                        "instructions": "",
+                        "required": 0,
+                        "conditional_logic": 0,
+                        "wrapper": {
+                            "width": "",
+                            "class": "",
+                            "id": ""
+                        },
+                        "default_value": "",
+                        "maxlength": "",
+                        "allow_in_bindings": 0,
+                        "placeholder": "",
+                        "prepend": "",
+                        "append": "",
+                        "parent_repeater": "field_6a4ba1e6321c4"
+                    },
+                    {
+                        "key": "field_6a4ba266321c6",
+                        "label": "Lien",
+                        "name": "lien",
+                        "aria-label": "",
+                        "type": "text",
+                        "instructions": "",
+                        "required": 0,
+                        "conditional_logic": 0,
+                        "wrapper": {
+                            "width": "",
+                            "class": "",
+                            "id": ""
+                        },
+                        "default_value": "",
+                        "maxlength": "",
+                        "allow_in_bindings": 0,
+                        "placeholder": "",
+                        "prepend": "",
+                        "append": "",
+                        "parent_repeater": "field_6a4ba1e6321c4"
+                    },
+                    {
+                        "key": "field_6a4ba2a7321c7",
+                        "label": "Fichier",
+                        "name": "fichier",
+                        "aria-label": "",
+                        "type": "file",
+                        "instructions": "",
+                        "required": 0,
+                        "conditional_logic": 0,
+                        "wrapper": {
+                            "width": "",
+                            "class": "",
+                            "id": ""
+                        },
+                        "return_format": "id",
+                        "library": "uploadedTo",
+                        "min_size": "",
+                        "max_size": "",
+                        "mime_types": "",
+                        "allow_in_bindings": 0,
+                        "parent_repeater": "field_6a4ba1e6321c4"
+                    }
+                ]
+            }
+        ],
+        "location": [
+            [
+                {
+                    "param": "page",
+                    "operator": "==",
+                    "value": "8"
+                }
+            ]
+        ],
+        "menu_order": 0,
+        "position": "normal",
+        "style": "default",
+        "label_placement": "top",
+        "instruction_placement": "label",
+        "hide_on_screen": "",
+        "active": true,
+        "description": "",
+        "show_in_rest": 0,
+        "display_title": ""
+    }
+]

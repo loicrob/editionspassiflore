@@ -1,0 +1,612 @@
+/* ─── Passiflore Catalogue — filter/sort/search UI ───────────────── */
+
+/* Hide the Kadence "product archive hero" on category pages so it
+   looks exactly like the shop page. */
+body.tax-product_cat .product-archive-hero-section,
+body.tax-product_cat .entry-hero.product-hero-section {
+	display: none !important;
+}
+
+/* Variables partagées : --pf-control-h (hauteur de contrôle, défaut 38px) et
+   --pf-accent-border-soft vivent dans style.css. Les deux barres surchargent
+   --pf-control-h plus bas (hiérarchie visuelle). */
+
+/* All interactive controls share the same height so they line up
+   regardless of inherited line-height differences (Kadence/WP sets
+   line-height:1.6 on body, which makes inputs taller than buttons). */
+.pf-cat-search-input,
+.pf-cat-trigger,
+.pf-cat-display button,
+.pf-cat-univers-btn,
+.pf-cat-format-btn,
+.pf-cat-sort-dir {
+	height: var(--pf-control-h);
+	line-height: 1.2;
+	box-sizing: border-box;
+}
+
+/* Same control height for the search wrapper so the absolutely-positioned
+   input has something to fill. */
+.pf-cat-search {
+	height: var(--pf-control-h);
+}
+
+.content-area {
+	margin-top: 0;
+}
+
+.pf-catalogue {
+	font-family: var(--pf-font-body);
+	color: var(--pf-text);
+}
+
+/* Menus are portaled to <body> — give them the same font so they look
+   integrated with the bar. */
+.pf-cat-menu {
+	font-family: var(--pf-font-body);
+	color: var(--pf-text);
+}
+
+/* Conteneur sticky full-bleed + smart-hide : mécanisme commun .pf-sticky-bar (style.css).
+   Ajouté au markup à côté de .pf-catalogue-sticky (que le JS continue de cibler). */
+
+/* ─── Bar (vertical container of rows) ──────────────────────────── */
+
+.pf-catalogue-bar {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	/* Padding vertical : barre principale via .pf-sub-header (style.css) ;
+	   le top bar via .pf-catalogue-bar-top. */
+}
+
+.pf-cat-bar-row {
+	display: flex;
+	flex-wrap: nowrap;
+	align-items: center;
+	gap: 8px;
+}
+
+.pf-cat-bar-row[hidden] { display: none; }
+
+/* The horizontal scroll container — used inside primary row to hold
+   sort/filters/tail items. On desktop it sits inline with search; on mobile
+   it drops to a row below search.
+   `flex: 0 1 auto` so it takes its natural content width and PDF (its
+   last child) sits flush against the row's right edge — search has
+   flex-grow:1 and absorbs all remaining space. */
+.pf-cat-row-scroll {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	overflow-x: auto;
+	scrollbar-width: thin;
+	-webkit-overflow-scrolling: touch;
+	flex: 0 1 auto;
+	min-width: 0;
+}
+
+.pf-cat-row-scroll > * { flex-shrink: 0; }
+
+/* Dynamic left/right fade indicators on each scrollable container. */
+.pf-cat-row-scroll.has-fade-right:not(.has-fade-left)
+	{ mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 32px), transparent 100%); }
+.pf-cat-row-scroll.has-fade-left:not(.has-fade-right)
+	{ mask-image: linear-gradient(to right, transparent 0, #000 32px, #000 100%); }
+.pf-cat-row-scroll.has-fade-left.has-fade-right
+	{ mask-image: linear-gradient(to right, transparent 0, #000 32px, #000 calc(100% - 32px), transparent 100%); }
+
+
+/* ─── Mobile / tablet (< 1024px) ─────────────────────────────────── */
+
+@media (max-width: 1023px) {
+	/* Reduce vertical breathing room on small screens — desktop padding
+	   was leaving an unjustified gap above and below the search bar. */
+	.pf-catalogue-bar { padding: 4px 0; gap: 4px; }
+
+	/* Primary row stacks: search-sort wrapper full width on top, then
+	   scroll container below. */
+	.pf-cat-bar-row-primary {
+		flex-direction: column;
+		align-items: stretch;
+		gap: 6px;
+	}
+	/* In column flex, flex-basis controls the cross-axis (height), not
+	   width, so reset to auto and force full width explicitly. Same fix
+	   for the scroll container — its `flex: 0 1 auto` in column flex
+	   would collapse it to height 0 and hide every filter. */
+	.pf-cat-search-sort {
+		flex: 0 0 auto !important;
+		width: 100%;
+		min-width: 0 !important;
+	}
+	.pf-cat-row-scroll {
+		flex: 0 0 auto;
+		width: 100%;
+	}
+
+	/* Hide desktop-only controls */
+}
+
+/* ─── Search + Sort wrapper ─────────────────────────────────────── */
+
+/* Wrapper that holds search and sort. Has flex-grow so it absorbs the
+   row's available space; inside, search grows to fill any space sort
+   isn't using. When sort collapses on focus, search expands naturally
+   because the wrapper itself stays the same size. */
+.pf-cat-search-sort {
+	display: flex;
+	align-items: center;
+	flex: 1 1 280px;
+	min-width: 220px;
+}
+
+/* ─── Search input ──────────────────────────────────────────────── */
+
+.pf-cat-search {
+	position: relative;
+	flex: 1 1 auto;
+	min-width: 0;
+	height: var(--pf-control-h);
+}
+
+.pf-cat-search-icon {
+	position: absolute;
+	left: 11px;
+	top: 50%;
+	transform: translateY(-50%);
+	width: 16px;
+	height: 16px;
+	color: var(--pf-text-dim);
+	pointer-events: none;
+	/* Above the input (which jumps to z-index 4 when searching) so the
+	   loupe stays visible over the input's white focused background. */
+	z-index: 5;
+}
+
+/* Absolutely positioned so its width can transition smoothly past
+   .pf-cat-search's own flex-basis (used for the "expand into sort's
+   space" effect when the input has focus or text). */
+.pf-cat-search-input {
+	position: absolute;
+	top: 0;
+	left: 0;
+	bottom: 0;
+	width: 100%;
+	/* Padding-right is small by default (no clear button visible). */
+	padding: 8px 14px 8px 38px !important;
+	border: 1px solid var(--pf-border-light) !important;
+	border-radius: var(--pf-radius-md) !important;
+	background: var(--pf-surface-alt) !important;
+	font-family: inherit;
+	font-size: 14px;
+	color: var(--pf-text) !important;
+	transition:
+		width 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+		padding 0.18s ease,
+		border-color 0.15s ease,
+		box-shadow 0.15s ease;
+}
+
+/* Once the user has typed something, make room for the clear button.
+   Wrapped in !important to beat the base padding's !important. */
+.pf-cat-search-input:not(:placeholder-shown) { padding-right: 38px !important; }
+
+.pf-cat-search-input:focus {
+	/* Bord transparent : règle globale input:focus. Anneau rouge + fond blanc. */
+	outline: none;
+	box-shadow: var(--pf-focus-ring-accent) !important;
+	background: var(--pf-surface) !important;
+}
+
+.pf-cat-search-input::placeholder { color: var(--pf-text-dim); }
+.pf-cat-search-input::-webkit-search-decoration,
+.pf-cat-search-input::-webkit-search-cancel-button,
+.pf-cat-search-input::-webkit-search-results-button,
+.pf-cat-search-input::-webkit-search-results-decoration { display: none; }
+
+.pf-cat-search-clear {
+	position: absolute;
+	right: 6px;
+	top: 50%;
+	transform: translateY(-50%);
+	display: none;
+	align-items: center;
+	justify-content: center;
+	width: 22px;
+	height: 22px;
+	border: none;
+	background: transparent;
+	color: var(--pf-text-dim);
+	font-size: 18px;
+	line-height: 1;
+	cursor: pointer;
+	border-radius: 50%;
+	z-index: 3;
+	transition: right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.pf-cat-search-clear:hover {
+	color: var(--pf-accent) !important;
+	background: none;
+	box-shadow: none;
+}
+
+/* Show the clear button only when the input contains text (placeholder hidden). */
+.pf-cat-search:has(.pf-cat-search-input:not(:placeholder-shown)) .pf-cat-search-clear {
+	display: flex;
+}
+
+/* Desktop "is-searching" — search expansion is now handled by the sort
+   collapsing inside the .pf-cat-search-sort wrapper (see Sort group
+   below). No manual width hack needed: the input is 100% of .pf-cat-search,
+   which grows via flex as sort shrinks within the shared wrapper. */
+
+/* ─── Sort group (criterion + direction) ────────────────────────── */
+
+.pf-cat-sort {
+	display: flex;
+	align-items: stretch;
+	gap: 0;
+	/* 8px visual gap from search; collapses to 0 along with max-width on focus. */
+	margin-left: 8px;
+	/* max-width: a large-enough upper bound so the natural width fits;
+	   the actual width is decided by content. Transitions cleanly to 0. */
+	max-width: 240px;
+	overflow: hidden;
+	transition: max-width 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+	            margin 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+	            opacity 0.2s ease;
+}
+
+/* On desktop, sort collapses when the search is focused/active. Because
+   sort lives in the .pf-cat-search-sort wrapper alongside search, the
+   wrapper's size stays constant — so search (flex-grow:1 inside the
+   wrapper) naturally expands into the freed space. */
+@media (min-width: 1024px) {
+	.pf-catalogue-bar.is-searching .pf-cat-sort {
+		max-width: 0;
+		margin-left: 0;
+		opacity: 0;
+		pointer-events: none;
+	}
+}
+
+.pf-cat-sort .pf-cat-dropdown .pf-cat-trigger {
+	border-top-right-radius: 0;
+	border-bottom-right-radius: 0;
+}
+
+.pf-cat-sort-dir {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 0 10px;
+	border: 1px solid var(--pf-border-light);
+	border-left: none;
+	border-top-left-radius: 0;
+	border-bottom-left-radius: 0;
+	border-top-right-radius: var(--pf-radius-md);
+	border-bottom-right-radius: var(--pf-radius-md);
+	background: var(--pf-cream);
+	color: var(--pf-text);
+	cursor: pointer;
+	font-size: 14px;
+	line-height: 1;
+	min-width: 36px;
+}
+
+.pf-cat-sort-dir:hover {
+	background: var(--pf-red-soft);
+	color: var(--pf-accent);
+	border-color: var(--pf-accent-border-soft);
+	box-shadow: none;
+}
+
+.pf-cat-sort-dir.is-active {
+	background: var(--pf-red-soft);
+	border-color: var(--pf-accent);
+	color: var(--pf-accent);
+}
+/* Inverted convention: DESC = ↑ (high to low, pointing down→up), ASC = ↓ */
+.pf-cat-sort-dir[data-sens="ASC"]  .pf-cat-arrow-desc,
+.pf-cat-sort-dir[data-sens="DESC"] .pf-cat-arrow-asc { display: none; }
+
+/* ─── Dropdown ──────────────────────────────────────────────────── */
+
+.pf-cat-dropdown { position: relative; }
+
+/* Corps du trigger fourni par .pf-dropdown__trigger (style.css).
+   Ci-dessous : seulement les états bespoke du catalogue. */
+.pf-cat-trigger:hover, .pf-cat-trigger:active, .pf-cat-trigger:focus {
+	border-color: var(--pf-accent-border-soft);
+	color: var(--pf-accent);
+	background: var(--pf-red-soft);
+	box-shadow: none;
+}
+
+.pf-cat-trigger:hover {
+	background: var(--pf-red-soft-strong) !important;
+}
+
+.pf-cat-dropdown.is-active .pf-cat-trigger {
+	border-color: var(--pf-accent);
+	color: var(--pf-accent);
+	background: var(--pf-red-soft);
+}
+
+.pf-cat-dropdown.is-open .pf-cat-trigger { border-color: var(--pf-accent); }
+
+.pf-cat-caret { font-size: 16px; line-height: 1; letter-spacing: -1px; }
+
+/* Corps du menu fourni par .pf-dropdown__menu (style.css ; position:fixed,
+   JS-positioned). Deltas bespoke conservés : plafonds de taille + scroll. */
+.pf-cat-menu {
+	max-width: 320px;
+	max-height: min(60vh, 480px);
+	overflow-y: auto;
+}
+
+/* Corps de l'option fourni par .pf-dropdown__option (+ :hover/.is-selected/.is-disabled). */
+
+.pf-cat-opt-count { color: var(--pf-text-dim); font-size: 12px; margin-left: auto; padding-left: 8px; }
+.pf-cat-option:hover:not(.is-disabled) .pf-cat-opt-count { color: var(--pf-accent); }
+
+.pf-cat-multi .pf-cat-option input[type="checkbox"] {
+	margin: 0;
+	accent-color: var(--pf-accent);
+}
+
+/* ─── Display segmented control ─────────────────────────────────── */
+
+/* Conteneur + segments fournis par .pf-switch / .pf-switch__btn (style.css).
+   Deltas bespoke : padding icône resserré + radius de jointure. */
+.pf-cat-display button {
+	padding: 8px 10px;
+}
+
+.pf-cat-display button:not(:last-child) {
+	border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+}
+
+.pf-cat-display button:last-child {
+	border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+}
+
+/* Option tranches grisée quand le format peut afficher des liseuses. */
+.pf-cat-display button:disabled {
+	opacity: 0.35;
+	cursor: not-allowed;
+}
+
+.pf-cat-display button:disabled:hover {
+	background: var(--pf-cream);
+	color: var(--pf-text);
+}
+
+.pf-cat-pdf.pf-cat-primary .pf-cat-trigger {
+	background: var(--pf-accent);
+	border-color: var(--pf-accent);
+	color: var(--pf-surface);
+}
+.pf-cat-pdf.pf-cat-primary .pf-cat-trigger:hover {
+	background: var(--pf-accent-dark);
+	border-color: var(--pf-accent-dark);
+	color: var(--pf-surface);
+}
+
+.pf-cat-pdf-link {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 16px;
+	padding: 8px 12px;
+	color: var(--pf-text);
+	text-decoration: none;
+	font-size: 14px;
+	border-radius: var(--pf-radius);
+}
+.pf-cat-pdf-link:hover { background: var(--pf-red-soft); color: var(--pf-accent); }
+.pf-cat-pdf-link svg { width: 14px; height: 14px; flex-shrink: 0; }
+
+/* ─── Chips ─────────────────────────────────────────────────────── */
+
+.pf-catalogue-chips {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+	align-items: center;
+}
+
+@media (max-width: 1023px) {
+	.pf-catalogue-chips {
+		flex-wrap: nowrap;
+		overflow-x: auto;
+		scrollbar-width: thin;
+	}
+	.pf-catalogue-chips > * { flex-shrink: 0; }
+}
+
+.pf-cat-chip {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	padding: 4px 6px 4px 10px;
+	margin-bottom: 10px;
+	border: 1px solid var(--pf-accent);
+	border-radius: 999px;
+	background: var(--pf-red-soft);
+	color: var(--pf-accent) !important;
+	font-family: inherit;
+	font-size: 12px;
+	cursor: pointer;
+	transition: background 0.15s ease;
+	box-shadow: none !important;
+}
+
+.pf-cat-chip:hover, .pf-cat-chip:focus, .pf-cat-chip:active { background: var(--pf-red-soft-strong); }
+
+.pf-cat-chip-x {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 16px;
+	height: 16px;
+	border-radius: 50%;
+	font-size: 14px;
+	line-height: 1;
+}
+
+.pf-cat-reset-all {
+	margin-left: auto;
+	padding: 4px 8px;
+	border: 0;
+	background: transparent;
+	color: var(--pf-text-dim);
+	font-family: inherit;
+	font-size: 12px;
+	text-decoration: underline;
+	cursor: pointer;
+}
+
+.pf-cat-reset-all:hover {
+	color: var(--pf-accent) !important;
+	background: none;
+	box-shadow: none;
+}
+.pf-cat-reset-all:active, .pf-cat-reset-all:focus {
+	color: var(--pf-text-dim);
+	background: none;
+	box-shadow: none;
+}
+
+@media (max-width: 1023px) { .pf-cat-reset-all { margin-left: 8px; } }
+
+/* ─── Hiérarchie visuelle entre les deux barres ─────────────────── */
+
+/* Top bar : légèrement plus grande (navigation principale) */
+.pf-catalogue-bar-top {
+	--pf-control-h: 40px;
+}
+
+.pf-catalogue-bar-top .pf-cat-univers-btn,
+.pf-catalogue-bar-top .pf-cat-trigger,
+.pf-catalogue-bar-top .pf-cat-format-btn {
+	font-size: 15px;
+}
+
+/* Barre principale : légèrement plus compacte (filtres utilitaires) */
+.pf-catalogue-bar:not(.pf-catalogue-bar-top) {
+	--pf-control-h: 34px;
+}
+
+.pf-catalogue-bar:not(.pf-catalogue-bar-top) .pf-cat-trigger,
+.pf-catalogue-bar:not(.pf-catalogue-bar-top) .pf-cat-search-input,
+.pf-catalogue-bar:not(.pf-catalogue-bar-top) .pf-cat-sort-dir {
+	font-size: 13px;
+}
+
+/* ─── Top bar (rayon switch + collection) ────────────────────────── */
+
+.pf-catalogue-bar-top {
+	flex-direction: row;
+	align-items: center;
+	padding: 8px 0 6px;
+	gap: 16px;
+	border-bottom: 1px solid var(--pf-border-light);
+}
+
+.pf-cat-univers {
+	display: inline-flex;
+	gap: 8px;
+	align-items: center;
+}
+
+.pf-cat-coll-pair {
+	display: flex;
+	align-items: stretch;
+}
+
+.pf-cat-coll-pair .pf-cat-univers-btn {
+	border: 1px solid color-mix(in srgb, var(--pf-text) 43%, transparent);
+	border-radius: var(--pf-radius-md) 0 0 var(--pf-radius-md);
+}
+
+.pf-cat-coll-pair .pf-cat-dropdown { display: flex; }
+
+.pf-cat-coll-pair .pf-cat-trigger {
+	border: 1px solid color-mix(in srgb, var(--pf-text) 43%, transparent);
+	border-radius: 0 var(--pf-radius-md) var(--pf-radius-md) 0;
+	border-left: none;
+	padding: 0 10px;
+	min-width: 36px;
+	justify-content: center;
+
+	.pf-cat-caret {
+		font-size: 20px;
+		letter-spacing: 0;
+	}
+}
+
+.pf-cat-univers-btn {
+	display: flex;
+	align-items: center;
+	gap: 5px;
+	padding: 8px 14px;
+	border: 0;
+	background: var(--pf-cream);
+	color: var(--pf-text);
+	font-family: inherit;
+	font-size: 14px;
+	font-weight: var(--pf-weight-semibold);
+	cursor: pointer;
+	white-space: nowrap;
+	transition: background 0.15s ease, color 0.15s ease;
+}
+
+.pf-cat-coll-pair .pf-cat-univers-btn.is-active { border-color: var(--pf-accent); }
+.pf-cat-univers-btn.is-active        { background: var(--pf-red-soft); color: var(--pf-accent); box-shadow: none; }
+.pf-cat-univers-btn:not(.is-active):hover { background: var(--pf-red-soft-strong); color: var(--pf-accent); box-shadow: none; }
+
+/* ─── Format switch ──────────────────────────────────────────────── */
+
+/* Conteneur + segments fournis par .pf-switch / .pf-switch__btn (style.css).
+   Delta bespoke : poussé à droite de la top bar. */
+.pf-cat-format-switch {
+	margin-left: auto;
+}
+
+
+/* Le trigger "Autres formats" s'intègre dans le switch format sans bordure propre */
+.pf-cat-format-switch .pf-cat-dropdown { display: flex; }
+.pf-cat-format-switch .pf-cat-trigger  {
+	border: 0;
+	border-radius: 0;
+}
+
+
+/* Non-clickable header labels in the collection dropdown default group */
+.pf-cat-cat-header {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	padding: 8px 12px 3px;
+	font-size: 11px;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.06em;
+	color: var(--pf-text-dim);
+	pointer-events: none;
+	user-select: none;
+}
+.pf-cat-cat-header:first-child { padding-top: 4px; }
+
+@media (max-width: 1023px) {
+	.pf-catalogue-bar-top { flex-wrap: wrap; gap: 8px; padding: 6px 0 4px; }
+	.pf-cat-univers-btn   { font-size: 14px; }
+}
+
+/* ─── Grid AJAX loading state ───────────────────────────────────── */
+
+.pf-catalogue-grid.is-loading { opacity: 0.5; transition: opacity 0.15s ease; pointer-events: none; }

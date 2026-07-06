@@ -1,0 +1,81 @@
+/* ============================================================
+   Page auteur individuelle — /auteur/{slug}/
+   ============================================================ */
+
+#wrapper {
+   background-color: var(--pf-surface-alt);
+}
+
+.pf-auteur-single {
+    max-width: 780px;
+    margin: 0 auto;
+}
+
+/* Titre */
+.pf-auteur-single-header {
+    margin-bottom: var(--pf-space-10);
+}
+
+.pf-auteur-single-prenom {
+    font-weight: var(--pf-weight-bold);
+}
+
+/* Corps — photo flottante + bio qui s'écoule */
+.pf-auteur-single-corps {
+    overflow: hidden; /* clearfix */
+}
+
+/* Photo */
+.pf-auteur-single-photo {
+    float: left;
+    width: 25%;
+    margin: 0 var(--pf-space-4) 0 0;
+}
+
+.pf-auteur-single-photo img {
+    width: 100%;
+    height: auto;
+    display: block;
+    border-radius: 6px;
+}
+
+/* Biographie */
+.pf-auteur-single-bio-contenu {
+    font-size: 1rem;
+    line-height: var(--pf-leading-relaxed);
+    color: var(--pf-text);
+}
+
+.pf-auteur-single-bio-contenu p {
+    margin-bottom: 1em;
+}
+
+.pf-auteur-single-bio-contenu p:first-child {
+    margin-top: 0;
+}
+
+@media (max-width: 600px) {
+    .pf-auteur-single-photo {
+        float: none;
+        width: 50%;
+        margin: 0 auto var(--pf-space-6);
+    }
+}
+
+/* Titres de section (livres, événements) — style commun */
+.pf-auteur-livres-titre,
+.pf-auteur-events-titre {
+    margin: 0 0 var(--pf-space-5);
+}
+
+/* Sections séparées (livres, événements) */
+.pf-auteur-livres,
+.pf-auteur-events {
+    margin-top: var(--pf-space-8);
+    padding-top: var(--pf-space-8);
+    border-top: 1px solid var(--pf-border);
+}
+
+.pf-auteur-livres-section + .pf-auteur-livres-section {
+    margin-top: var(--pf-space-8);
+}

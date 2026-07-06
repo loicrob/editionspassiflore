@@ -1,0 +1,57 @@
+/* ============================================================
+   Trombinosocope des auteurs — /auteurs
+   ============================================================ */
+
+.content-area {
+    margin-top: 0;
+}
+
+/* Grille */
+.pf-auteurs-grille {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: var(--pf-space-6);
+}
+
+@media (max-width: 1024px) {
+    .pf-auteurs-grille {
+        grid-template-columns: repeat(4, 1fr);
+    }
+}
+
+@media (max-width: 768px) {
+    .pf-auteurs-grille {
+        grid-template-columns: repeat(3, 1fr);
+        gap: var(--pf-space-5);
+    }
+}
+
+@media (max-width: 480px) {
+    .pf-auteurs-grille {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+/* La carte auteur (.pf-card + composant carte auteur) et le champ de recherche
+   (composant générique .pf-search) sont définis globalement dans style.css.
+   Ne reste ici que ce qui est propre à la page /auteurs. */
+
+/* ============================================================
+   Barre de recherche — uniquement sur /auteurs.
+   Conteneur sticky + smart-hide : .pf-sticky-bar. Champ : .pf-search (style.css).
+   ============================================================ */
+
+/* La barre porte la classe commune .pf-sub-header (padding) — cf. style.css. */
+
+/* Grille de résultats — états */
+.pf-rech-grid.is-loading {
+    opacity: 0.5;
+    transition: opacity 0.15s ease;
+    pointer-events: none;
+}
+
+.pf-rech-vide {
+    text-align: center;
+    color: var(--pf-muted);
+    padding: var(--pf-space-8) 0;
+}

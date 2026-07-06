@@ -1,0 +1,1192 @@
+/* ═══════════════════════════════════════════════════════════════
+   Passiflore Bookshelf — Étagère de livres
+   Modes : covers (couverture face) | spines (tranche face)
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ─── Container ──────────────────────────────────────────────── */
+
+.pf-bookshelf {
+	--plank-h: 44px;
+	--plank-front: 8px;
+	--plank-color-top: #d4c4a8;
+	--plank-color-front: #c0ad8e;
+	--plank-color-dark: #a89474;
+	--wall-color: var(--pf-surface);
+	--frame-color: #e0d8cc;
+	--pf-red: var(--pf-accent);
+	--device-color: #2a2a2c;
+	font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+	background: var(--wall-color);
+	border: 1px solid var(--frame-color);
+	border-radius: var(--pf-radius-card);
+	box-shadow:
+		inset 0 0 30px rgba(0, 0, 0, 0.03),
+		0 2px 12px rgba(0, 0, 0, 0.06);
+}
+
+.pf-bookshelf--shelves {
+	display: flex;
+	flex-direction: column;
+}
+
+/* ─── Shelf ──────────────────────────────────────────────────── */
+
+.pf-shelf {
+	position: relative;
+	background: var(--wall-color);
+	border-radius: var(--pf-radius-card);
+}
+
+
+.pf-shelf-books {
+	display: flex;
+	align-items: flex-end;
+	gap: 18px;
+	padding: 40px 40px 3px 40px;
+	min-height: var(--shelf-inner);
+	position: relative;
+	z-index: 2;
+}
+
+.pf-bookshelf--scroll .pf-shelf {
+	/* Un scroller rogne TOUJOURS au padding-box, sur les deux axes
+	   (overflow-y:clip serait converti en hidden, et overflow-clip-margin
+	   resterait sans effet). Plutôt que d'agrandir le container, c'est le
+	   JS qui rentre le livre saisi/survolé via --reveal-dy / --hover-dy
+	   quand son empreinte agrandie toucherait le bord haut. */
+	overflow-x: auto;
+	overflow-y: hidden;
+	scroll-behavior: smooth;
+	scrollbar-width: thin;
+	scrollbar-color: var(--plank-color-dark) transparent;
+	-webkit-overflow-scrolling: touch;
+}
+
+.pf-bookshelf--scroll .pf-shelf::-webkit-scrollbar {
+	height: 6px;
+}
+
+.pf-bookshelf--scroll .pf-shelf::-webkit-scrollbar-track {
+	background: transparent;
+}
+
+.pf-bookshelf--scroll .pf-shelf::-webkit-scrollbar-thumb {
+	background: var(--plank-color-dark);
+	border-radius: 3px;
+}
+
+.pf-bookshelf--scroll .pf-shelf-inner {
+	display: flex;
+	flex-direction: column;
+	width: max-content;
+	min-width: 100%;
+}
+
+/* Les deux modes gardent le min-width:100% de base : peu de livres → l'inner
+   (donc la planche) occupe toute la largeur du rayon, livres tassés à gauche
+   et étagère vide à droite (un vrai rayon partiellement rempli) ; beaucoup →
+   max-content prend le dessus et on défile. Sans ça (covers shrink-wrappait
+   l'inner à la largeur des couvertures), la planche s'arrêtait au dernier
+   livre en laissant un mur nu à droite. */
+
+/* Mode spines : chaque tranche porte un .pf-pages-ghost décoratif dont la
+   boîte fait (cover-w-base + spine-w) de large, masqué au repos par son
+   clip-path. Mais clip-path ne réduit pas la boîte de mise en page : ces
+   fantômes débordent .pf-shelf-inner à droite et gonflent le scrollWidth du
+   .pf-shelf de ~200-300px → zone de défilement morte à droite (mur sans
+   planche) au-delà du dernier livre. On rogne ce débordement décoratif
+   horizontal au niveau de l'inner (l'axe vertical reste visible : le pop-up
+   de survol monte toujours, rogné par le scroller comme avant). La
+   couverture saisie reste visible : le JS la rentre dans la fenêtre
+   (--reveal-dx), désormais ⊆ boîte de l'inner. */
+.pf-bookshelf--scroll.pf-bookshelf--spines .pf-shelf-inner {
+	overflow-x: clip;
+	overflow-y: visible;
+}
+
+.pf-bookshelf--scroll .pf-shelf-books {
+	flex-wrap: nowrap;
+}
+
+.pf-bookshelf--shelves .pf-shelf-books {
+	flex-wrap: nowrap;
+	justify-content: center;
+}
+
+/* Spines mode: books touch like on a real bookshelf */
+.pf-bookshelf--spines .pf-shelf-books {
+	gap: 2px;
+	padding: 40px 40px 0 40px;
+}
+
+/* Planche plus haute quand les chevalets de prix sont affichés :
+   le ::before (dessus en bois) prend plus de place pour que les
+   cartes de prix reposent visuellement sur une surface plus large. */
+.pf-bookshelf--show-price.pf-bookshelf--covers {
+	--plank-h: 58px;
+}
+
+/* ─── Plank (3D wooden shelf) ────────────────────────────────── */
+
+.pf-shelf-plank {
+	position: relative;
+	top: calc(-0.9 * var(--plank-h));
+	z-index: 1;
+	height: calc(var(--plank-h) + var(--plank-front));
+	margin-left: 20px;
+	margin-right: 20px;
+}
+
+.pf-shelf-plank::before {
+	content: '';
+	display: block;
+	height: var(--plank-h);
+	background:
+		linear-gradient(to bottom, rgba(255,255,255,0.2) 0%, transparent 40%, rgba(0,0,0,0.03) 100%),
+		linear-gradient(to right, var(--plank-color-top) 0%, #ddd0b8 20%, var(--plank-color-top) 50%, #d8c8a4 80%, var(--plank-color-top) 100%);
+	border-top: 1px solid rgba(255, 255, 255, 0.35);
+	clip-path: polygon(20px 0%, calc(100% - 20px) 0%, 100% 100%, 0% 100%);
+}
+
+.pf-shelf-plank::after {
+	content: '';
+	display: block;
+	height: var(--plank-front);
+	background: linear-gradient(to bottom, var(--plank-color-front) 0%, var(--plank-color-dark) 100%);
+	border-top: 1px solid rgba(255, 255, 255, 0.1);
+	box-shadow:
+		0 4px 16px -2px rgba(0, 0, 0, 0.22),
+		0 2px 6px -1px rgba(0, 0, 0, 0.12);
+	border-radius: 2px;
+}
+
+/* ─── Book Item (common) ─────────────────────────────────────── */
+
+/* The DOM is identical in both modes. Each book has:
+   - .pf-book-inside     (white interior — visible when the cover swings open)
+   - .pf-book-spine      (spine: tranche image, generated, or device edge)
+   - .pf-book-cover      (front cover image / e-reader screen)
+   - .pf-book-pages      (top face: page-edges band — covers mode)
+   - .pf-book-held-deco  (spines only: covers-anatomy ghost spine + pages,
+                          shown once the grabbed book lands face-on)
+   CSS below dispatches the positioning per mode. */
+
+.pf-book {
+	display: inline-flex;
+	flex-direction: column;
+	align-items: center;
+	flex-shrink: 0;
+	position: relative;
+	text-decoration: none;
+	z-index: 2;
+}
+
+/* Ombre de contact sur la planche — ancre visuellement le livre au bois.
+   Positionnée depuis le haut (--book-h) pour rester au pied du livre même
+   quand le wrapper a un padding-bas (chevalet en mode covers). */
+.pf-book::after {
+	content: '';
+	position: absolute;
+	top: calc(var(--book-h) - 3px);
+	left: 6%;
+	right: 6%;
+	height: 7px;
+	background: radial-gradient(ellipse at center, rgba(50, 35, 18, 0.25), rgba(50, 35, 18, 0) 70%);
+	pointer-events: none;
+	z-index: -1;
+	transition: opacity 0.3s ease;
+}
+
+.pf-book--has-price {
+	z-index: 3;
+}
+
+/* En covers, le livre est assis au fond de la planche pour laisser la
+   place du chevalet devant lui. */
+.pf-bookshelf--covers .pf-book--has-price {
+	padding-bottom: 30px;
+}
+
+.pf-book-inner {
+	position: relative;
+	height: var(--book-h);
+	transform-style: preserve-3d;
+	transition: transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.pf-book-cover,
+.pf-book-spine,
+.pf-book-pages,
+.pf-book-inside {
+	position: absolute;
+}
+
+.pf-book-cover img,
+.pf-book-spine > img,
+.pf-spine-ghost > img {
+	display: block;
+	width: 100%;
+	height: 100%;
+	object-fit: fill;
+}
+
+.pf-book-nocover {
+	width: 100%;
+	height: 100%;
+	background: linear-gradient(135deg, #a09080, #8a7a6a);
+}
+
+/* ─── Mode COVERS — cover flat, spine 2D parallelogram on left ─ */
+
+.pf-bookshelf--covers .pf-book {
+	perspective: 1500px;
+}
+
+/* L'ombre du volume vit sur .pf-book-inner (la boîte du livre lui-même),
+   pas sur le wrapper : elle ne bave plus sous le livre quand le wrapper
+   porte le padding du chevalet. */
+.pf-bookshelf--covers .pf-book-inner {
+	width: calc(var(--cover-w) + var(--spine-w));
+	box-shadow: -11px -11px 8px 0px rgb(0 0 0 / 10%);
+}
+
+/* Le hover scale s'applique à l'inner (pas au wrapper) : le chevalet —
+   frère de l'inner — reste parfaitement immobile, et le livre agrandi
+   passe devant lui (z-index 6 > 5). --hover-dx / --hover-dy (posés par
+   JS) rentrent le livre quand il touche un bord du container en mode
+   scroll. */
+.pf-bookshelf--covers .pf-book:hover .pf-book-inner,
+.pf-bookshelf--covers .pf-book:focus-visible .pf-book-inner {
+	transform: translate(var(--hover-dx, 0px), var(--hover-dy, 0px)) scale(1.1);
+	z-index: 6;
+}
+
+.pf-bookshelf--covers .pf-book:hover,
+.pf-bookshelf--covers .pf-book:focus-visible {
+	z-index: 6;
+}
+
+/* White interior — same dimensions as the cover, hidden behind it.
+   Revealed at hover when the cover swings open. */
+.pf-bookshelf--covers .pf-book-inside {
+	top: 0;
+	left: var(--spine-w);
+	width: var(--cover-w);
+	height: 100%;
+	background: var(--pf-cream-dark);
+	box-shadow: inset 6px 0 10px -4px rgba(0, 0, 0, 0.12);
+	border-radius: 0 2px 2px 0;
+	z-index: 1;
+}
+
+.pf-bookshelf--covers .pf-book-cover {
+	top: 0;
+	left: var(--spine-w);
+	width: var(--cover-w);
+	height: 100%;
+	overflow: hidden;
+	background: #fff;
+	box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.15);
+	border-radius: 0 2px 2px 0;
+	transform-origin: left center;
+	transition: transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+	z-index: 2;
+}
+
+/* Spine rendered as a thin skewed parallelogram on the left. Whatever
+   sits inside (.pf-spine-generated or an <img>) follows the skew. The
+   ::before overlay restores a hand-drawn depth gradient on top of the
+   custom background so spines without a tranche image still feel 3D. */
+.pf-bookshelf--covers .pf-book-spine {
+	top: 0;
+	left: 0;
+	width: var(--spine-w);
+	height: 100%;
+	transform: skewY(14deg);
+	transform-origin: right center;
+	background-color: #4a3f35;
+	overflow: hidden;
+	box-shadow: -1px 0 3px rgba(0, 0, 0, 0.15);
+	z-index: 1;
+	border-radius: 2px 0 0 2px;
+}
+
+.pf-bookshelf--covers .pf-book-spine::before {
+	content: '';
+	position: absolute;
+	inset: 0;
+	background: rgba(0, 0, 0, 0.1);
+	pointer-events: none;
+	z-index: 2;
+}
+
+/* Page edges seen from above — parallelogram on top of the book,
+   in continuity with the spine's top edge. Always visible. */
+.pf-bookshelf--covers .pf-book-pages {
+	top: calc(-1 * var(--spine-w) * 0.249);
+	left: 1px;
+	width: calc(var(--cover-w) + var(--spine-w) - 1px);
+	height: calc(var(--spine-w) * 0.249);
+	clip-path: polygon(0 0, var(--cover-w) 0, 100% 100%, var(--spine-w) 100%);
+	background:
+		linear-gradient(to bottom, rgba(0, 0, 0, 0.18), rgba(0, 0, 0, 0)),
+		repeating-linear-gradient(
+			to bottom,
+			#f6f1e2 0px,
+			#f6f1e2 0.7px,
+			#d8d0bd 0.7px,
+			#d8d0bd 1.4px
+		);
+	pointer-events: none;
+	z-index: 3;
+}
+
+.pf-bookshelf--covers .pf-book:hover .pf-book-cover,
+.pf-bookshelf--covers .pf-book:focus-visible .pf-book-cover {
+	/* --cover-angle is set per-book by JS from the cursor's horizontal
+	   position over the cover (0deg at the left edge → -25deg at the
+	   right edge). Fallback -25deg covers the brief interval before the
+	   first mousemove and any keyboard-only focus reveal. */
+	transform: rotateY(var(--cover-angle, -25deg));
+}
+
+/* Pas de déco fantôme en covers (elle réplique l'anatomie déjà là). */
+.pf-bookshelf--covers .pf-book-held-deco {
+	display: none;
+}
+
+/* ─── Mode SPINES — livre 3D rigide, saisi puis tourné face au lecteur ─
+
+   Au repos le livre est un vrai volume : la tranche (face avant) dans le
+   plan de l'étagère, la couverture accrochée au bord droit de la tranche
+   et repliée à 90° vers le fond du rayonnage (invisible de face), le
+   bloc pages blanc (.pf-book-inside) 1.5px derrière la couverture dans
+   le même plan.
+
+   Survol (étape 1) : le livre se déboîte — simple translation vers le
+   lecteur, comme un doigt qui tire la tranche.
+
+   Saisie (étape 2, classe .pf-book--cover-revealed posée par JS, sans
+   :hover pour fonctionner aussi au tap) : le volume ENTIER pivote de
+   -90° autour de son arête avant-gauche et atterrit sur le plan z=0
+   (translateZ(-spine-w)) : la couverture finit face au lecteur, au
+   pixel près sur le plan 2D. À ce moment la déco .pf-book-held-deco
+   (tranche biseautée + bandeau de pages, l'anatomie covers exacte) se
+   fond par-dessus — sans couture possible puisque tout est à z=0. Le
+   livre saisi a alors la même apparence qu'un livre covers survolé,
+   et --cover-angle (curseur) ouvre la couverture à l'identique.
+
+   La largeur du wrapper reste --spine-w-base en permanence : les
+   voisins ne bougent jamais, le livre saisi les recouvre simplement.
+   --reveal-dx (posé par JS) recentre la couverture sur la tranche et
+   la recale quand le livre est trop près d'un bord du container.
+   L'inner et la déco partagent le même préfixe de transformation
+   (translateX(--reveal-dx) scale(1.1), origine left bottom) pour
+   rester rigoureusement alignés. */
+
+.pf-bookshelf--spines .pf-book {
+	width: var(--spine-w-base);
+	min-width: 0;
+	perspective: 1200px;
+}
+
+.pf-bookshelf--spines .pf-book-inner {
+	width: var(--spine-w);
+	transform-origin: left bottom;
+	transition: transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.pf-bookshelf--spines .pf-book-spine {
+	top: 0;
+	left: 0;
+	width: var(--spine-w);
+	height: 100%;
+	overflow: hidden;
+	box-shadow:
+		inset -2px 0 4px -2px rgba(0, 0, 0, 0.25),
+		1px 1px 4px rgba(0, 0, 0, 0.18);
+	border-radius: 2px;
+}
+
+/* Couverture : pleine largeur dès le départ, simplement repliée à 90°
+   vers le fond (edge-on → projection nulle). `visibility: hidden` évite
+   le liseré de projection à exactement 90° et masque l'<img> tant que
+   son data-src n'est pas chargé. */
+.pf-bookshelf--spines .pf-book-cover {
+	top: 0;
+	left: var(--spine-w);
+	width: var(--cover-w-base);
+	height: 100%;
+	overflow: hidden;
+	background: #fff;
+	box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.15);
+	border-radius: 0 2px 2px 0;
+	transform-origin: left center;
+	transform: rotateY(90deg);
+	visibility: hidden;
+	pointer-events: none;
+	transition:
+		transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+		visibility 0s 0.45s;
+}
+
+/* Bloc pages : même plan que la couverture au repos, 1.5px en retrait
+   pour éviter le z-fighting quand la couverture est fermée dessus. */
+.pf-bookshelf--spines .pf-book-inside {
+	top: 0;
+	left: var(--spine-w);
+	width: var(--cover-w-base);
+	height: 100%;
+	background: white;
+	box-shadow: inset 6px 0 10px -4px rgba(0, 0, 0, 0.12);
+	border-radius: 0 2px 2px 0;
+	transform-origin: left center;
+	transform: rotateY(90deg) translateZ(-1.5px);
+	visibility: hidden;
+}
+
+/* Le volume en perspective rend le bandeau pages-dessus inutile au repos. */
+.pf-bookshelf--spines .pf-book-pages {
+	display: none;
+}
+
+/* Étape 1 — déboîtage au survol : le livre sort légèrement du rang. */
+.pf-bookshelf--spines .pf-book:hover .pf-book-inner,
+.pf-bookshelf--spines .pf-book:focus-visible .pf-book-inner {
+	transform: translateZ(16px);
+}
+
+.pf-bookshelf--spines .pf-book:hover,
+.pf-bookshelf--spines .pf-book:focus-visible,
+.pf-bookshelf--spines .pf-book.pf-book--cover-revealed {
+	z-index: 10;
+}
+
+/* Étape 2 — saisie : rotation rigide du volume autour de l'arête
+   avant-gauche, atterrissage sur z=0. (Sélecteur .pf-book.pf-book--…
+   pour battre la spécificité du :hover d'étape 1.) */
+.pf-bookshelf--spines .pf-book.pf-book--cover-revealed .pf-book-inner {
+	transform:
+		translateX(var(--reveal-dx, 0px))
+		translateY(var(--reveal-dy, 0px))
+		scale(1.1)
+		translateZ(calc(-1 * var(--spine-w)))
+		rotateY(-90deg);
+	transition: transform 0.5s cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+/* Une fois saisi, la couverture se manipule comme en mode covers :
+   l'angle net vu du lecteur vaut exactement var(--cover-angle)
+   (-90° du volume + 90° de pli + angle curseur). */
+.pf-bookshelf--spines .pf-book.pf-book--cover-revealed .pf-book-cover {
+	transform: rotateY(calc(90deg + var(--cover-angle, 0deg)));
+	visibility: visible;
+	pointer-events: auto;
+	transition:
+		transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+		visibility 0s 0s;
+}
+
+.pf-bookshelf--spines .pf-book.pf-book--cover-revealed .pf-book-inside {
+	visibility: visible;
+}
+
+/* Le livre a quitté la planche : son ombre de contact s'estompe. */
+.pf-bookshelf--spines .pf-book.pf-book--cover-revealed::after {
+	opacity: 0;
+}
+
+/* ─── Déco « livre en main » (spines) ────────────────────────────
+   Boîte alignée sur l'inner (même géométrie, même origine, même préfixe
+   de transformation — sans la rotation 3D). Au repos, la tranche fantôme
+   recouvre exactement la tranche réelle et le bandeau de pages est replié
+   sur l'arête supérieure : la déco apparaît dès le début de la saisie
+   (crossfade invisible) puis ses enfants MORPHENT vers l'anatomie covers
+   — la tranche glisse à gauche en prenant son biseau, le bandeau se
+   déploie — pendant que le volume réel pivote. Pas d'apparition brusque :
+   à l'atterrissage tout est déjà en place. */
+
+/* Les transitions de FERMETURE (règles repos, ci-dessous) doivent copier
+   exactement celles du retour de l'inner — 0.3s easeOutQuad — sinon le
+   fantôme traîne derrière le volume déjà rangé et les deux tranches
+   apparaissent côte à côte. Celles d'OUVERTURE (règles saisies) gardent
+   leurs 0.5s. */
+.pf-book-held-deco {
+	position: absolute;
+	top: 0;
+	left: 0;
+	width: var(--spine-w);
+	height: var(--book-h);
+	transform-origin: left bottom;
+	transform: none;
+	opacity: 0;
+	pointer-events: none;
+	/* Le fondu s'achève avec l'atterrissage (0.2s + 0.1s = 0.3s), et le
+	   z-index remonte immédiatement : le fantôme recouvre la tranche
+	   réelle pendant tout le retour. */
+	transition:
+		transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+		opacity 0.1s linear 0.2s,
+		z-index 0s;
+	z-index: 2;
+}
+
+.pf-bookshelf--spines .pf-book.pf-book--cover-revealed .pf-book-held-deco {
+	transform:
+		translateX(var(--reveal-dx, 0px))
+		translateY(var(--reveal-dy, 0px))
+		scale(1.1);
+	opacity: 1;
+	/* Une fois le livre posé (fin du vol), la déco passe SOUS l'inner :
+	   le bandeau de pages se retrouve derrière la couverture, qui passe
+	   donc devant quand le curseur l'ouvre — comme en mode covers. */
+	z-index: -1;
+	transition:
+		transform 0.5s cubic-bezier(0.22, 0.61, 0.36, 1),
+		opacity 0.1s linear 0s,
+		z-index 0s 0.45s;
+}
+
+/* Tranche fantôme. Au repos : un cran à droite (sur la tranche réelle),
+   sans biseau. Saisie : glisse sur [-spine-w, 0] et prend le biseau
+   covers. Le léger ease-in suit la projection du volume qui pivote (en
+   cos θ : elle s'attarde près du repos avant de filer). */
+.pf-spine-ghost {
+	position: absolute;
+	top: 0;
+	left: calc(-1 * var(--spine-w));
+	width: var(--spine-w);
+	height: 100%;
+	transform: translateX(var(--spine-w)) skewY(0deg);
+	transform-origin: right center;
+	background-color: #4a3f35;
+	overflow: hidden;
+	box-shadow: -1px 0 3px rgba(0, 0, 0, 0.15);
+	border-radius: 2px 0 0 2px;
+	transition: transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.pf-bookshelf--spines .pf-book.pf-book--cover-revealed .pf-spine-ghost {
+	transform: translateX(0px) skewY(14deg);
+	transition: transform 0.5s cubic-bezier(0.5, 0, 0.3, 1);
+}
+
+/* L'assombrissement covers n'apparaît qu'avec le biseau. */
+.pf-spine-ghost::before {
+	content: '';
+	position: absolute;
+	inset: 0;
+	background: rgba(0, 0, 0, 0.1);
+	pointer-events: none;
+	z-index: 2;
+	opacity: 0;
+	transition: opacity 0.3s linear;
+}
+
+.pf-bookshelf--spines .pf-book.pf-book--cover-revealed .pf-spine-ghost::before {
+	opacity: 1;
+	transition: opacity 0.5s linear;
+}
+
+/* Bandeau de pages. Au repos : replié sur l'arête supérieure de la
+   tranche (clip-path écrasé sur la ligne du haut du livre). Saisie : se
+   déploie vers la droite et le haut — le clip révèle le motif de pages
+   sans l'étirer. Il reste toujours en retrait du bord droit de la
+   couverture en vol (les sommets progressent linéairement, la projection
+   de la couverture en sin θ va plus vite). */
+.pf-pages-ghost {
+	position: absolute;
+	top: calc(-1 * var(--spine-w) * 0.249);
+	left: calc(-1 * var(--spine-w) + 1px);
+	width: calc(var(--cover-w-base) + var(--spine-w) - 1px);
+	height: calc(var(--spine-w) * 0.249);
+	clip-path: polygon(
+		calc(var(--spine-w) - 1px) 100%,
+		calc(2 * var(--spine-w) - 1px) 100%,
+		calc(2 * var(--spine-w) - 1px) 100%,
+		calc(var(--spine-w) - 1px) 100%
+	);
+	background:
+		linear-gradient(to bottom, rgba(0, 0, 0, 0.18), rgba(0, 0, 0, 0)),
+		repeating-linear-gradient(
+			to bottom,
+			#f6f1e2 0px,
+			#f6f1e2 0.7px,
+			#d8d0bd 0.7px,
+			#d8d0bd 1.4px
+		);
+	transition: clip-path 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.pf-bookshelf--spines .pf-book.pf-book--cover-revealed .pf-pages-ghost {
+	clip-path: polygon(0 0, var(--cover-w-base) 0, 100% 100%, var(--spine-w) 100%);
+	transition: clip-path 0.5s cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+/* ─── Liseuse (livres numériques) ────────────────────────────────
+   L'appareil remplace le livre : une ardoise plate aux coins arrondis,
+   sans tranche papier ni bandeau de pages (le PHP n'émet ni spine ni
+   pages en covers). L'écran épouse le ratio de la couverture (largeur
+   calculée côté PHP : écran = hauteur − bezels, padding 7px/20px
+   ci-dessous), donc la couverture s'affiche en entier. La couverture
+   d'une liseuse ne s'ouvre pas. */
+
+.pf-bookshelf--covers .pf-book--ereader .pf-book-inner {
+	width: var(--cover-w);
+	box-shadow: none; /* l'ombre suit les coins arrondis de l'appareil */
+}
+
+.pf-bookshelf--covers .pf-book--ereader .pf-book-cover {
+	left: 0;
+	box-shadow:
+		-11px -11px 8px 0px rgb(0 0 0 / 10%),
+		2px 2px 10px rgba(0, 0, 0, 0.15);
+}
+
+.pf-book--ereader .pf-book-cover {
+	background: var(--device-color);
+	border-radius: 9px;
+	padding: 7px 7px 24px;
+	box-sizing: border-box;
+}
+
+/* Écran de la liseuse : fond blanc, clipe les débordements de l'image. */
+.pf-ereader-screen {
+	position: relative;
+	width: 100%;
+	height: 100%;
+	background: #fff;
+	overflow: hidden;
+	border-radius: 3px;
+}
+
+.pf-book--ereader .pf-book-cover img {
+	object-fit: contain;
+}
+
+/* Bouton d'accueil simulé : pastille ronde blanche, logo Passiflore. */
+.pf-ereader-brand {
+	position: absolute;
+	bottom: 6px;
+	left: 50%;
+	transform: translateX(-50%);
+	width: 14px;
+	height: 14px;
+	border-radius: 50%;
+	background: #fff;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.pf-ereader-brand .pf-spine-icon,
+.pf-ereader-brand img {
+	width: 10px;
+	max-width: none;
+	height: 10px;
+	display: block;
+}
+
+/* L'écran ne s'ouvre pas — sauf en hero avec extrait, où la couverture
+   pivote à −35° pour révéler "Extrait →". */
+.pf-bookshelf--covers .pf-book--ereader:not(.pf-book--has-extract):hover .pf-book-cover,
+.pf-bookshelf--covers .pf-book--ereader:not(.pf-book--has-extract):focus-visible .pf-book-cover {
+	transform: none;
+}
+
+.pf-bookshelf--spines .pf-book--ereader.pf-book--cover-revealed .pf-book-cover {
+	transform: rotateY(90deg);
+}
+
+/* Chant de liseuse (mode spines, hors catalogue) : version sombre de la
+   tranche générée, coins arrondis. */
+.pf-spine-generated--device {
+	border-radius: 4px;
+	color: #c8c8cc;
+}
+
+.pf-bookshelf--spines .pf-book--ereader .pf-book-spine {
+	border-radius: 4px;
+}
+
+/* ─── Boîtier CD (livres audio) ──────────────────────────────────
+   Boîtier cristal aux dimensions standard (142×125×10 mm) : jaquette
+   sous un couvercle plastique brillant, charnière striée sur le bord
+   gauche du couvercle, plateau sombre visible quand la jaquette ne
+   remplit pas la face. Toute l'anatomie (tranche biseautée — l'insert
+   papier du dos —, bandeau supérieur, saisie spines) est conservée. */
+
+.pf-book--cd .pf-book-cover {
+	background: #1c1c1f;
+}
+
+.pf-book--cd .pf-book-cover img {
+	object-fit: contain;
+	background: #131316;
+}
+
+/* Couvercle plastique : reflet diagonal + stries de charnière à gauche
+   (sur le couvercle : elles s'ouvrent avec lui). */
+.pf-book--cd .pf-book-cover::after {
+	content: '';
+	position: absolute;
+	inset: 0;
+	background:
+		repeating-linear-gradient(
+			to bottom,
+			rgba(255, 255, 255, 0.16) 0px,
+			rgba(255, 255, 255, 0.16) 1.5px,
+			rgba(0, 0, 0, 0.30) 1.5px,
+			rgba(0, 0, 0, 0.30) 5px,
+			rgba(0, 0, 0, 0.08) 5px,
+			rgba(0, 0, 0, 0.08) 24px
+		) left / 8px 100% no-repeat,
+		linear-gradient(
+			105deg,
+			rgba(255, 255, 255, 0.30) 2%,
+			rgba(255, 255, 255, 0.08) 22%,
+			rgba(255, 255, 255, 0) 40%,
+			rgba(255, 255, 255, 0) 80%,
+			rgba(255, 255, 255, 0.10) 97%
+		);
+	pointer-events: none;
+}
+
+/* Épaisseur du boîtier : plastique sombre, pas de papier. */
+.pf-book--cd .pf-book-pages,
+.pf-book--cd .pf-pages-ghost {
+	background:
+		linear-gradient(to bottom, rgba(0, 0, 0, 0.30), rgba(0, 0, 0, 0.05)),
+		#35353a;
+}
+
+/* ─── Generated spine (no tranche image) ─────────────────────── */
+
+.pf-spine-generated {
+	width: 100%;
+	height: 100%;
+	background: var(--spine-bg, var(--pf-red));
+	position: relative;
+	display: flex;
+	flex-direction: column;
+	justify-content: space-between;
+	align-items: center;
+	padding: 8px 2px 6px;
+	box-sizing: border-box;
+	color: #fff;
+	overflow: hidden;
+}
+
+.pf-spine-generated::before,
+.pf-spine-generated::after {
+	content: '';
+	position: absolute;
+	top: 0;
+	bottom: 0;
+	width: 2px;
+	pointer-events: none;
+}
+
+.pf-spine-generated::before {
+	left: 0;
+	background: linear-gradient(to right, rgba(0, 0, 0, 0.35), transparent);
+}
+
+.pf-spine-generated::after {
+	right: 0;
+	background: linear-gradient(to left, rgba(0, 0, 0, 0.15), transparent);
+}
+
+.pf-spine-title {
+	writing-mode: sideways-lr;
+	text-orientation: mixed;
+	font-weight: 600;
+	font-size: 11px;
+	letter-spacing: 0.02em;
+	line-height: 1.15;
+	max-height: 75%;
+	overflow: hidden;
+	white-space: nowrap;
+	text-overflow: ellipsis;
+	text-shadow: 0 1px 1px rgba(0, 0, 0, 0.2);
+	flex: 0 1 auto;
+}
+
+.pf-spine-icon {
+	width: 70%;
+	max-width: 24px;
+	height: auto;
+	color: rgba(255, 255, 255, 0.85);
+	opacity: 0.9;
+	flex-shrink: 0;
+}
+
+img.pf-spine-icon {
+	border-radius: 50%;
+}
+
+/* ─── Price Chevalet (paper tent card) — mode covers uniquement ─ */
+
+/* Petit chevalet en papier plié, posé sur la planche devant le livre,
+   incliné vers l'arrière (rotateX dans la perspective du .pf-book) ; le
+   ::before est le dos du pliage qui dépasse du haut. Frère de
+   .pf-book-inner : il reste immobile quand le livre est saisi — et comme
+   le livre agrandi ne le recouvre qu'à moitié, il s'efface au hover. */
+.pf-chevalet {
+	position: absolute;
+	bottom: 0;
+	left: 50%;
+	transform: translateX(-50%) rotateX(20deg);
+	z-index: 5;
+	pointer-events: none;
+	transition: opacity 0.25s ease;
+}
+
+.pf-bookshelf--covers .pf-book:hover .pf-chevalet,
+.pf-bookshelf--covers .pf-book:focus-visible .pf-chevalet {
+	opacity: 0;
+}
+
+.pf-chevalet-card {
+	position: relative;
+	display: flex;
+	perspective: 200px;
+}
+
+.pf-chevalet-card::before {
+	content: '';
+	position: absolute;
+	top: -14px;
+	left: 16%;
+	z-index: -1;
+	width: 50%;
+	height: calc(100% + 8px);
+	background: #faf9f2ad;
+	transform-origin: bottom center;
+	transform: translateX(-50%) rotateX(55deg);
+	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1), 0 0 0 0.5px rgba(0, 0, 0, 0.05);
+	border-radius: 1px;
+}
+
+.pf-chevalet-price {
+	display: block;
+	background: linear-gradient(to bottom, #fffef8, #f8f6f0);
+	color: #2c2a26;
+	font-size: 12px;
+	font-weight: 600;
+	line-height: 1;
+	padding: 4px 10px;
+	margin-bottom: 4px;
+	white-space: nowrap;
+	letter-spacing: 0.01em;
+	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1), 0 0 0 0.5px rgba(0, 0, 0, 0.05);
+	border-radius: 1px;
+	transform: skewX(6deg);
+}
+
+/* Counter-skew pour que le texte reste droit. .woocommerce-Price-amount est
+   un <span> inline — il faut inline-block pour que transform s'applique. */
+.pf-chevalet-price .woocommerce-Price-amount,
+.pf-chevalet-price .pf-chevalet-tome {
+	display: inline-block;
+	transform: skewX(-6deg);
+}
+
+.pf-chevalet-price del {
+	opacity: 0.5;
+	font-size: 0.85em;
+}
+
+.pf-chevalet-price ins {
+	text-decoration: none;
+	font-weight: 700;
+}
+
+.pf-chevalet-price .woocommerce-Price-amount {
+	font-size: inherit;
+	color: inherit;
+}
+
+/* ─── Étiquette « À paraître » ───────────────────────────────────
+   Petite étiquette posée sur le chant de la planche (le ::after de
+   .pf-shelf-plank), centrée horizontalement sous le livre. Enfant de
+   .pf-book : --book-h la place juste sous le pied du livre, sur le
+   liseré sombre du devant de planche, et le z-index la fait passer
+   au-dessus de la planche (.pf-shelf-books z-index 2 > plank 1). */
+.pf-book-shelf-label {
+	position: absolute;
+	top: calc(var(--book-h) + 2px);
+	left: 50%;
+	transform: translateX(-50%);
+	z-index: 4;
+	background: var(--pf-accent);
+	color: white;
+	font-size: 11px;
+	font-weight: 700;
+	letter-spacing: 0.08em;
+	line-height: 1;
+	text-transform: uppercase;
+	white-space: nowrap;
+	padding: 4px 9px;
+	border-radius: 2px;
+	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+	pointer-events: none;
+}
+
+/* Avec chevalet de prix, le wrapper porte un padding-bas (30px) qui remonte
+   le livre au-dessus du chant : on décale l'étiquette d'autant pour la
+   garder sur le devant de planche, et non au niveau du chevalet. */
+.pf-book--has-price .pf-book-shelf-label {
+	top: calc(var(--book-h) + 34px);
+}
+
+/* Étiquette de format (Classique, Grands caractères…) : fond neutre, texte gris chaud. */
+.pf-book-shelf-label--format {
+	background: var(--pf-surface);
+	color: var(--pf-text);
+}
+
+/* Si un livre de la planche porte un shelf-label sans chevalet, on lève
+   TOUS les livres de 8px pour créer un espace visuel uniforme. L'ombre
+   de contact suit le même décalage pour rester au pied de chaque livre. */
+.pf-shelf:has(.pf-book--has-shelf-label) .pf-book-inner {
+	top: -8px;
+}
+
+.pf-shelf:has(.pf-book--has-shelf-label) .pf-book::after {
+	top: calc(var(--book-h) - 3px - 8px);
+}
+
+/* ─── Badge de recommandation + explication (espace compte) ──────
+   Posé par pf_reco_render() via Passiflore_Bookshelf::set_reco_annotations().
+   Le conteneur couvre l'empreinte du livre ; il est enfant de .pf-book (qui ne
+   pivote pas), donc l'overlay ne « part » pas avec la couverture qui s'ouvre au
+   survol, et reste borné à la couverture → jamais rogné par le conteneur de
+   défilement. Seul le badge capte le pointeur ; le reste laisse passer le clic
+   vers la fiche livre. */
+.pf-book-reco {
+	position: absolute;
+	top: 0;
+	left: 0;
+	width: 100%;
+	height: var(--book-h);
+	pointer-events: none;
+	z-index: 6;
+}
+
+.pf-book-reco-badge {
+	position: absolute;
+	top: 6px;
+	left: calc(var(--spine-w) + 6px);
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 26px;
+	height: 26px;
+	border-radius: 50%;
+	background: var(--pf-accent);
+	color: #fff;
+	box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+	cursor: help;
+	pointer-events: auto;
+}
+
+.pf-book-reco-badge:focus-visible {
+	outline: 2px solid #fff;
+	outline-offset: 1px;
+}
+
+.pf-book-reco-tip {
+	position: absolute;
+	top: 0;
+	left: var(--spine-w);
+	width: var(--cover-w);
+	height: var(--book-h);
+	box-sizing: border-box;
+	display: flex;
+	align-items: center;
+	margin: 0;
+	padding: 14px;
+	background: rgba(250, 246, 240, 0.96);
+	backdrop-filter: blur(var(--pf-aero-blur, 6px));
+	-webkit-backdrop-filter: blur(var(--pf-aero-blur, 6px));
+	color: var(--pf-text);
+	font-size: 12px;
+	line-height: 1.4;
+	text-align: left;
+	border-radius: 0 2px 2px 0;
+	box-shadow: inset 0 0 0 1px var(--pf-border-light);
+	opacity: 0;
+	visibility: hidden;
+	transition: opacity 0.2s ease, visibility 0.2s ease;
+	pointer-events: none;
+	overflow: auto;
+}
+
+.pf-book-reco-badge:hover ~ .pf-book-reco-tip,
+.pf-book-reco-badge:focus ~ .pf-book-reco-tip,
+.pf-book-reco.is-open .pf-book-reco-tip {
+	opacity: 1;
+	visibility: visible;
+}
+
+/* ─── Empty State ────────────────────────────────────────────── */
+
+.pf-bookshelf-empty {
+	text-align: center;
+	padding: 40px 20px;
+	color: var(--pf-muted);
+	font-style: italic;
+}
+
+/* ─── Mode HERO (fiche livre) ────────────────────────────────────
+   En mode hero (page produit unique), la rotation de couverture est
+   fixe au hover — pas de tracking curseur (setupCursorReveal est
+   désactivé côté JS pour ces livres).
+   - Avec extrait    → −35° (override via --cover-angle sur le book)
+   - Sans extrait    → transform: none (couverture fermée, scale only) */
+
+/* Avec extrait : couverture ouverte à −35° fixe au hover. */
+.pf-bookshelf--hero .pf-book--has-extract:hover,
+.pf-bookshelf--hero .pf-book--has-extract:focus-visible {
+	--cover-angle: -35deg;
+}
+
+/* Liseuse hero avec extrait : seul l'img pivote dans .pf-ereader-screen.
+   Le cadre device (.pf-book-cover) reste immobile. */
+.pf-bookshelf--hero .pf-book--ereader.pf-book--has-extract:hover .pf-book-cover,
+.pf-bookshelf--hero .pf-book--ereader.pf-book--has-extract:focus-visible .pf-book-cover {
+	transform: none;
+}
+
+.pf-bookshelf--hero .pf-book--ereader.pf-book--has-extract .pf-ereader-screen {
+	perspective: 800px;
+}
+
+.pf-bookshelf--hero .pf-book--ereader.pf-book--has-extract .pf-ereader-screen img {
+	position: relative;
+	z-index: 2;
+	transform-origin: left center;
+	transition: transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.pf-bookshelf--hero .pf-book--ereader.pf-book--has-extract:hover .pf-ereader-screen img,
+.pf-bookshelf--hero .pf-book--ereader.pf-book--has-extract:focus-visible .pf-ereader-screen img {
+	transform: rotateY(-35deg);
+}
+
+/* Hint "EXTRAIT →" dans .pf-ereader-screen (derrière l'img, z-index 1).
+   Le container étant exactement la zone écran, pas besoin de décalage bezel. */
+.pf-hero-flip-hint--screen {
+	right: 0;
+	top: 0;
+	height: 100%;
+	z-index: 1;
+}
+
+/* Sans extrait : scale uniquement, couverture ne s'ouvre pas. */
+.pf-bookshelf--hero.pf-bookshelf--covers .pf-book:not(.pf-book--has-extract):hover .pf-book-cover,
+.pf-bookshelf--hero.pf-bookshelf--covers .pf-book:not(.pf-book--has-extract):focus-visible .pf-book-cover {
+	transform: none;
+}
+
+/* Hint FEUILLETER ↓ — vertical, bord droit de .pf-book-inside. */
+.pf-hero-flip-hint {
+	position: absolute;
+	right: 0;
+	top: 0;
+	height: 100%;
+	width: 22px;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: 6px;
+	opacity: 0;
+	transition: opacity 0.25s ease 0.15s;
+	pointer-events: none;
+	user-select: none;
+}
+
+.pf-bookshelf--hero .pf-book--has-extract:hover .pf-hero-flip-hint,
+.pf-bookshelf--hero .pf-book--has-extract:focus-visible .pf-hero-flip-hint {
+	opacity: 1;
+}
+
+.pf-hero-flip-hint__text {
+	writing-mode: vertical-lr;
+	text-orientation: upright;
+	font-family: system-ui, -apple-system, sans-serif;
+	font-size: 9px;
+	font-weight: 700;
+	letter-spacing: 0.18em;
+	color: var(--global-palette5);
+	text-transform: uppercase;
+}
+
+.pf-hero-flip-hint__arrow {
+	font-size: 13px;
+	line-height: 1;
+	color: var(--global-palette5);
+}
+
+/* ─── Responsive ─────────────────────────────────────────────── */
+
+@media (max-width: 768px) {
+	.pf-shelf-books {
+		gap: 12px;
+		padding: 15px 15px 0;
+	}
+
+	.pf-bookshelf--covers .pf-book-spine {
+		transform: skewY(10deg);
+		transform-origin: right center;
+	}
+
+	.pf-bookshelf--covers .pf-book-pages {
+		top: calc(-1 * var(--spine-w) * 0.176);
+		height: calc(var(--spine-w) * 0.176);
+	}
+
+	.pf-bookshelf--spines .pf-book.pf-book--cover-revealed .pf-spine-ghost {
+		transform: translateX(0px) skewY(10deg);
+	}
+
+	.pf-pages-ghost {
+		top: calc(-1 * var(--spine-w) * 0.176);
+		height: calc(var(--spine-w) * 0.176);
+	}
+
+	.pf-bookshelf--covers .pf-book:hover .pf-book-cover {
+		transform: rotateY(-16deg);
+	}
+
+	.pf-chevalet-price {
+		font-size: 11px;
+		padding: 3px 8px 4px;
+	}
+}
+
+@media (max-width: 480px) {
+	.pf-shelf-books {
+		gap: 8px;
+		padding: 10px 10px 0;
+	}
+}
+
+/* ─── Reduced motion ─────────────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+	.pf-book,
+	.pf-book-inner,
+	.pf-book-cover,
+	.pf-book-inside,
+	.pf-book-held-deco,
+	.pf-spine-ghost,
+	.pf-spine-ghost::before,
+	.pf-pages-ghost,
+	.pf-chevalet {
+		transition-duration: 0.01s !important;
+		transition-delay: 0s !important;
+	}
+}

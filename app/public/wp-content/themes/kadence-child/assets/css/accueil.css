@@ -1,0 +1,1067 @@
+.content-area {
+    margin-top: 0;
+}
+
+/* =============================================================================
+   Page d'accueil — Éditions Passiflore
+   ============================================================================= */
+
+/* ── 1. Hero ────────────────────────────────────────────────────────────────── */
+
+.pf-hero {
+    --pf-hero-glass: #ffffffbf; /* voile blanc translucide des encarts posés sur l'image du héro */
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    min-height: max(520px, calc(100dvh - var(--pf-sticky-offset, 0px)));
+    overflow: hidden;
+}
+
+/* Rangée haute : contenu (+ actualités flottante sur grand écran) */
+.pf-hero-haut {
+    flex: 1;
+    display: flex;
+    min-height: 0;
+    position: relative;
+    z-index: 2;
+}
+
+/* Slot actualités — masqué par défaut (mobile : l'encart est déplacé en JS
+   vers « En ce moment »). Visible sur grand écran via la media query plus bas. */
+.pf-hero-actualites-slot {
+    display: none;
+}
+
+/* ── Left column (now full width) ── */
+
+.pf-hero-contenu {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 3rem 3.5rem 5rem;
+    position: relative;
+    z-index: 2;
+    color: var(--pf-heading);
+    gap: 1.5rem;
+    overflow: hidden;
+    text-align: center;
+}
+
+/* Image de fond sur tout le hero */
+.pf-hero::before {
+    content: '';
+    position: absolute;
+    inset: -20px; /* dépasse légèrement pour masquer les bords flous */
+    background-image: var(--pf-hero-bg);
+    background-size: cover;
+    background-position: center center;
+    opacity: 0.15;
+    filter: blur(7px);
+    z-index: 0;
+}
+
+.pf-hero-logo-wrap a {
+    display: block;
+    line-height: 0;
+    display: flex;
+    justify-content: center;
+}
+
+.pf-hero-logo-wrap img {
+    max-height: 120px;
+    width: auto;
+}
+
+/* ── Typing text ── */
+
+.pf-hero-typage {
+    margin-top: 0.75rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    font-size: clamp(2.6rem, 4.2vw, 4.8rem);
+    font-weight: 200;
+    line-height: 1.08;
+    letter-spacing: -0.015em;
+    color: var(--pf-heading);
+}
+
+.pf-hero-typage-nom {
+    display: flex;
+    flex-direction: column;
+    align-items: baseline;
+}
+
+.pf-hero-sous-titre {
+    text-align: center;
+    font-family: var(--global-heading-font-family);
+    font-size: clamp(1rem, 1.6vw, 1.2rem);
+    font-weight: 400;
+    letter-spacing: 0.12em;
+    color: var(--pf-accent);
+    min-height: 1.4em;
+}
+
+.pf-hero-ligne {
+    min-height: 1.12em;
+    display: block;
+}
+
+#pf-ligne-2 {
+    font-weight: 700;
+}
+
+#pf-ligne-3 {
+    margin-top: 0.75rem;
+    margin-bottom: 4px;
+}
+
+/* Blinking cursor via ::after on the active line — absolute so it doesn't
+   affect centering (the flex-column + align-items:center gives each line
+   fit-content width, so left:100% lands right after the last character). */
+.pf-hero-ligne--active {
+    position: relative;
+}
+
+.pf-hero-ligne--active::after {
+    content: '';
+    position: absolute;
+    top: -2px;
+    left: 100%;
+    margin-left: 2px;
+    width: 2px;
+    height: clamp(1rem, 1.6vw, 1.2rem);
+    background: var(--pf-text);
+    animation: pf-blink 0.9s ease-in-out infinite;
+}
+
+@keyframes pf-blink {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0; }
+}
+
+/* ── Presentation text ── */
+
+.pf-hero-presentation {
+    max-width: 550px;
+    margin: 0;
+    font-size: clamp(0.75rem, 1.2vw, 0.88rem);
+    line-height: 1.65;
+    color: var(--pf-text);
+    min-height: 1.65em;
+    text-align: center;
+}
+
+.pf-hero-presentation--active::after {
+    content: '';
+    display: inline-block;
+    width: 2px;
+    height: 0.82em;
+    background: var(--pf-text);
+    vertical-align: -0.04em;
+    margin-left: 2px;
+    animation: pf-blink 0.9s ease-in-out infinite;
+}
+
+/* ── Hero buttons ── */
+
+.pf-hero-btns {
+    display: flex;
+    gap: 0.85rem;
+    margin-top: 1.75rem;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
+}
+
+/* Icon support inside Kadence buttons */
+.pf-hero-btns .wp-block-button__link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+@keyframes pf-arrow-bounce {
+    0%, 65%, 100% { transform: translateY(0);   }
+    20%            { transform: translateY(4px); }
+    35%            { transform: translateY(0);   }
+    50%            { transform: translateY(2px); }
+}
+
+.pf-hero-btns [data-scroll-to] svg {
+    animation: pf-arrow-bounce 2s ease-in-out infinite;
+}
+
+.pf-hero-btns [data-scroll-to]:hover svg,
+.pf-hero-btns [data-scroll-to]:focus svg {
+    animation: none;
+}
+
+/* ── Hero category cards (bas du hero) ── */
+
+.pf-hero-categories {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    flex-shrink: 0;
+}
+
+.pf-hero-cat {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    text-align: center;
+    padding: 1.75rem 2rem;
+    background: var(--pf-hero-glass);
+    color: var(--pf-heading);
+    text-decoration: none;
+    transition: background 0.2s ease, color 0.2s ease;
+}
+
+.pf-hero-cat:hover,
+.pf-hero-cat:focus {
+    background: var(--pf-accent);
+    text-decoration: none;
+}
+
+.pf-hero-cat-titre {
+    font-size: clamp(1.15rem, 2vw, 1.6rem);
+    font-weight: 600;
+    line-height: 1.15;
+}
+
+.pf-hero-cat-desc {
+    font-size: clamp(0.8rem, 1.1vw, 0.9rem);
+    line-height: 1.5;
+    color: var(--pf-text);
+    max-width: 34ch;
+}
+
+.pf-hero-cat:hover .pf-hero-cat-titre,
+.pf-hero-cat:focus .pf-hero-cat-titre,
+.pf-hero-cat:hover .pf-hero-cat-desc,
+.pf-hero-cat:focus .pf-hero-cat-desc {
+    color: var(--pf-surface);
+}
+
+/* Encart « descendre » sous les catégories — uniquement grand écran (cf. media query) */
+.pf-hero-scroll {
+    display: none;
+}
+
+/* ── Grand écran (ordinateur + tablette) : hero en deux colonnes ── */
+
+@media ( min-width: 769px ) {
+    .pf-hero {
+        height: calc(100dvh - var(--pf-sticky-offset, 0px));
+        min-height: 520px;
+    }
+
+    .pf-hero-haut {
+        flex-direction: row;
+        align-items: stretch;
+    }
+
+    .pf-hero-contenu {
+        flex: 0 0 50%;
+        max-width: 50%;
+        align-items: flex-start;
+        text-align: left;
+        padding: 2rem 2.5rem;
+    }
+
+    .pf-hero-contenu .pf-hero-typage,
+    .pf-hero-contenu .pf-hero-sous-titre,
+    .pf-hero-contenu .pf-hero-presentation {
+        align-items: flex-start;
+        text-align: left;
+    }
+
+    .pf-hero-contenu .pf-hero-btns {
+        justify-content: flex-start;
+    }
+
+    .pf-hero-logo-wrap a {
+        justify-content: left;
+    }
+
+    /* Slot actualités : 40 % restants, encart centré et flottant */
+    .pf-hero-actualites-slot {
+        display: flex;
+        flex: 0 0 50%;
+        align-items: center;
+        justify-content: center;
+        padding: 2rem 2.5rem;
+        min-width: 0;
+    }
+
+    .pf-hero-actualites-slot .pf-en-ce-moment-actualites {
+        width: 100%;
+        max-width: 460px;
+        margin: 0;
+        align-self: stretch;
+        /* height:100% rend la hauteur "définie" pour Chrome (align-self:stretch
+           seul ne l'est pas) → flex:1 sur le carousel peut s'en servir */
+        height: 100%;
+        min-height: 0;
+        overflow: hidden;
+    }
+
+    /* Deux encarts catégories côte à côte (50 / 50) */
+    .pf-hero-categories {
+        flex-direction: row;
+    }
+
+    /* Encart « descendre » : même style que .pf-hero-cat, caret animé */
+    .pf-hero-scroll, .pf-hero-scroll:active {
+        position: relative;
+        z-index: 2;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
+        margin-top: 1px;
+        padding: 1.2rem 0 1.4rem;
+        border: none;
+        background: var(--pf-hero-glass);
+        color: var(--pf-accent);
+        cursor: pointer;
+        transition: background 0.2s ease, color 0.2s ease;
+    }
+
+    .pf-hero-scroll:hover,
+    .pf-hero-scroll:focus {
+        background: var(--pf-accent);
+        color: var(--pf-surface);
+    }
+
+    .pf-hero-scroll svg {
+        display: block;
+    }
+
+    .pf-hero-scroll.pf-hero-scroll--anim svg {
+        animation: pf-hero-scroll-fade 1.5s ease-in-out infinite;
+    }
+
+    .pf-hero-scroll.is-paused svg {
+        animation: none;
+        opacity: 1;
+        transform: translateY(4px);
+    }
+
+    .pf-hero-scroll.is-clicked svg {
+        animation: none;
+    }
+
+    @keyframes pf-hero-scroll-fade {
+        0%   { opacity: 0; transform: translateY(-12px); }
+        75%  { opacity: 1; transform: translateY(4px); }
+        100%  { opacity: 1; transform: translateY(4px); }
+    }
+}
+
+/*
+── Scroll caret (commenté — à réactiver si besoin) ──────────────────────────
+
+.pf-scroll-caret-wrap {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 3;
+    width: 100%;
+    height: 5rem;
+}
+
+CSS cannot interpolate between two gradients (background-image is non-animatable).
+Workaround: stack two pseudo-elements. ::before is the base gradient (always visible);
+::after is the hover delta that fades in, producing the darker combined result.
+.pf-scroll-caret-wrap::before,
+.pf-scroll-caret-wrap::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+}
+
+.pf-scroll-caret-wrap::before {
+    background: linear-gradient(to bottom, transparent, #ffffff9c, #ffffff);
+}
+
+.pf-scroll-caret-wrap::after {
+    background: linear-gradient(to bottom, transparent, #00000045, #00000085);
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+.pf-scroll-caret-wrap:hover::after { opacity: 1; }
+
+.pf-scroll-caret {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    padding: 0;
+    border: none;
+    background: none;
+    cursor: pointer;
+    color: var(--global-palette1, #c62836);
+    scale: 1;
+    transition: scale 0.2s ease;
+    animation: pf-caret-bounce 1.8s ease-in-out infinite;
+}
+
+.pf-scroll-caret:hover, .pf-scroll-caret:active, .pf-scroll-caret:focus {
+    text-decoration: none;
+    color: var(--global-palette1, #c62836);
+    background: none;
+    box-shadow: none;
+}
+
+@keyframes pf-caret-bounce {
+    0%, 100% { translate: 0 0; }
+    55%       { translate: 0 8px; }
+}
+*/
+
+/* ── Right column ── */
+
+.pf-hero-droite {
+    flex: 1 1 58%;
+    min-width: 0;
+    position: relative;
+    z-index: 2;
+    display: flex;
+    align-items: stretch;
+    background-color: var(--pf-hero-glass);
+    padding-bottom: 5rem;
+}
+
+/* Titre du carousel */
+.pf-carousel-titre {
+    padding: 1.25rem 1.5rem 0.75rem;
+    margin: 0;
+}
+
+/* Carousel in hero context */
+.pf-hero-carousel-wrap {
+    flex: 1;
+    min-width: 0;    /* supprime min-width:auto → le flex ne déborde plus pf-hero-droite */
+    overflow: hidden; /* scroll container → min-width auto = 0 ; contient Splide avant resize */
+    display: flex;
+    flex-direction: column;
+}
+
+.pf-hero-carousel {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden; /* idem ; Splide recalcule la bonne largeur via ResizeObserver */
+    display: flex;
+    flex-direction: column;
+}
+
+.pf-hero-carousel .splide__track {
+    flex: 1;
+}
+
+.pf-hero-carousel .splide__list {
+    height: 100%;
+}
+
+/* Slide : centre la carte polaroïd, laisse de l'espace pour les flèches et la pagination */
+.pf-hero-carousel .pf-actualite-slide {
+    height: 100%;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 1.5rem 3.5rem 3rem;
+}
+
+/* Carte polaroïd — taille naturelle, centrée dans le slide */
+.pf-hero-carousel .pf-polaroid {
+    width: fit-content; /* épouse la largeur de l'image */
+    max-width: 100%;    /* ne dépasse pas l'espace entre les flèches */
+    flex: 0 0 auto;
+    display: flex;
+    flex-direction: column;
+    background: var(--pf-surface);
+    padding: 1rem;
+    box-shadow: 0 2px 8px rgb(26 22 21 / 21%), -6px 6px 20px 2px rgb(26 22 21 / 14%);
+    border-radius: 5px; /* hors échelle assumé : rendu « photo » du polaroïd */
+}
+
+/* Zone image : suit la taille naturelle de l'image */
+.pf-hero-carousel .pf-actualite-image {
+    flex: 0 0 auto; /* annule flex: 0 0 50% de la règle non-scopée */
+    line-height: 0;
+    overflow: hidden;
+    background: transparent;
+}
+
+.pf-hero-carousel .pf-actualite-image img {
+    display: block;
+    width: auto;
+    height: auto;
+    max-width: 100%;
+    max-height: calc((100dvh - var(--pf-sticky-offset, 0px)) * 0.6);
+}
+
+/* Infos sous l'image */
+.pf-hero-carousel .pf-actualite-contenu {
+    flex: 0 0 auto;
+    padding: 0;
+    margin-top: 1rem;
+    background: transparent;
+}
+
+.pf-hero-carousel .pf-actualite-titre {
+    font-size: 1.1rem;
+}
+
+/* Standalone carousel (outside hero — kept for backwards compat) */
+.pf-actualites-section {
+    width: 100%;
+    background: var(--pf-cream-dark);
+}
+
+.pf-actualites-carousel .splide__track {
+    overflow: hidden;
+}
+
+.pf-actualite-slide {
+    display: flex;
+    align-items: stretch;
+    min-height: 460px;
+}
+
+.pf-actualite-image {
+    flex: 0 0 50%;
+    overflow: hidden;
+    background: var(--pf-heading);
+}
+
+.pf-actualite-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.pf-actualite-contenu {
+    flex: 1;
+    display: flex;
+    gap: 1rem;
+    flex-direction: column;
+    justify-content: center;
+    padding: 3rem 3.5rem;
+    background: var(--pf-surface-alt);
+}
+
+.pf-actualite-titre {
+    font-size: 1.6rem;
+    line-height: 1.2;
+    color: var(--pf-accent);
+}
+
+.pf-actualite-texte {
+    font-size: 0.95rem;
+    line-height: 1.75;
+    color: var(--pf-text);
+}
+
+.pf-actualite-texte p:last-child { margin: 0; }
+
+.pf-actualite-lien {
+    align-self: flex-start;
+}
+
+/* Splide arrows */
+.pf-actualites-carousel .splide__arrow {
+    background: var(--pf-accent);
+    opacity: 1;
+    width: 2.2rem;
+    height: 2.2rem;
+}
+.pf-actualites-carousel .splide__arrow:hover { background: var(--pf-accent-dark); }
+.pf-actualites-carousel .splide__arrow svg  { fill: var(--pf-surface); width: 0.9rem; height: 0.9rem; }
+.pf-actualites-carousel .splide__arrow--prev { left: 1.75rem; }
+.pf-actualites-carousel .splide__arrow--next { right: 1.75rem; }
+
+/* Flèches à gauche/droite des points de pagination */
+.pf-en-ce-moment-actualites .splide__arrow {
+    top: auto;
+    bottom: 1rem;
+    transform: none;
+}
+.pf-en-ce-moment-actualites .splide__arrow--prev {
+    left: calc(50% - 5rem);
+    right: auto;
+}
+.pf-en-ce-moment-actualites .splide__arrow--next {
+    right: calc(50% - 5rem);
+    left: auto;
+}
+
+/* Splide pagination */
+.pf-actualites-carousel .splide__pagination { bottom: 1.75rem; }
+.pf-actualites-carousel .splide__pagination__page {
+    background: var(--pf-border);
+    opacity: 1;
+    transition: background 0.2s ease;
+}
+.pf-actualites-carousel .splide__pagination__page.is-active {
+    background: var(--pf-accent);
+    transform: scale(1.2);
+}
+
+/* ── 2. Section dividers ────────────────────────────────────────────────────── */
+
+.pf-section-header {
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+/* Les deux sections ont site-container sur le <section> — pas de padding latéral sur les enfants */
+.pf-en-ce-moment-section .pf-section-header,
+.pf-au-catalogue-section .pf-section-header {
+    padding-left: 0;
+    padding-right: 0;
+    max-width: none;
+    margin-left: 0;
+    margin-right: 0;
+}
+
+.pf-en-ce-moment-section .pf-section-titre,
+.pf-au-catalogue-section .pf-section-titre { margin-left: 0; }
+
+.pf-en-ce-moment-section .pf-bookshelf,
+.pf-au-catalogue-section .pf-bookshelf { margin-left: 0; margin-right: 0; }
+
+/* ── 3. Étagères ────────────────────────────────────────────────────────────── */
+
+.pf-etagere-bloc {
+    display: flex;
+    flex-direction: column;
+}
+
+/* ── En ce moment ───────────────────────────────────────────────────────────── */
+
+.pf-en-ce-moment-section {
+    padding-bottom: 0;
+}
+
+.pf-en-ce-moment-section > .pf-section-header,
+.pf-au-catalogue-section > .pf-section-header {
+    position: sticky;
+    top: var(--pf-sticky-offset, 0px);
+    z-index: 3;
+    background: var(--pf-surface-alt);
+    margin-top: var(--pf-space-6);
+    /* Pas de margin-bottom ici : sur un en-tête sticky, la marge fait partie de la
+       « boîte » contrainte par la section → l'en-tête se décolle d'autant plus tôt.
+       L'écart sous le titre est porté par l'élément suivant (voir « + * » ci-dessous). */
+    padding-top: var(--pf-space-6);
+    padding-bottom: var(--pf-space-6);
+    text-align: center;
+}
+
+/* Écart sous le titre de section, déplacé du header vers le bloc qui le suit
+   (.pf-en-ce-moment-cols n'avait pas de margin-top ; les .pf-etagere-bloc l'ont déjà
+   → visuellement identique, mais l'en-tête sticky garde une boîte plus courte). */
+.pf-en-ce-moment-section > .pf-section-header + *,
+.pf-au-catalogue-section > .pf-section-header + * {
+    margin-top: var(--pf-space-6);
+}
+
+.pf-en-ce-moment-section > .pf-section-header.pf-header-stuck,
+.pf-au-catalogue-section > .pf-section-header.pf-header-stuck {
+    box-shadow: var(--pf-shadow-stuck);
+    clip-path: inset(0 0 -12px 0);
+}
+
+/* Effet « aéro » au scroll — voir le bloc « Éléments sticky » de style.css. */
+@supports ((backdrop-filter: blur(2px)) or (-webkit-backdrop-filter: blur(2px))) {
+    .pf-en-ce-moment-section > .pf-section-header.pf-header-stuck,
+    .pf-au-catalogue-section > .pf-section-header.pf-header-stuck {
+        background: color-mix(in srgb, var(--pf-surface-alt) 90%, transparent);
+        -webkit-backdrop-filter: blur(var(--pf-aero-blur));
+        backdrop-filter: blur(var(--pf-aero-blur));
+    }
+}
+
+/* ── Colonnes côte à côte (desktop) ── */
+
+.pf-en-ce-moment-cols {
+    display: flex;
+    gap: 2.5rem;
+    align-items: stretch;
+    margin-bottom: 1rem;
+}
+
+.pf-en-ce-moment-cols > * {
+    flex: 1;
+    min-width: 0;
+}
+
+.pf-en-ce-moment-actualites {
+    margin-bottom: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.pf-en-ce-moment-actualites .pf-actualites-carousel {
+    flex: 1;
+    min-height: 0;
+    width: 100%;
+    min-width: 0;
+    max-width: 760px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    isolation: isolate;
+    border-radius: var(--pf-radius-card);
+}
+
+/* Dans le hero : pas de titre « Actualités » au-dessus de l'encart. */
+.pf-hero .pf-en-ce-moment-actualites .pf-section-header {
+    display: none;
+}
+
+.pf-en-ce-moment-actualites .splide__track {
+    flex: 1;
+    min-height: 0;
+    /* max-height écrase le height inline posé par Splide JS (calculé depuis
+       le contenu), et overflow:hidden clippe les slides qui dépassent. */
+    max-height: 100%;
+    overflow: hidden;
+}
+
+.pf-en-ce-moment-actualites .splide__list,
+.pf-en-ce-moment-actualites .splide__slide {
+    height: 100%;
+    align-items: center;
+}
+
+/* Slide centré, hauteur contrainte */
+.pf-en-ce-moment-actualites .pf-actualite-slide {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 0;
+    padding: 0.2rem 0.2rem 4.2rem 0.2rem;
+}
+
+/* Polaroid stylé et contraint.
+   height:100% donne une hauteur *définie* (≠ max-height qui ne fait que
+   plafonner et laisse la hauteur indéfinie), indispensable pour que la
+   hauteur de l'image se résolve. La chaîne est définie aussi bien dans le hero
+   (hero → slide) que sur mobile (Splide pose une hauteur inline sur le track),
+   donc l'image est contrainte en hauteur dans les deux cas — carte
+   proportionnelle qui épouse le plus large entre image et légende. */
+.pf-en-ce-moment-actualites .pf-polaroid {
+    width: fit-content;
+    max-width: 100%;
+    height: 100%;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    /* center (≠ stretch par défaut) : sinon le wrap image serait étiré à la
+       largeur du polaroïd et son aspect-ratio ne piloterait plus la largeur. */
+    align-items: center;
+    background: var(--pf-surface);
+    padding: 0;
+    box-shadow: var(--pf-shadow);
+    border-radius: var(--pf-radius-card);
+    overflow: hidden;
+}
+
+/* aspect-ratio inline (PHP) + height:100% → largeur DÉFINIE = hauteur × ratio.
+   C'est cette largeur définie (et non la largeur naturelle de l'image, que le
+   calcul intrinsèque utiliserait sinon) qui dimensionne l'image. width:auto
+   laisse le ratio piloter ; max-width évite tout débordement. NB : le polaroïd
+   épouse le plus large entre cette image et la légende (limite de CSS pur :
+   fit-content ne peut pas se caler sur la seule image quand le texte est plus
+   large). */
+.pf-en-ce-moment-actualites .pf-actualite-image {
+    flex: 1;
+    min-height: 0;
+    height: 100%;
+    width: auto;
+    max-width: 100%;
+    overflow: hidden;
+    background: transparent;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.pf-en-ce-moment-actualites .pf-actualite-image img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+/* width:0 + min-width:100% : la légende ne contribue PAS à la largeur
+   intrinsèque du polaroïd (sa largeur définie est 0, ignorée), mais se replie
+   ensuite à 100 % de la largeur établie par l'image → le texte s'enroule sur
+   la largeur de l'image au lieu de l'élargir. box-sizing pour inclure le padding. */
+.pf-en-ce-moment-actualites .pf-actualite-contenu {
+    flex: 0 0 auto;
+    box-sizing: border-box;
+    width: 0;
+    min-width: 100%;
+    padding: 1rem 1.75rem 1.4rem;
+    margin-top: 0;
+    background: transparent;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.pf-en-ce-moment-actualites .pf-actualite-corps {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.pf-en-ce-moment-actualites .pf-actualite-titre {
+    font-size: 1.5rem;
+    font-weight: 600;
+    line-height: 1.35;
+    color: var(--pf-heading);
+}
+
+.pf-en-ce-moment-actualites .pf-actualite-texte {
+    font-size: 0.9rem;
+    line-height: 1.6;
+}
+
+.pf-en-ce-moment-actualites .pf-actualite-lien {
+    align-self: flex-start;
+    font-size: 0.9rem;
+}
+
+.pf-en-ce-moment-events {
+    padding-bottom: 0;
+}
+
+.pf-etagere-emoji {
+    line-height: 1;
+    font-style: normal;
+    font-size: 1rem;
+}
+
+/* ── Au catalogue ────────────────────────────────────────────────────────────── */
+
+.pf-au-catalogue-section {
+    padding-bottom: 1rem;
+}
+
+.pf-au-catalogue-section .pf-etagere-bloc {
+    margin-top: var(--pf-space-6);
+    margin-bottom: var(--pf-space-8);
+}
+
+/* Étagères dans "En ce moment" — fond identique à la section */
+.pf-en-ce-moment-section .pf-etagere-bloc {
+    margin-top: var(--pf-space-6);
+    margin-bottom: var(--pf-space-8);
+    background: transparent;
+}
+
+/* L'étagère s'étend sur toute la hauteur disponible dans le bloc */
+.pf-etagere-bloc .pf-bookshelf {
+    margin: var(--pf-space-3);
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.pf-etagere-bloc .pf-shelf {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+}
+
+/* Les livres occupent toute la hauteur du shelf, restent alignés en bas */
+.pf-etagere-bloc .pf-shelf-books {
+    flex: 1;
+    min-height: 0;
+}
+
+/* Trait ornemental + titre-lien flèche : composant global .pf-section-titre (style.css). */
+
+.pf-bookshelf {
+    margin: 0 var(--global-content-edge-padding);
+}
+
+/* ── Animation d'entrée des étagères ─────────────────────────────────────────── */
+
+/* Pose de départ, posée par JS (classe `pf-bookshelf-armed`) → jamais active en
+   reduced-motion. Visible dès le chargement, avant le scroll de déclenchement. */
+
+/* Covers : couverture ouverte (pose de survol) + livre agrandi */
+.pf-bookshelf-armed.pf-bookshelf--covers .pf-book-cover {
+    transform: rotateY(-25deg);
+}
+.pf-bookshelf-armed.pf-bookshelf--covers .pf-book-inner {
+    transform: scale(1.1);
+}
+
+/* Spines : dos penché à droite (pivot bas-droit de la tranche) */
+.pf-bookshelf-armed.pf-bookshelf--spines .pf-book {
+    transform: rotate(8deg);
+    transform-origin: right bottom;
+}
+
+/* Keyframes de retour au repos */
+@keyframes pf-cover-settle {
+    from { transform: rotateY(-25deg); }
+    to   { transform: rotateY(0); }
+}
+@keyframes pf-cover-inner-settle {
+    from { transform: scale(1.1); }
+    to   { transform: scale(1); }
+}
+@keyframes pf-spine-settle {
+    from { transform: rotate(8deg); }
+    to   { transform: rotate(0); }
+}
+
+/* Au déclenchement : retour au repos, en cascade gauche→droite.
+   backwards = la pose de départ (keyframe `from`) reste tenue pendant le délai, puis on
+   revient à l'état natif → le survol refonctionne (pas de transform figé). Le JS retire
+   `pf-bookshelf-armed` au même instant : l'anim prend le relais sans à-coup. */
+.pf-bookshelf-intro.pf-bookshelf--covers .pf-book-cover {
+    animation: pf-cover-settle 1.5s cubic-bezier(0.22, 0.61, 0.36, 1) backwards;
+    animation-delay: var(--pf-intro-delay, 0s);
+}
+.pf-bookshelf-intro.pf-bookshelf--covers .pf-book-inner {
+    animation: pf-cover-inner-settle 1.5s cubic-bezier(0.22, 0.61, 0.36, 1) backwards;
+    animation-delay: var(--pf-intro-delay, 0s);
+}
+.pf-bookshelf-intro.pf-bookshelf--spines .pf-book {
+    transform-origin: right bottom;
+    animation: pf-spine-settle 0.4s cubic-bezier(0.22, 0.61, 0.36, 1) backwards;
+    animation-delay: var(--pf-intro-delay, 0s);
+}
+
+/* Exception liseuses (livres numériques) : l'écran ne s'ouvre pas → on garde le scale
+   (sur .pf-book-inner) mais on neutralise la rotation de couverture, pose de base et anim.
+   Sélecteur plus spécifique (.pf-book--ereader) → l'emporte sur les règles ci-dessus. */
+.pf-bookshelf-armed.pf-bookshelf--covers .pf-book--ereader .pf-book-cover {
+    transform: none;
+}
+.pf-bookshelf-intro.pf-bookshelf--covers .pf-book--ereader .pf-book-cover {
+    animation: none;
+}
+
+/* ── 4. Contact ─────────────────────────────────────────────────────────────── */
+
+.pf-contact-section {
+    background: var(--pf-cream-dark);
+    padding-bottom: 4rem;
+    min-height: calc(100dvh - var(--pf-sticky-offset, 0px));
+}
+
+.pf-contact-contenu {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 1.5rem 2rem 0;
+    font-size: 0.95rem;
+    line-height: 1.75;
+    color: var(--pf-text);
+}
+
+/* ── 6. Responsive ──────────────────────────────────────────────────────────── */
+
+@media ( max-width: 768px ) {
+    .pf-en-ce-moment-cols {
+        flex-direction: column;
+        gap: 0;
+    }
+
+    /* Même plafond que desktop (slot hero = max-width 460px) : sans lui le
+       carousel grandit jusqu'à son max-width:760px de base et les cartes font
+       quasi toute la largeur du slide (effet « 100% »). align-self:center pour
+       centrer dans .pf-en-ce-moment-cols (flex-column, align-items:stretch). */
+    .pf-en-ce-moment-actualites {
+        margin-bottom: 1rem;
+        align-self: center;
+        width: 100%;
+        max-width: 460px;
+    }
+
+    /* Mobile/tablette : le carousel est relocalisé dans .pf-en-ce-moment-cols,
+       conteneur sans hauteur définie → Splide auto-dimensionnait le track trop
+       petit (images riquiqui). On lui donne une hauteur définie et généreuse,
+       comme le hero sur desktop : l'image se contraint alors à une bonne taille.
+       flex:none pour que la hauteur prime sur le flex:1 (flex-basis 0%). */
+    .pf-en-ce-moment-actualites .pf-actualites-carousel {
+        padding: 1rem;
+        flex: none;
+        height: min(62vh, 460px);
+    }
+
+    /* Annule le cap générique max-height:240px (règle .pf-actualite-image plus
+       bas, héritée de l'ancien carousel standalone) qui rapetissait les images
+       de cette section. La hauteur définie du carousel les contraint déjà. */
+    .pf-en-ce-moment-actualites .pf-actualite-image {
+        max-height: none;
+    }
+
+    .pf-hero-contenu {
+        padding: 2.5rem 2rem 5rem;
+    }
+
+    .pf-hero-typage {
+        font-size: clamp(2rem, 7vw, 3rem);
+    }
+
+    .pf-hero-typage-nom {
+        align-items: center;
+    }
+
+    .pf-actualite-slide {
+        flex-direction: column;
+        min-height: auto;
+    }
+
+    .pf-actualite-image {
+        flex: 0 0 auto;
+        max-height: 240px;
+    }
+
+    .pf-actualite-contenu {
+        padding: 1.75rem 1.5rem;
+    }
+
+    .pf-actualite-titre {
+        font-size: 1.25rem;
+    }
+
+    .pf-section-header {
+        padding: 2.5rem var(--global-content-edge-padding) 0;
+    }
+}
+
+@media ( max-width: 480px ) {
+    .pf-hero-typage {
+        font-size: clamp(1.9rem, 9vw, 2.8rem);
+    }
+}

@@ -1,0 +1,142 @@
+/* ─── Passiflore — Panier ────────────────────────────────────────── */
+/* Tokens + cadre des tableaux (.shop_table) + base des champs : style.css.
+   Ne reste ici que le spécifique au panier. */
+
+/* ─── Largeur du bloc panier (alignwide) ─────────────────────────── */
+/* Kadence donne aux blocs Cart/Checkout alignwide `width:100vw` + marges de
+   centrage, puis une surcharge (woocommerce.min.css) remet `margin:0` SANS
+   réinitialiser la largeur → le bloc garde 100vw, ancré à gauche, et déborde à
+   droite (du conteneur et de l'écran). On rétablit la largeur de la colonne de
+   contenu — le pendant manquant du `width:unset` que Kadence applique, lui, au
+   checkout. Spécificité (0,3,0) pour battre la règle de base `.entry-content
+   .alignwide` (0,2,0). */
+.wp-site-blocks .wp-block-woocommerce-cart.alignwide {
+	width: auto;
+	max-width: 100%;
+}
+
+/* ─── Tableau du panier ──────────────────────────────────────────── */
+/* Cadre + en-tête : .woocommerce table.shop_table (style.css). Ici : densité. */
+
+.woocommerce-cart table.shop_table thead th {
+	padding: 0.85em 1em;
+}
+
+.woocommerce-cart table.shop_table td {
+	padding: 1em;
+	vertical-align: middle;
+	color: var(--pf-text);
+}
+
+.woocommerce-cart table.shop_table .product-name a {
+	color: var(--pf-heading);
+	font-weight: var(--pf-weight-semibold);
+	text-decoration: none;
+}
+
+.woocommerce-cart table.shop_table .product-name a:hover {
+	color: var(--pf-accent);
+}
+
+.woocommerce-cart .product-thumbnail img {
+	width: 56px;
+	height: auto;
+	border-radius: var(--pf-radius);
+}
+
+.woocommerce-cart td.product-remove a.remove {
+	color: var(--pf-text-dim) !important;
+}
+
+.woocommerce-cart td.product-remove a.remove:hover {
+	background: var(--pf-accent) !important;
+	color: var(--pf-surface) !important;
+}
+
+.woocommerce-cart .quantity input.qty {
+	padding: 0.4em;
+}
+
+/* ─── Totaux du panier ───────────────────────────────────────────── */
+
+/* Totaux : motif .pf-panel--alt (markup WooCommerce → sélecteur conservé, tokens). */
+.woocommerce-cart .cart_totals {
+	border: 1px solid var(--pf-border-light);
+	border-radius: var(--pf-radius-lg);
+	padding: var(--pf-panel-pad);
+	background: var(--pf-surface-alt);
+}
+
+.woocommerce-cart .cart_totals h2 {
+	margin-top: 0;
+	color: var(--pf-heading);
+}
+
+.woocommerce-cart .cart_totals table th,
+.woocommerce-cart .cart_totals table td {
+	color: var(--pf-text);
+}
+
+.woocommerce-cart .cart_totals .order-total .amount {
+	color: var(--pf-accent);
+	font-size: 1.15rem;
+}
+
+/* ─── Boutons ────────────────────────────────────────────────────── */
+/* « Valider la commande » (.checkout-button.alt) est rougi par le câblage
+   global Kadence ; ici, seulement sa mise en page bloc pleine largeur. */
+
+.woocommerce-cart .wc-proceed-to-checkout .checkout-button {
+	display: block;
+	width: 100%;
+	text-align: center;
+	font-size: 1rem;
+	padding: 0.8em 1.2em;
+}
+
+/* Actions secondaires (mise à jour panier + application coupon) en style
+   discret pour laisser « Valider la commande » comme seule action primaire.
+   Le bouton coupon reçoit la couleur globale de bouton Kadence → !important. */
+.woocommerce-cart button[name="update_cart"],
+.woocommerce-cart .woocommerce-cart-form .coupon button.button {
+	background: transparent !important;
+	color: var(--pf-accent) !important;
+	border: 1px solid var(--pf-border-light) !important;
+}
+
+.woocommerce-cart button[name="update_cart"]:not([disabled]):hover,
+.woocommerce-cart .woocommerce-cart-form .coupon button.button:hover {
+	background: var(--pf-red-soft) !important;
+	border-color: var(--pf-accent) !important;
+	box-shadow: none !important;
+}
+
+/* ─── Panier vide ────────────────────────────────────────────────── */
+
+.woocommerce-cart .cart-empty.woocommerce-info {
+	border-top-color: var(--pf-accent);
+}
+
+/* « Retour à la boutique » n'est pas un bouton .alt → coloré ici. */
+.woocommerce-cart .return-to-shop .button {
+	background: var(--pf-accent);
+	border-color: var(--pf-accent);
+	color: var(--pf-surface);
+}
+
+/* ─── Redirection « panier vidé » ────────────────────────────────── */
+/* Quand on vide le panier en restant sur la page, cart-empty-redirect.js pose
+   .pf-cart-redirecting sur <html> juste avant de naviguer vers le catalogue :
+   on masque l'écran « panier vide » par défaut pour éviter qu'il n'apparaisse
+   le temps de la navigation. */
+html.pf-cart-redirecting .wp-block-woocommerce-empty-cart-block {
+	display: none !important;
+}
+
+/* ─── Responsive ─────────────────────────────────────────────────── */
+
+@media (max-width: 768px) {
+	.woocommerce-cart .cart_totals {
+		margin-top: 1.5rem;
+	}
+}

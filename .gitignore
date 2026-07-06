@@ -1,0 +1,96 @@
+# ==============================================================
+# Environnement Local by Flywheel
+# ==============================================================
+conf/
+logs/
+
+# ==============================================================
+# Paramètres Claude Code locaux (personnels, pas à versionner)
+# ==============================================================
+.claude/settings.local.json
+
+# ==============================================================
+# WordPress core
+# ==============================================================
+app/public/wp-admin/
+app/public/wp-includes/
+app/public/wp-activate.php
+app/public/wp-blog-header.php
+app/public/wp-comments-post.php
+app/public/wp-config.php
+app/public/wp-config-sample.php
+app/public/wp-cron.php
+app/public/wp-links-opml.php
+app/public/wp-load.php
+app/public/wp-login.php
+app/public/wp-mail.php
+app/public/wp-settings.php
+app/public/wp-signup.php
+app/public/wp-trackback.php
+app/public/xmlrpc.php
+app/public/index.php
+app/public/license.txt
+app/public/readme.html
+app/public/local-xdebuginfo.php
+
+# ==============================================================
+# Thèmes tiers — on garde UNIQUEMENT kadence-child
+# ==============================================================
+app/public/wp-content/themes/*
+!app/public/wp-content/themes/kadence-child/
+
+# ==============================================================
+# Extensions tierces — toutes exclues (aucun plugin custom pour l'instant)
+# Pour ajouter un plugin custom : !app/public/wp-content/plugins/nom-du-plugin/
+# ==============================================================
+app/public/wp-content/plugins/*
+
+# ==============================================================
+# Médias, uploads, sauvegardes, cache, traductions
+# ==============================================================
+app/public/wp-content/uploads/
+app/public/wp-content/updraft/
+app/public/wp-content/upgrade/
+app/public/wp-content/languages/
+app/public/wp-content/cache/
+app/public/wp-content/index.php
+
+# ==============================================================
+# macOS / éditeurs
+# ==============================================================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+*.swp
+*.swo
+*.orig
+
+# ==============================================================
+# Base de données (Dumps SQL)
+# ==============================================================
+*.sql
+
+*.sqlite
+
+# Contenu binaire volumineux (ebooks, images de tranche) — même nature que les uploads
+app/public/epubs/
+app/public/tranches/
+
+# Régénéré automatiquement par WordPress (permaliens)
+app/public/.htaccess
+
+# Config Claude Code / éditeur imbriquée (personnelle)
+**/.claude/
+
+# Scripts d'import PrestaShop -> WordPress + données sources (laissés hors de Git)
+app/public/import-*.php
+app/public/correction-isbn-numeriques.php
+app/public/patch-photos-auteurs.php
+app/public/supprimer-auteurs.php
+app/public/merge_to_scf.py
+app/public/*.csv
+app/public/*.numbers
+

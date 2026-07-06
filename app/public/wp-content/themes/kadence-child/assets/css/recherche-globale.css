@@ -1,0 +1,437 @@
+/* Passiflore — Recherche globale (header) */
+
+:root {
+	--pf-gs-btn-size: 40px;
+}
+
+/* ── Intégration dans le <li> du menu ────────────────────────────────────── */
+
+.pf-gsearch-nav-item {
+	display: flex !important;
+	align-items: center;
+	padding: 0 !important;
+}
+
+/* ── Bouton loupe / croix toggle ──────────────────────────────────────────── */
+
+.pf-gsearch {
+	display: flex;
+	align-items: center;
+	flex-direction: row-reverse; /* bouton ancré à droite, panneau s'étend à gauche */
+}
+
+.pf-gsearch-btn-loupe { display: flex; }
+.pf-gsearch-btn-close { display: none; }
+body.pf-search-open .pf-gsearch-btn-loupe { display: none; }
+body.pf-search-open .pf-gsearch-btn-close { display: flex; }
+
+.pf-gsearch-btn {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: var(--pf-gs-btn-size);
+	height: var(--pf-gs-btn-size);
+	padding: 0;
+	border: none;
+	background: transparent;
+	color: var(--pf-text);
+	cursor: pointer;
+	border-radius: 50%;
+	transition: color 0.2s, background 0.2s;
+	flex-shrink: 0;
+}
+
+.pf-gsearch-btn:hover,
+.pf-gsearch-btn:focus-visible {
+	background: var(--pf-red-soft);
+	outline: none;
+}
+
+.pf-gsearch-btn:hover span,
+.pf-gsearch-btn:focus-visible span {
+	color: var(--pf-accent) !important;
+}
+
+.pf-gsearch-btn svg {
+	width: 20px;
+	height: 20px;
+	pointer-events: none;
+}
+
+/* ── État ouvert : bouton « Fermer » primary (croix crème sur rouge) ───────── */
+
+body.pf-search-open .pf-gsearch-btn {
+	background: var(--pf-accent);
+}
+body.pf-search-open .pf-gsearch-btn-close {
+	color: var(--pf-cream);
+}
+body.pf-search-open .pf-gsearch-btn:hover,
+body.pf-search-open .pf-gsearch-btn:focus-visible {
+	background: var(--pf-accent-dark);
+}
+/* La croix reste crème au survol (sinon la règle générique la repasse en rouge). */
+body.pf-search-open .pf-gsearch-btn:hover .pf-gsearch-btn-close,
+body.pf-search-open .pf-gsearch-btn:focus-visible .pf-gsearch-btn-close {
+	color: var(--pf-cream) !important;
+}
+
+/* ── Panneau (max-width animée, ancré à droite via row-reverse) ───────────── */
+
+.pf-gsearch-panel {
+	flex: 1;
+	min-width: 0;
+	display: flex;
+	overflow: hidden;
+	max-width: 0;
+	transition: max-width 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ── Ouverture ────────────────────────────────────────────────────────────── */
+
+body.pf-search-open #primary-menu > li:not(.pf-gsearch-nav-item) {
+	display: none !important;
+}
+
+body.pf-search-open #primary-menu {
+	width: var(--pf-gsearch-nav-w, 100%) !important;
+}
+
+body.pf-search-open .pf-gsearch-nav-item {
+	flex: 1 !important;
+	min-width: 0 !important;
+}
+
+body.pf-search-open .pf-gsearch {
+	gap: 8px;
+	width: 100%;
+}
+
+/* Le panneau s'étend jusqu'à la largeur capturée moins le bouton */
+body.pf-search-open .pf-gsearch-panel {
+	padding: 3px;
+	max-width: calc(var(--pf-gsearch-nav-w) - var(--pf-gs-btn-size));
+}
+
+/* Fermeture */
+body.pf-search-closing .pf-gsearch-panel {
+	max-width: 0 !important;
+}
+
+/* ── Barre de saisie ──────────────────────────────────────────────────────── */
+
+.pf-gsearch-bar {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	width: 100%;
+}
+
+/* ── Champ (loupe + input + croix) ────────────────────────────────────────── */
+/* Entièrement fourni par le composant commun .pf-search.pf-search--sm (style.css).
+   Le markup garde les classes .pf-gsearch-input / .pf-gsearch-clear comme hooks JS. */
+
+/* ── Dropdown type (composant partagé .pf-dropdown) ──────────────────────── */
+/* Corps trigger/menu/option fourni par .pf-dropdown (style.css).
+   Restent locaux : la rotation du caret et le z-index du menu
+   (doit passer au-dessus de l'overlay résultats z-index 9998). */
+
+.pf-gsearch-type-wrap {
+	flex-shrink: 0;
+}
+
+.pf-gsearch-type-caret {
+	font-size: 10px;
+	line-height: 1;
+	transition: transform 0.2s ease;
+}
+
+.pf-gsearch-type-wrap.is-open .pf-gsearch-type-caret {
+	transform: rotate(180deg);
+}
+
+.pf-gsearch-type-menu {
+	z-index: 10000;
+}
+
+.pf-gsearch-close {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 32px;
+	height: 32px;
+	padding: 0;
+	border: none;
+	background: transparent;
+	color: var(--pf-text);
+	cursor: pointer;
+	border-radius: 50%;
+	flex-shrink: 0;
+	transition: color 0.2s, background 0.2s;
+}
+
+.pf-gsearch-close:hover,
+.pf-gsearch-close:focus-visible {
+	color: var(--pf-accent);
+	background: var(--pf-red-soft);
+	outline: none;
+}
+
+.pf-gsearch-close svg {
+	width: 18px;
+	height: 18px;
+	pointer-events: none;
+}
+
+/* ── Overlay (injecté par JS dans <body>) ─────────────────────────────────── */
+
+.pf-gsearch-overlay {
+	position: fixed;
+	inset: 0;
+	top: var(--pf-sticky-offset, 0px);
+	background: rgba(26, 22, 21, 0.35);
+	z-index: 9997;
+}
+
+/* ── Résultats (position fixed sous le header) ────────────────────────────── */
+
+.pf-gsearch-results {
+	position: fixed;
+	top: var(--pf-sticky-offset, 0px);
+	left: 0;
+	right: 0;
+	background: var(--pf-cream);
+	border-top: 1px solid var(--pf-border-light);
+	max-height: calc(100vh - var(--pf-sticky-offset, 0px));
+	overflow-y: auto;
+	z-index: 9998;
+	box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+.pf-gsearch-results:empty:not(.is-loading) {
+	display: none;
+}
+
+.pf-gsearch-results.is-loading {
+	min-height: 48px;
+}
+
+.pf-gsearch-results.is-loading::before {
+	content: '';
+	position: absolute;
+	top: 0;
+	left: 0;
+	right: 0;
+	height: 2px;
+	background: linear-gradient(90deg, transparent, var(--pf-accent), transparent);
+	transform: translateX(-100%);
+	animation: pf-gsearch-loading 1.1s ease-in-out infinite;
+	will-change: transform;
+}
+
+@keyframes pf-gsearch-loading {
+	from { transform: translateX(-100%); }
+	to   { transform: translateX(100%); }
+}
+
+/* ── Groupes ──────────────────────────────────────────────────────────────── */
+
+.pf-gsearch-group {
+	padding: 6px 0;
+	border-bottom: 1px solid var(--pf-border-light);
+	display: grid;
+	grid-template-columns: auto 1fr;
+}
+
+.pf-gsearch-group:last-child {
+	border-bottom: none;
+}
+
+.pf-gsearch-group-label {
+	grid-column: 1 / -1;
+	padding: 6px 20px 2px;
+	margin: 0;
+	font-size: 0.8em;
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: 0.1em;
+	color: var(--pf-text);
+	opacity: 0.8;
+}
+
+/* ── Items ────────────────────────────────────────────────────────────────── */
+
+.pf-gsearch-item {
+	display: grid;
+	grid-template-columns: subgrid;
+	grid-column: 1 / -1;
+	column-gap: 12px;
+	padding: 8px 20px;
+	text-decoration: none !important;
+	color: var(--pf-heading) !important;
+	transition: background 0.12s;
+}
+
+.pf-gsearch-item:hover {
+	background: rgba(198, 40, 54, 0.05);
+}
+
+.pf-gsearch-item:hover .pf-gsearch-item-title {
+	color: var(--pf-accent);
+}
+
+.pf-gsearch-item-img-wrap {
+	height: 72px;
+	overflow: hidden;
+	display: flex;
+    justify-content: center;
+}
+
+.pf-gsearch-item-img {
+	width: auto;
+	display: block;
+	border-radius: 3px;
+	max-width: 100px !important;
+    object-fit: cover;
+}
+
+.pf-gsearch-item-text {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	min-width: 0;
+}
+
+.pf-gsearch-item-title {
+	font-size: 0.9em;
+	font-weight: 500;
+	color: var(--pf-heading);
+	transition: color 0.12s;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.pf-gsearch-item-subtitle {
+	font-size: 0.8em;
+	color: var(--pf-text);
+	opacity: 0.85;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	min-width: 0;
+}
+
+.pf-gsearch-item-meta {
+	font-size: 0.8em;
+	color: var(--pf-text);
+	opacity: 0.7;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	min-width: 0;
+}
+
+/* Livres et auteurs : pas de subtitle → description sur 2 lignes */
+.pf-gsearch-item:not(:has(.pf-gsearch-item-subtitle)) .pf-gsearch-item-meta {
+	white-space: normal;
+	display: -webkit-box;
+	-webkit-line-clamp: 2;
+	-webkit-box-orient: vertical;
+}
+
+/* ── Message vide ─────────────────────────────────────────────────────────── */
+
+.pf-gsearch-empty {
+	padding: 20px;
+	text-align: center;
+	margin: 0;
+}
+
+/* ── Header mobile Kadence (tablette + mobile, ≤1024px) ─────────────────────── */
+/* Toutes les règles sont scopées #mobile-header : la spécificité id (1,1,1) bat
+   les règles globales .pf-gsearch-panel (0,2,1). La fermeture globale
+   `body.pf-search-closing .pf-gsearch-panel` est en !important → les surcharges
+   mobiles de max-width doivent l'être aussi. Le desktop (#primary-menu, ≥1025px)
+   n'est jamais touché. */
+
+/* Tablette (769–1024px) : barre toujours visible entre logo et hamburger. */
+@media (min-width: 769px) and (max-width: 1024px) {
+	#mobile-header .site-main-header-inner-wrap {
+		grid-template-columns: auto 1fr !important;
+	}
+	#mobile-header .site-header-main-section-right {
+		flex: 1 1 auto;
+		gap: 12px;
+	}
+	#mobile-header .site-header-item {
+    	margin-right: 0;
+	}
+	#mobile-header .pf-gsearch-mobile-item {
+		flex: 1 1 auto;
+		min-width: 0;
+		margin-right: 0;
+		margin-left: 12px;
+	}
+	#mobile-header .pf-gsearch {
+		width: 100%;
+		flex: 1;
+	}
+	#mobile-header .pf-gsearch-btn {
+		display: none !important; /* pas de toggle : la barre est permanente */
+	}
+	#mobile-header .pf-gsearch-panel {
+		max-width: none !important;
+		overflow: visible;
+		padding: 3px;
+	}
+	#mobile-header .site-header-item-navgation-popup-toggle {
+		flex: 0 0 auto;
+	}
+}
+
+/* Mobile (≤768px) : loupe à gauche du hamburger ; déploiement plein largeur. */
+@media (max-width: 768px) {
+	#mobile-header .pf-gsearch-btn {
+		display: flex; /* loupe / croix */
+	}
+	#mobile-header .pf-gsearch-type-wrap {
+		display: none; /* trop encombrant sur mobile : recherche sur tout */
+	}
+	/* Replié par défaut : .pf-gsearch-panel max-width:0 hérité. */
+
+	/* Déployé : on masque logo + hamburger et la recherche occupe toute la rangée. */
+	body.pf-search-open #mobile-header .site-header-main-section-left,
+	body.pf-search-open #mobile-header .site-header-item-navgation-popup-toggle,
+	body.pf-search-open #mobile-header .site-header-focus-item:has(>.header-mobile-cart-wrap) {
+		display: none !important;
+	}
+	body.pf-search-open #mobile-header .site-main-header-inner-wrap {
+		grid-template-columns: 1fr !important;
+	}
+	#mobile-header .site-header-main-section-right {
+		gap: 6px;
+	}
+	body.pf-search-open #mobile-header .site-header-main-section-right {
+		grid-column: 1 / -1;
+		flex: 1 1 auto;
+		justify-content: flex-start;
+	}
+	#mobile-header .site-header-item {
+    	margin-right: 0;
+	}
+	body.pf-search-open #mobile-header .pf-gsearch-mobile-item,
+	body.pf-search-open #mobile-header .pf-gsearch {
+		flex: 1 1 auto;
+		width: 100%;
+		gap: 8px;
+		margin-right: 0;
+	}
+	body.pf-search-open #mobile-header .pf-gsearch-panel {
+		max-width: 100% !important;
+		padding: 3px;
+	}
+	body.pf-search-closing #mobile-header .pf-gsearch-panel {
+		max-width: 0 !important;
+	}
+}

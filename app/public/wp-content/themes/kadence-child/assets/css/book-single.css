@@ -1,0 +1,978 @@
+/* ═══════════════════════════════════════════════════════════════
+   Passiflore — Fiche livre (single product)
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ─── Hero layout ────────────────────────────────────────────── */
+
+.bs-hero {
+	display: grid;
+	grid-template-columns: 320px 1fr;
+	grid-template-areas:
+		"heading visual"
+		"info    visual";
+	gap: var(--pf-space-3) var(--pf-space-10);
+	align-items: start;
+	padding: var(--pf-space-8) 0 var(--pf-space-10);
+}
+
+.bs-hero__heading {
+	grid-area: heading;
+	display: flex;
+	flex-direction: column;
+	gap: var(--pf-space-3);
+	font-family: var(--pf-font-heading);
+}
+
+.bs-hero__info {
+	grid-area: info;
+	display: flex;
+	flex-direction: column;
+	gap: var(--pf-space-3);
+}
+
+.bs-hero__info .price {
+	margin: 0;
+}
+
+.bs-hero__visual {
+	grid-area: visual;
+	min-width: 0;
+}
+
+/* ─── Hero info — typographie ────────────────────────────────── */
+
+.bs-hero__authors {
+	margin: 0;
+}
+
+/* Rôle (.pf-label) et noms (.pf-value) portent la voix « étiquette/valeur » (style.css) ;
+   ici, seulement les marges et l'interligne contextuels. Le `color` couvre les séparateurs
+   nus (« , ») entre les noms. */
+.bs-hero__authors-line {
+    font-size: var(--pf-text-xs);
+	margin: 0;
+	line-height: 1;
+}
+
+.bs-hero__authors-line + .bs-hero__authors-line {
+	margin-top: 0.2em;
+}
+
+/* Voix « titre principal » via .pf-titre-1 ; ici on ne garde que la taille/couleur contextuelles. */
+.bs-hero__title {
+	font-size: 1.7rem;
+	line-height: 1.2;
+	margin: 0;
+}
+
+.bs-hero__subtitle {
+	font-size: 1rem;
+	font-style: italic;
+	color: var(--pf-text);
+	margin: 0;
+}
+
+/* ─── Prix ───────────────────────────────────────────────────── */
+
+.bs-hero__price {
+	font-size: 1.3rem;
+	font-weight: 600;
+	color: var(--pf-heading);
+}
+
+.bs-hero__price .woocommerce-Price-amount {
+	color: inherit;
+}
+
+/* ─── Actions (boutons) ──────────────────────────────────────── */
+
+.bs-hero__actions {
+	display: flex;
+	flex-direction: column;
+	gap: var(--pf-space-2);
+	margin-top: var(--pf-space-1);
+}
+
+.bs-hero__secondary-row {
+	display: flex;
+	flex-direction: column;
+	gap: var(--pf-space-2);
+}
+
+.bs-hero__secondary-row > * {
+	flex: 1;
+	width: auto;
+}
+
+/* .pf-info__flip : .pf-btn .pf-btn--outline .pf-btn--block (style.css). On garde l'état disabled. */
+
+.pf-info__flip:disabled {
+	opacity: 0.5;
+	cursor: progress;
+}
+
+/* Bouton WooCommerce (panier) : sélecteur composé conservé pour battre la spécificité WC ; valeurs sur tokens. */
+.bs-hero__cart.button {
+	display: block;
+	width: 100%;
+	padding: var(--pf-btn-pad);
+	border-radius: var(--pf-radius);
+	font-size: 0.9rem;
+	text-align: center;
+	background: var(--pf-accent);
+	color: var(--pf-surface) !important;
+	border: 1px solid var(--pf-accent);
+	transition: var(--pf-btn-transition);
+}
+
+.bs-hero__cart.button:hover {
+	background: var(--pf-accent-dark);
+	box-shadow: none;
+}
+
+/* Lien « Voir le panier » inséré par WooCommerce après un ajout AJAX : masqué
+   (le compteur du header suffit comme retour). Sélecteur a.added_to_cart.wc-forward
+   (0,3,1) pour battre `.woocommerce a.added_to_cart{display:inline-block}` (0,2,1). */
+.bs-hero__actions a.added_to_cart.wc-forward {
+	display: none;
+}
+
+/* ─── Lien Place des Libraires ───────────────────────────────── */
+
+.bs-hero__libraires {
+	font-size: 0.85rem;
+	color: var(--pf-text);
+	text-decoration: none;
+	font-family: var(--pf-font-body);
+}
+
+.bs-hero__libraires:hover {
+	color: var(--pf-accent);
+}
+
+/* ─── Boutons de format ──────────────────────────────────────── */
+
+.bs-formats {
+	display: flex;
+	align-items: center;
+	flex-wrap: wrap;
+	gap: 0.4rem;
+	margin-top: var(--pf-space-1);
+	font-family: var(--pf-font-body);
+	font-size: 0.8rem;
+}
+
+.bs-formats__label {
+	color: var(--pf-text);
+	font-size: 0.78rem;
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+}
+
+/* Boutons de format : .pf-btn .pf-btn--sm + .pf-btn--neutral (inactif) / .pf-btn--primary (actif) — voir style.css. */
+
+/* ─── Hero visual — étagère ──────────────────────────────────── */
+
+/* Le livre hero est centré, cliquable (ouvre l'overlay). Padding latéral ample
+   pour que l'étagère + la planche débordent un peu le livre (toutes tailles
+   d'écran). L'étagère étant fit-content, ce padding s'applique en entier quand
+   la largeur le permet et se rabote tout seul (clamp fit-content) sur les
+   colonnes étroites — le livre reste centré sur la planche, jamais de
+   débordement. */
+.pf-bookshelf--hero .pf-shelf-books {
+	justify-content: center;
+	padding-top: 32px;
+	padding-left: 64px;
+	padding-right: 64px;
+	width: fit-content;
+}
+
+.bs-hero__visual, .bs-hero__visual .pf-bookshelf, .pf-bookshelf--hero .pf-shelf {
+	width: fit-content;
+}
+
+/* Curseur pointer pour signaler l'interactivité */
+.pf-bookshelf--hero .pf-book {
+	cursor: pointer;
+}
+
+/* ─── Overlay fullscreen — flipbook ──────────────────────────── */
+
+.bs-flipbook-overlay {
+	display: none;
+	position: fixed;
+	inset: 0;
+	z-index: 9999;
+	background: rgba(15, 10, 8, 0.93);
+	flex-direction: column;
+	align-items: center;
+	padding-top: calc(1.25rem + var(--pf-adminbar));
+	padding-bottom: var(--pf-space-5);
+}
+
+.bs-flipbook-overlay.is-open {
+	display: flex;
+	gap: var(--pf-space-5);
+	padding-right: var(--pf-space-5);
+    padding-left: var(--pf-space-5);
+}
+
+.bs-flipbook-close {
+	align-self: flex-end;
+	margin-right: var(--pf-space-5);
+	flex-shrink: 0;
+	width: 2.5rem;
+	height: 2.5rem;
+	border-radius: 50%;
+	background: rgba(255, 255, 255, 0.12);
+	border: 1px solid rgba(255, 255, 255, 0.25);
+	color: #fff;
+	font-size: 1.1rem;
+	line-height: 1;
+	cursor: pointer;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	transition: background 0.15s;
+}
+
+.bs-flipbook-close:hover {
+	background: rgba(255, 255, 255, 0.22);
+}
+
+/* ─── Viewport scrollable ────────────────────────────────────── */
+
+.bs-flipbook-viewport {
+	flex: 1;
+	align-self: stretch;
+	min-height: 0;
+	overflow: auto;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.bs-flipbook-scale-wrapper {
+	position: relative;
+	flex-shrink: 0;
+	transition: transform 0.3s ease;
+	/* width/height définis par JS selon l'échelle viewport */
+}
+
+.bs-flipbook-inner {
+	position: absolute;
+	top: 0;
+	left: 0;
+	transform-origin: top left;
+	/* transform + dimensions définis par JS */
+}
+
+/* Reset margin du flipbook à l'intérieur de l'overlay */
+.bs-flipbook-inner #passiflore-flipbook {
+	margin: 0;
+}
+
+/* ─── Toolbar flipbook ───────────────────────────────────────── */
+
+.bs-flipbook-toolbar {
+	flex-shrink: 0;
+	display: flex;
+	align-items: center;
+	gap: 0.15rem;
+	background: rgba(20, 12, 8, 0.88);
+	backdrop-filter: blur(10px);
+	-webkit-backdrop-filter: blur(10px);
+	border-radius: 2rem;
+	padding: 0.3rem 0.45rem;
+	user-select: none;
+	white-space: nowrap;
+}
+
+.bs-tb-btn {
+	width: 2.2rem;
+	height: 2.2rem;
+	border-radius: 50%;
+	background: transparent;
+	border: none;
+	color: rgba(255, 255, 255, 0.8);
+	cursor: pointer;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	transition: background 0.15s, color 0.15s;
+	flex-shrink: 0;
+	padding: 0;
+}
+
+.bs-tb-btn:hover:not(:disabled) {
+	background: rgba(255, 255, 255, 0.14);
+	color: #fff;
+}
+
+.bs-tb-btn:active:not(:disabled) {
+	background: rgba(255, 255, 255, 0.22);
+}
+
+.bs-tb-btn:disabled {
+	opacity: 0.3;
+	cursor: default;
+}
+
+.bs-tb-btn:focus:not(:focus-visible) {
+	background: transparent;
+}
+
+.bs-tb-sep {
+	width: 1px;
+	height: 1.25rem;
+	background: rgba(255, 255, 255, 0.2);
+	margin: 0 0.2rem;
+	flex-shrink: 0;
+}
+
+/* Mode toggle — icône selon l'état courant */
+.bs-tb-btn--mode .bs-tb-icon-single { display: none; }
+.bs-tb-btn--mode .bs-tb-icon-double { display: flex; align-items: center; }
+.bs-tb-btn--mode[aria-pressed="true"] .bs-tb-icon-double { display: none; }
+.bs-tb-btn--mode[aria-pressed="true"] .bs-tb-icon-single { display: flex; align-items: center; }
+
+/* Bouton page suivante — spinner de chargement */
+.bs-tb-btn--next .bs-tb-spinner { display: none; }
+.bs-tb-btn--next.is-loading .bs-tb-chevron { display: none; }
+.bs-tb-btn--next.is-loading .bs-tb-spinner {
+	display: block;
+	animation: pf-spin 0.7s linear infinite; /* keyframes globales (style.css) */
+}
+
+/* ─── Onglet Caractéristiques ────────────────────────────────── */
+
+.bs-tab-caract {
+	padding: var(--pf-space-2) 0;
+}
+
+/* ─── Prix littéraires & distinctions ───────────────────────── */
+
+.bs-distinctions {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	display: flex;
+	flex-direction: column;
+	gap: var(--pf-space-1);
+	font-family: var(--pf-font-body);
+	font-size: 0.85rem;
+	color: var(--pf-text);
+}
+
+.bs-distinctions li {
+	display: flex;
+	align-items: center;
+	gap: 0.4em;
+	padding: 0.35em 0;
+	border-bottom: 1px solid var(--pf-border);
+}
+
+.bs-distinctions li:last-child {
+	border-bottom: none;
+}
+
+
+/* ─── Badge disponibilité ─────────── */
+
+.bs-dispo-line {
+	display: flex;
+	align-items: center;
+	gap: var(--pf-space-2);
+	flex-wrap: wrap;
+}
+
+.bs-caract-table {
+	width: 100%;
+	border-collapse: collapse;
+	font-size: 0.9rem;
+}
+
+.bs-caract-table th,
+.bs-caract-table td {
+	padding: 0.55em 0.75em;
+	text-align: left;
+	border-bottom: 1px solid var(--pf-border);
+	vertical-align: top;
+}
+
+.bs-caract-table th {
+	font-weight: 600;
+	color: var(--pf-text);
+	white-space: nowrap;
+	width: 40%;
+	background: var(--pf-surface-alt);
+}
+
+.bs-caract-table td {
+	color: var(--pf-heading);
+}
+
+.bs-caract-table tr:last-child th,
+.bs-caract-table tr:last-child td {
+	border-bottom: none;
+}
+
+
+/* ─── Onglet Livres associés ─────────────────────────────────────── */
+
+.bs-tab-lies {
+	padding: var(--pf-space-2) 0;
+}
+
+.bs-lies-section {
+	margin-bottom: var(--pf-space-10);
+}
+
+.bs-lies-section:last-child {
+	margin-bottom: 0;
+}
+
+/* ─── Onglet Presse & Médias ─────────────────────────────────── */
+
+.bs-tab-media {
+	padding: var(--pf-space-2) 0;
+}
+
+.bs-media-section {
+	margin-bottom: var(--pf-space-10);
+}
+
+.bs-media-section:last-child {
+	margin-bottom: 0;
+}
+
+.bs-media-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+	gap: var(--pf-space-4);
+}
+
+/* Cartes presse/vidéos/podcasts = composant .pf-card (variante --static : non
+   cliquable, blanc + bordure ; --compact : padding resserré ; voir style.css).
+   Ici, uniquement les spécificités média. */
+.bs-media-grid .bs-item--hidden {
+	display: none;
+}
+
+/* Dans le corps paddé (.pf-card-content), le dernier élément (figure média ou
+   lien) absorbe l'espace vertical restant → bas des cartes alignés. */
+.bs-media-grid .pf-card-content > :last-child {
+	flex: 1;
+}
+
+/* Conteneur du média : c'est lui qui s'étire (flex:1), le média à l'intérieur
+   garde son ratio et reste centré verticalement, l'espace en trop se répartit
+   au-dessus et en dessous. */
+.bs-media-figure {
+	display: flex;
+	flex-direction: column;
+	justify-content: center;
+	min-height: 0;
+}
+
+/* Titre média : entièrement géré par .pf-card-title (style.css).
+   Description via .pf-card-text. */
+
+.bs-media-link {
+	font-size: 0.85rem;
+	color: var(--pf-accent);
+	text-decoration: none;
+	font-weight: 600;
+	margin-top: auto;
+}
+
+.bs-media-link:hover {
+	text-decoration: underline;
+}
+
+.bs-media-embed {
+	width: 100%;
+	border-radius: var(--pf-radius-md);
+	overflow: hidden;
+}
+
+/* Embed vidéo (iframe oEmbed) : épouse le ratio réel posé en inline ; fallback 16/9.
+   Plafond de hauteur (surtout pour le portrait) : on borne la largeur à
+   hauteur_max × ratio (--bs-ar posé inline), ce qui plafonne la hauteur sans
+   casser le ratio. La vidéo est alors centrée horizontalement dans sa carte. */
+.bs-media-embed:not(.bs-media-embed--audio) {
+	aspect-ratio: 16 / 9;
+	max-width: calc(var(--bs-video-max-h, 420px) * var(--bs-ar, 1.7778));
+	margin-inline: auto;
+}
+
+/* Toutes les iframes oEmbed : pleine largeur, sans bordure. */
+.bs-media-embed iframe {
+	display: block;
+	width: 100%;
+	border: none;
+}
+
+/* iframe vidéo : remplit le cadre au ratio défini sur le wrapper.
+   Pas pour l'audio : sans height imposée, l'iframe garde la hauteur de son
+   attribut = la hauteur native du player SoundCloud/Spotify. */
+.bs-media-embed:not(.bs-media-embed--audio) iframe {
+	height: 100%;
+}
+
+/* Fichier vidéo direct : ratio intrinsèque du fichier, hauteur plafonnée
+   (le portrait est alors letterboxé sur fond noir, faute de ratio connu côté
+   serveur pour un fichier uploadé). */
+.bs-media-video {
+	display: block;
+	width: 100%;
+	height: auto;
+	max-height: var(--bs-video-max-h, 420px);
+	object-fit: contain;
+	border: none;
+	border-radius: var(--pf-radius-md);
+	background: #000;
+}
+
+.bs-media-audio {
+	width: 100%;
+	margin-top: var(--pf-space-1);
+	border-radius: var(--pf-radius-md);
+}
+
+/* ─── Onglet Avis ────────────────────────────────────────────── */
+
+.bs-tab-avis {
+	padding: var(--pf-space-2) 0;
+}
+
+.bs-avis-section {
+	margin-bottom: var(--pf-space-10);
+}
+
+.bs-avis-section:last-child {
+	margin-bottom: 0;
+}
+
+/* Fond/filet/rayon : .pf-quote (style.css, filet sable par défaut). */
+.bs-avis-item {
+	padding: var(--pf-space-4) var(--pf-space-5);
+	margin: 0 0 var(--pf-space-4);
+}
+
+.bs-avis-item.bs-item--hidden {
+	display: none;
+}
+
+.bs-avis-text {
+	font-size: 0.95rem;
+	color: var(--pf-heading);
+	margin: 0 0 0.6rem;
+	line-height: 1.6;
+	font-family: var(--pf-font-heading);
+}
+
+.bs-avis-footer {
+	font-size: 0.8rem;
+	color: var(--pf-text);
+}
+
+.bs-avis-titre {
+	font-size: 1rem;
+	font-weight: 600;
+	margin: 0 0 0.4rem;
+}
+
+.bs-avis-date {
+	color: var(--pf-muted);
+}
+
+.bs-avis-empty {
+	font-size: 0.9rem;
+	font-style: italic;
+	color: var(--pf-muted);
+	margin: 0 0 var(--pf-space-4);
+}
+
+.bs-avis-item--pending {
+	opacity: 0.55;
+}
+
+.bs-avis-pending-notice {
+	font-size: 0.78rem;
+	font-style: italic;
+	color: var(--pf-muted);
+	margin: var(--pf-space-2) 0 0;
+}
+
+/* Réponse de l'éditeur sous un avis (fiche livre) : .pf-avis-reponse (style.css).
+   L'avis hôte (.bs-avis-item) est sur fond --pf-surface-alt → on repasse la réponse en blanc pour garder le contraste. */
+.bs-avis-item .pf-avis-reponse {
+	background: var(--pf-surface);
+}
+
+/* Fond/couleur/filet/padding : .pf-notice--error (style.css). */
+.bs-avis-erreur {
+	margin: 0 0 var(--pf-space-5);
+}
+
+/* ─── Formulaire de dépôt d'avis ─────────────────────────────── */
+
+.bs-avis-form p {
+	margin: 0 0 var(--pf-space-4) !important;
+}
+
+.comment-form-comment {
+	margin: 0 !important;
+}
+
+.bs-avis-form label {
+	display: block;
+	font-size: 0.85rem;
+	color: var(--pf-text);
+	margin-bottom: 0.35rem;
+}
+
+/* Champs : bord + focus via la base formulaire globale (style.css). Ici, seulement les deltas. */
+.bs-avis-form input[type="text"],
+.bs-avis-form textarea {
+	width: 100%;
+	padding: 0.6em 0.75em;
+	font-family: inherit;
+	font-size: 0.95rem;
+	color: var(--pf-heading);
+}
+
+.bs-avis-form input[disabled] {
+	background: var(--pf-cream-dark);
+	color: var(--pf-text);
+	border-color: var(--pf-border);
+	cursor: default;
+}
+
+.bs-avis-form textarea {
+	resize: vertical;
+}
+
+.bs-avis-form .comment-notes,
+.bs-avis-form .comment-notes-after {
+	font-size: 0.8rem;
+	color: var(--pf-muted);
+}
+
+.bs-avis-form .form-submit {
+	margin-bottom: 0;
+}
+
+/* Bouton de soumission (comment_form) : sélecteur conservé ; valeurs sur tokens (look primaire). */
+.bs-avis-form .submit,
+.bs-avis-form input[type="submit"] {
+	display: inline-block;
+	padding: var(--pf-btn-pad);
+	border: 1px solid var(--pf-accent);
+	border-radius: var(--pf-radius);
+	background: var(--pf-accent);
+	color: var(--pf-surface);
+	font-size: 0.9rem;
+	font-weight: var(--pf-btn-weight);
+	cursor: pointer;
+	transition: var(--pf-btn-transition);
+}
+
+.bs-avis-form .submit:hover,
+.bs-avis-form input[type="submit"]:hover {
+	background: var(--pf-accent-dark);
+	border-color: var(--pf-accent-dark);
+	box-shadow: none;
+}
+
+.bs-avis-form .required {
+	color: var(--pf-accent);
+}
+
+/* ─── Bouton "Voir tout" ─────────────────────────────────────── */
+
+/* .bs-voir-tout : .pf-btn .pf-btn--neutral .pf-btn--sm (style.css) ; on garde la marge contextuelle. */
+.bs-voir-tout {
+	margin-top: var(--pf-space-3);
+}
+
+/* ─── Responsive ─────────────────────────────────────────────── */
+
+@media (max-width: 900px) {
+	.bs-caract-table th {
+		width: 45%;
+	}
+
+	.bs-media-grid {
+		grid-template-columns: 1fr;
+	}
+}
+
+/* Mobile uniquement : hero en colonne (la tablette garde les deux colonnes) */
+@media (max-width: 767px) {
+	.bs-hero {
+		display: flex;
+		flex-direction: column;
+		gap: var(--pf-space-8);
+	}
+
+	.bs-hero__heading { order: 1; }
+	.bs-hero__visual  { order: 2; align-self: center; }
+	.bs-hero__info    { order: 3; align-self: center; align-items: center; }
+}
+
+/* Mobile uniquement : espacements réduits */
+@media (max-width: 599px) {
+	.bs-hero {
+		gap: var(--pf-space-6);
+		padding: var(--pf-space-4) 0 var(--pf-space-6);
+	}
+
+	.bs-hero__title {
+		font-size: 1.4rem;
+	}
+
+	.bs-hero__actions {
+		gap: 0.4rem;
+	}
+}
+
+/* Tablette + desktop (hero deux colonnes) : contenu centré verticalement,
+   et le visuel (fit-content) centré horizontalement dans sa cellule. */
+@media (min-width: 768px) {
+	.bs-hero {
+		align-items: center;
+	}
+
+	.bs-hero__visual {
+		justify-self: center;
+	}
+}
+
+
+/* ─── Layout sections ────────────────────────────────────────── */
+
+.bs-body {
+	display: grid;
+	grid-template-columns: 160px minmax(0, 1fr);
+	gap: var(--pf-space-12);
+	align-items: start;
+	padding: var(--pf-space-12) 0 var(--pf-space-16);
+}
+
+/* ─── Nav latérale sticky — ligne de progression + points ─────── */
+
+.bs-sectionnav {
+	position: sticky;
+	top: calc(var(--pf-sticky-offset, 0px) + 2rem);
+	display: flex;
+	flex-direction: column;
+	padding-left: var(--pf-space-5);
+}
+
+.bs-sectionnav::before {
+	content: '';
+	position: absolute;
+	left: 0.38rem;
+	top: 0.7rem;
+	bottom: 0.7rem;
+	width: 1px;
+	background: var(--pf-border);
+}
+
+/* Liens de nav : reprennent la voix « étiquette » (petites capitales espacées),
+   décrochée de .pf-label pour ne pas hériter de son ton atténué ; couleur + layout + états. */
+.bs-sectionnav a {
+	position: relative;
+	display: block;
+	padding: 0.45em 0;
+	font-family: var(--pf-font-body);
+	font-size: var(--pf-text-xs);
+	font-weight: var(--pf-weight-normal);
+	text-transform: uppercase;
+	letter-spacing: 0.1em;
+	line-height: 1.2;
+	color: var(--pf-text);
+	text-decoration: none;
+	transition: color 0.15s;
+}
+
+.bs-sectionnav a::before {
+	content: '';
+	position: absolute;
+	left: -1.0625rem;
+	top: 50%;
+	transform: translateY(-50%);
+	width: 7px;
+	height: 7px;
+	border-radius: 50%;
+	border: 1.5px solid var(--pf-border);
+	background: var(--pf-cream-dark);
+	transition: border-color 0.2s, background 0.2s;
+}
+
+.bs-sectionnav a:hover {
+	color: var(--pf-accent);
+}
+
+.bs-sectionnav a.is-active {
+	color: var(--pf-accent);
+	font-weight: 600;
+}
+
+.bs-sectionnav a.is-active::before,
+.bs-sectionnav a:hover::before {
+	border-color: var(--pf-accent);
+	background: var(--pf-accent);
+}
+
+/* Mobile : nav horizontale sticky en haut */
+@media (max-width: 599px) {
+	.bs-body {
+		display: block;
+	}
+
+	.bs-sectionnav {
+		position: sticky;
+		top: var(--pf-sticky-offset, 0px);
+		flex-direction: row;
+		overflow-x: auto;
+		white-space: nowrap;
+		scrollbar-width: none;
+		background: var(--pf-cream-dark);
+		border-bottom: 1px solid var(--pf-border);
+		padding-left: 0;
+		z-index: 100;
+	}
+
+	/* Effet « aéro » au scroll — voir le bloc « Éléments sticky » de style.css. */
+	@supports ((backdrop-filter: blur(2px)) or (-webkit-backdrop-filter: blur(2px))) {
+		.bs-sectionnav {
+			background: rgba(245, 240, 232, 0.9); /* --pf-cream-dark translucide */
+			-webkit-backdrop-filter: blur(var(--pf-aero-blur));
+			backdrop-filter: blur(var(--pf-aero-blur));
+		}
+	}
+
+	.bs-sectionnav::-webkit-scrollbar { display: none; }
+
+	.bs-sectionnav::before { display: none; }
+
+	.bs-sectionnav a {
+		padding: 0.6em 1em;
+		border-bottom: 2px solid transparent;
+	}
+
+	.bs-sectionnav a::before { display: none; }
+
+	.bs-sectionnav a.is-active,
+	.bs-sectionnav a:hover {
+		border-bottom-color: var(--pf-accent);
+	}
+}
+
+
+/* ─── Sections ───────────────────────────────────────────────── */
+
+.bs-section {
+	padding-top: var(--pf-space-6);
+	padding-bottom: var(--pf-space-10);
+	border-bottom: 1px solid var(--pf-border);
+	scroll-margin-top: calc(var(--pf-sticky-offset, 0px) + 1rem);
+}
+
+.bs-section:last-child {
+	border-bottom: none;
+}
+
+/* Titre de section : la voix typo vient de la règle h2 globale (style.css) ;
+   ici on ne garde que la couleur et la marge contextuelles. */
+.bs-section__title {
+	color: var(--pf-text);
+	margin: 0 0 var(--pf-space-5);
+}
+
+.bs-section__body {
+	font-size: 0.95rem;
+	line-height: 1.7;
+	color: var(--pf-heading);
+}
+
+/* scroll-margin-top mobile : header + nav horizontale */
+@media (max-width: 599px) {
+	.bs-section {
+		scroll-margin-top: calc(var(--pf-sticky-offset, 0px) + 3rem);
+	}
+}
+
+
+/* ─── Auteurs : wrapper carte + rôle ─────────────────────────── */
+
+.bs-auteur-wrapper {
+	flex-shrink: 0;
+	width: 200px;
+	scroll-snap-align: start;
+	display: flex;
+	flex-direction: column;
+}
+
+.bs-auteur-wrapper .pf-auteur-card {
+	flex: 1;
+}
+
+/* Étiquette via .pf-label ; ici, couleur + alignement + marge contextuels. */
+.bs-auteur-role {
+    font-size: var(--pf-text-xs);
+	text-align: center;
+	margin: 0.35rem 0 0;
+}
+
+.bs-auteur-meta {
+	font-size: 0.88rem;
+	color: var(--pf-text);
+	font-style: italic;
+	margin: var(--pf-space-3) 0 0;
+}
+
+/* ─── Onglet Auteur(s) / Autrice(s) ─────────────────────────── */
+
+.bs-tab-auteurs {
+	padding: var(--pf-space-2) 0;
+}
+
+/* Carte auteur : conteneur, photo, titre, bio, zoom — tout est global (style.css).
+   Spécifique aux pages produit : seulement le padding du corps (un peu resserré). */
+.bs-tab-auteurs .pf-card-content {
+	padding: var(--pf-space-3) 0.85rem var(--pf-space-4);
+}
+
+/* Dégradés scroll (override couleur events.css) */
+.bs-tab-auteurs .pf-event-tiles-wrap::before {
+	background: linear-gradient(to right, var(--pf-surface-alt), transparent);
+}
+
+.bs-tab-auteurs .pf-event-tiles-wrap::after {
+	background: linear-gradient(to left, var(--pf-surface-alt), transparent);
+}
+
+/* Scroll horizontal — overflow + scrollbar fournis par .pf-hscroll (style.css). */
+.bs-tab-auteurs .pf-event-auteurs-scroll {
+	display: flex;
+	gap: var(--pf-space-4);
+	padding: 10px !important;
+}
+
+/* cartes maintenant dans .bs-auteur-wrapper — voir règles bs-auteur-wrapper plus bas */
+
+/* Noms en texte libre (champ-texte) */
+.bs-auteurs-texte {
+	list-style: none;
+	margin: var(--pf-space-4) 0 0;
+	padding: 0;
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--pf-space-2) var(--pf-space-6);
+	font-size: 0.95rem;
+	color: var(--pf-text);
+}

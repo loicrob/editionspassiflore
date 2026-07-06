@@ -1,0 +1,303 @@
+/**
+ * Vue « Carte » des événements — PROTOTYPE.
+ *
+ * Habillage de la carte Leaflet + infobulles, calé sur les tokens --pf-*.
+ * Chargé après leaflet.css et pf-events (cf. dépendances d'enqueue).
+ */
+
+.pf-events-map-wrap {
+	position: relative;
+	margin: var(--pf-space-6) 0 var(--pf-space-10);
+}
+
+/* Conteneur de la carte.
+ * position:relative + z-index:0 => contexte d'empilement propre : les z-index
+ * internes élevés de Leaflet (panes, contrôles) restent contenus SOUS la barre
+ * sticky du header (qui est au niveau page). */
+#pf-events-map {
+	position: relative;
+	z-index: 0;
+	width: 100%;
+	height: min(70vh, 640px);
+	min-height: 360px;
+	border: 1px solid var(--pf-border);
+	border-radius: var(--pf-radius-lg);
+	overflow: hidden;
+	background: var(--pf-cream);
+}
+
+.leaflet-container {
+	font-family: inherit;
+	background: var(--pf-cream);
+}
+
+/* ─── Barre de recherche (dans le __left du header) ──────────────── */
+/* Occupe l'espace de gauche comme .pf-ev-search en vue liste ; le champ hérite
+   du composant .pf-search--sm (style.css). Classes propres (.pf-map-search*)
+   pour ne pas être détournée par le contrôleur de la liste (events-search.js). */
+.pf-map-search {
+	width: 100%;
+}
+
+.pf-map-search .pf-search-input {
+	font-size: 14px;
+}
+
+/* ─── Marqueur (SVG — pointe exactement centrée sur le point) ─────── */
+
+.pf-map-pin {
+	background: none;
+	border: 0;
+	color: var(--pf-accent); /* couleur du pin : currentColor dans le SVG */
+}
+
+.pf-map-pin__svg {
+	display: block;
+	width: 100%;
+	height: 100%;
+	overflow: visible;
+	filter: drop-shadow( 0 1px 1.5px color-mix( in srgb, var(--pf-heading) 30%, transparent ) );
+}
+
+.pf-map-pin__svg path {
+	fill: currentColor;
+	stroke: var(--pf-surface, #fff);
+	stroke-width: 2;
+}
+
+.pf-map-pin__svg circle {
+	fill: var(--pf-surface, #fff);
+}
+
+.pf-map-pin:hover {
+	color: var(--pf-accent-dark);
+}
+
+/* ─── Pin de cluster (compteur d'événements) ─────────────────────── */
+
+.pf-map-cluster {
+	background: none;
+	border: 0;
+}
+
+.pf-map-cluster span {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 36px;
+	height: 36px;
+	border-radius: 50%;
+	background: var(--pf-accent);
+	color: var(--pf-surface, #fff);
+	font-weight: var(--pf-weight-bold);
+	font-size: var(--pf-text-sm);
+	border: 2px solid var(--pf-surface, #fff);
+	box-shadow: var(--pf-shadow);
+}
+
+.pf-map-cluster--md span {
+	width: 44px;
+	height: 44px;
+	font-size: var(--pf-text-base);
+}
+
+.pf-map-cluster--lg span {
+	width: 52px;
+	height: 52px;
+	font-size: var(--pf-text-base);
+}
+
+.pf-map-cluster:hover span {
+	background: var(--pf-accent-dark);
+}
+
+/* ─── Infobulle : lieu + mini-cartes d'événement ─────────────────── */
+
+/* Classe répétée = spécificité (0,2,0) : nécessaire pour battre le reset
+   .tribe-common div (0,1,1, cf. CLAUDE.md) qui remet sinon ce padding à 0 sur
+   les pages TEC (la vue carte est un template TEC V2, rendu sous un ancêtre
+   .tribe-common — le popup Leaflet en hérite même s'il est injecté par JS). */
+.leaflet-popup-content-wrapper.leaflet-popup-content-wrapper {
+	border-radius: var(--pf-radius-card);
+	box-shadow: var(--pf-shadow-hover);
+	background: var(--pf-surface, #fff);
+	/* Padding (et non margin) : le padding par défaut de Leaflet (1px) sert de
+	   barrière empêchant le collapse des marges verticales de .leaflet-popup-content
+	   avec ce wrapper. Le mettre à 0 supprimait cette barrière et laissait les
+	   marges du contenu déborder au-delà des bords haut/bas arrondis du wrapper. */
+	padding: var(--pf-space-3);
+}
+
+.leaflet-popup-content {
+	/* Ni width ni margin ici : Leaflet mesure et fixe lui-même une largeur en px
+	   (via JS, bornée par minWidth/maxWidth) sur cet élément — la forcer en CSS
+	   (ex. width:100%) casse cette mesure (popups rétrécis) et, combiné à un
+	   parent .leaflet-popup-content-wrapper en position:absolute sans largeur
+	   propre, supprime le padding visuel du wrapper (largeur indéterminée). */
+	margin: 0;
+	line-height: var(--pf-leading-snug, 1.3);
+}
+
+.pf-map-pop {
+	display: flex;
+	flex-direction: column;
+	gap: var(--pf-space-3);
+	width: 100%;
+}
+
+/* En-tête d'un cluster : dénominateur commun + total.
+   Classe répétée (0,2,0) : idem .leaflet-popup-content-wrapper ci-dessus. */
+.pf-map-pop__area.pf-map-pop__area {
+	padding-right: var(--pf-space-5); /* place pour le bouton × de Leaflet */
+	padding-bottom: var(--pf-space-2);
+	border-bottom: 1px solid var(--pf-border);
+}
+
+.pf-map-pop__area-label {
+	display: block;
+	font-weight: var(--pf-weight-semibold);
+	color: var(--pf-heading);
+	font-size: var(--pf-text-base);
+	line-height: var(--pf-leading-snug, 1.3);
+}
+
+.pf-map-pop__area-count {
+	display: block;
+	color: var(--pf-muted);
+	font-size: var(--pf-text-xs);
+}
+
+/* Bloc d'un lieu (en-tête + ses cartes). */
+.pf-map-pop__group {
+	display: flex;
+	flex-direction: column;
+	gap: var(--pf-space-2);
+}
+
+/* Classe répétée (0,2,0) : idem .leaflet-popup-content-wrapper plus haut. */
+.pf-map-pop__venue.pf-map-pop__venue {
+	padding-right: var(--pf-space-5); /* × dans l'infobulle d'un lieu unique */
+}
+
+.pf-map-pop__venue-name {
+	display: block;
+	font-weight: var(--pf-weight-semibold);
+	color: var(--pf-heading);
+	font-size: var(--pf-text-base);
+	line-height: var(--pf-leading-snug, 1.3);
+}
+
+.pf-map-pop__venue-city {
+	display: block;
+	color: var(--pf-muted);
+	font-size: var(--pf-text-xs);
+}
+
+/* Dans un cluster, l'en-tête donne déjà la zone → le nom de lieu passe en
+   sous-titre et n'a plus besoin de dégager le ×. */
+.pf-map-pop--cluster .pf-map-pop__venue {
+	padding-right: 0;
+}
+
+.pf-map-pop--cluster .pf-map-pop__venue-name {
+	font-size: var(--pf-text-sm);
+}
+
+/* Séparateur entre lieux d'un même cluster. */
+.pf-map-pop--cluster .pf-map-pop__group + .pf-map-pop__group {
+	border-top: 1px solid var(--pf-border-light);
+	padding-top: var(--pf-space-3);
+}
+
+/* Mini-carte : réutilise .pf-card (--static --compact), passée en disposition
+   horizontale (vignette à gauche) et resserrée pour l'infobulle. Bordure/rayon
+   ré-imposés ici (0,2,0) pour survivre au reset .tribe-common * des pages TEC. */
+.pf-map-pop-card.pf-card {
+	flex-direction: row;
+	align-items: stretch;
+	width: 100%;
+	box-sizing: border-box;
+	border: 1px solid var(--pf-border-light);
+	border-radius: var(--pf-radius);
+}
+
+.pf-map-pop-card .pf-map-pop-card__media {
+	flex: 0 0 auto;
+	width: 40px;
+	overflow: hidden;
+	background: var(--pf-cream-dark);
+}
+
+.pf-map-pop-card .pf-map-pop-card__media img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	display: block;
+}
+
+.pf-map-pop-card .pf-card-content {
+	padding: var(--pf-space-2);
+	gap: 1px;
+	justify-content: center;
+}
+
+.pf-map-pop-card .pf-card-title {
+	font-size: var(--pf-text-sm);
+	line-height: var(--pf-leading-snug, 1.3);
+}
+
+.pf-map-pop-card .pf-card-text {
+	font-size: var(--pf-text-xs);
+	color: var(--pf-muted);
+}
+
+/* La carte est un lien → titre qui rougit au survol (les --static n'ont pas
+   d'effet de survol par défaut). */
+.pf-map-pop-card.pf-card:hover .pf-card-title,
+.pf-map-pop-card.pf-card:focus .pf-card-title {
+	color: var(--pf-accent);
+}
+
+/* Lien « attribution » OSM discret */
+.leaflet-control-attribution a {
+	color: var(--pf-accent);
+}
+
+/* Pointe triangulaire par défaut de Leaflet (rendue en carré pivoté à 45°) :
+   ne correspond pas au design de carte flottante de nos infobulles → masquée. */
+.leaflet-popup-tip-container {
+	display: none;
+}
+
+/* ─── États de repli ─────────────────────────────────────────────── */
+
+/* Classes répétées (0,2,0) : .pf-events-map-empty est un <p> et
+   .pf-events-map-fallback un <ul>, tous deux visés par le même reset
+   .tribe-common div/p/ul (cf. .leaflet-popup-content-wrapper plus haut). */
+.pf-events-map-empty.pf-events-map-empty {
+	position: absolute;
+	left: 50%;
+	top: 50%;
+	transform: translate(-50%, -50%);
+	z-index: 1;
+	margin: 0;
+	padding: var(--pf-space-2) var(--pf-space-4);
+	background: color-mix(in srgb, var(--pf-surface, #fff) 88%, transparent);
+	border: 1px solid var(--pf-border);
+	border-radius: var(--pf-radius);
+	color: var(--pf-text);
+	font-size: var(--pf-text-sm);
+	pointer-events: none;
+}
+
+.pf-events-map-fallback.pf-events-map-fallback {
+	margin: var(--pf-space-4) 0 0;
+	padding-left: 1.2em;
+}
+
+@media (max-width: 767px) {
+	#pf-events-map {
+		height: 62vh;
+		min-height: 320px;
+	}
+}

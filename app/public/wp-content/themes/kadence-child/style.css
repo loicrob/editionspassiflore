@@ -1,0 +1,1358 @@
+/*
+Theme Name: Kadence Child
+Theme URI: https://www.kadencewp.com/kadence-theme/
+Template: kadence
+Author: Kadence WP
+Author URI: https://www.kadencewp.com/
+Description: Kadence Theme is a lightweight yet full featured WordPress theme for creating beautiful fast loading and accessible websites, easier than ever. It features an easy to use drag and drop header and footer builder to build any type of header in minutes. It features a full library of gorgeous starter templates that are easy to modify with our intelligent global font and color controls. With extensive integration with the most popular 3rd party plugins, you can quickly build impressive ecommerce websites, course websites, business websites, and more.
+Tags: translation-ready,accessibility-ready,two-columns,right-sidebar,left-sidebar,footer-widgets,blog,custom-logo,custom-background,custom-menu,rtl-language-support,editor-style,threaded-comments,custom-colors,featured-images,wide-blocks,full-width-template,theme-options,e-commerce
+Version: 1.4.5.1774266498
+Updated: 2026-03-23 12:48:18
+
+*/
+
+/* =========================================================
+   Design tokens — système global Passiflore
+   Référence : docs/design-system.md
+   ========================================================= */
+:root {
+    /* Polices */
+    --pf-font-heading: Georgia, 'Times New Roman', serif;
+    --pf-font-body: var(--global-body-font-family, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif);
+
+    /* Échelle typographique */
+    --pf-text-xs:   0.75rem;
+    --pf-text-sm:   0.875rem;
+    --pf-text-base: 1rem;
+    --pf-text-lg:   1.125rem;
+    --pf-text-xl:   clamp(1.2rem, 1rem + 1vw, 1.5rem);
+    --pf-text-2xl:  clamp(1.5rem, 1.1rem + 2vw, 2rem);
+    --pf-text-hero: clamp(2.6rem, 4.2vw, 4.8rem);
+
+    /* Hauteurs de ligne (rythme vertical) */
+    --pf-leading-none:    1;     /* gros chiffres, titres mono-ligne */
+    --pf-leading-tight:   1.15;  /* titres */
+    --pf-leading-snug:    1.3;   /* sous-titres, noms de carte, étiquettes */
+    --pf-leading-normal:  1.5;   /* texte courant */
+    --pf-leading-relaxed: 1.65;  /* paragraphes longs (bio, presse) */
+
+    /* Poids de police */
+    --pf-weight-normal:   400;
+    --pf-weight-semibold: 600;
+    --pf-weight-bold:     700;
+
+    /* Couleurs sémantiques — pointent sur la palette Kadence (source unique).
+       Utiliser ces tokens plutôt que les hex ou --global-paletteN en dur. */
+    --pf-accent:      var(--global-palette1);   /* rouge Passiflore */
+    --pf-accent-dark: var(--global-palette2);   /* rouge foncé (survols) */
+    --pf-text:        var(--global-palette3);   /* texte courant */
+    --pf-heading:     var(--global-palette4);   /* titres */
+    --pf-muted:       var(--global-palette6);   /* texte secondaire */
+    --pf-text-dim:    #8b7a72;                  /* texte atténué chaud (placeholders, comptes) */
+    --pf-border:      var(--global-palette10);  /* bordures, filets (#e0d8cc — acté 2026-07-02) */
+    --pf-border-light:#e0d8cc;                  /* bordure/cadre clair (contrôles, filets discrets) */
+    --pf-sand:        #D9C8B0;                  /* sable historique — usages volontairement plus foncés (badge attente…) */
+    --pf-surface:     #fff;                     /* fond carte / champ */
+    --pf-surface-alt: var(--global-palette9);   /* fond crème clair (#FCFBF7) */
+    --pf-cream:       var(--global-palette8);   /* fond crème principal (#FAF6F0) */
+    --pf-cream-dark:  var(--global-palette7);   /* crème soutenu (#F5F0E8) */
+
+    /* Boutons & contrôles de formulaire */
+    --pf-control-h:      38px; /* hauteur des contrôles de barre (déroulants, switches) — surchargée par barre (cf. catalogue) */
+    --pf-radius:         3px;
+    --pf-radius-md:      6px;  /* contrôles : champs/déroulants/switches du catalogue & recherche */
+    --pf-radius-lg:      8px;  /* panneaux, tableaux (récap commande, paiement…) */
+    --pf-radius-card:    12px; /* tuiles : auteurs, événements, livres associés */
+    --pf-btn-pad:        0.65em 1.2em;
+    --pf-btn-pad-sm:     0.3em 0.7em;
+    --pf-panel-pad:      var(--pf-space-5) var(--pf-space-6); /* padding des panneaux encadrés (.pf-panel, récap commande…) */
+    --pf-btn-weight:     var(--pf-weight-normal);
+    --pf-btn-transition: background .2s, border-color .2s, color .2s;
+    /* Alphas dérivés de la palette via color-mix → suivent la palette si l'admin
+       la change au Customizer (contrairement aux anciens rgba() figés). */
+    --pf-red-soft:        color-mix(in srgb, var(--pf-accent) 8%, transparent);  /* survol rouge translucide */
+    --pf-red-soft-strong: color-mix(in srgb, var(--pf-accent) 16%, transparent); /* survol/actif rouge plus marqué */
+    --pf-accent-border-soft: color-mix(in srgb, var(--pf-accent) 22%, transparent); /* bordure rouge translucide (contrôles actifs) */
+    --pf-focus-ring:        0 0 0 3px var(--pf-border); /* anneau de focus par défaut (champs, boutons) */
+    --pf-focus-ring-accent: 0 0 0 3px var(--pf-red-soft); /* anneau de focus rouge (barres de recherche) */
+
+    /* Couleur des boutons natifs Kadence : on possède la couleur via SES variables
+       (robuste, pas de bataille de spécificité avec les sélecteurs outline (0,4,0)).
+       !important sur la *définition* de variable → bat le CSS inline du personnalisateur,
+       sans rendre le fond des boutons !important (nos surcharges par page restent prioritaires). */
+    --global-palette-btn-bg:        var(--global-palette1) !important;
+    --global-palette-btn:           #fff !important;
+    --global-palette-btn-bg-hover:  var(--global-palette2) !important;
+    --global-palette-btn-hover:     #fff !important;
+    --global-palette-btn-out:       var(--global-palette1) !important;
+    --global-palette-btn-out-hover: var(--global-palette2) !important;
+
+    /* Espacement */
+    --pf-space-1:  .25rem;
+    --pf-space-2:  .5rem;
+    --pf-space-3:  .75rem;
+    --pf-space-4:  1rem;
+    --pf-space-5:  1.25rem;
+    --pf-space-6:  1.5rem;
+    --pf-space-8:  2rem;
+    --pf-space-10: 2.5rem;
+    --pf-space-12: 3rem;
+    --pf-space-14: 3.5rem;
+    --pf-space-16: 4rem;
+    --pf-space-20: 5rem;
+
+    /* Ombres & transitions (motif "glow" des tuiles du site) */
+    --pf-shadow:       0 0 4px 1px rgba(0,0,0,.08);
+    --pf-shadow-hover: 0 0 6px 3px rgba(0,0,0,.14);
+    /* Ombre "détachée" d'un élément sticky collé (barres, séparateurs de mois). */
+    --pf-shadow-stuck: 0 1px 0 0 rgba(94, 82, 77, 0.04), 0 12px 24px -16px rgba(94, 82, 77, 0.22);
+    /* Ombre d'un élément flottant (menus déroulants, pop-overs). */
+    --pf-shadow-float: 0 10px 24px -8px rgba(94, 82, 77, 0.18);
+    --pf-transition:   .2s ease;
+
+    /* Couleurs de statut (hors palette de marque : pas de vert/bleu dans la palette).
+       Consommées par .pf-badge--* et .pf-notice--*. */
+    --pf-success:    #2e7d32;  --pf-success-bg: #e8f5e9;
+    --pf-info:       #1565c0;  --pf-info-bg:    #e3f2fd;
+    --pf-warning:    #e65100;  --pf-warning-bg: #fff3e0;
+    --pf-danger:     #b71c1c;  --pf-danger-bg:  #fce4ec;
+
+    /* Flou d'arrière-plan partagé par les éléments sticky (effet « aéro » au scroll).
+       Source unique → rendu identique sur le header et les barres sticky. */
+    --pf-aero-blur:    6px;
+
+    /* Offset de la barre d'admin WP — consommé par les éléments sticky (fiche livre…).
+       --pf-sticky-offset (header + barre admin) est tenu à jour par recherche-globale.js. */
+    --pf-adminbar: 0px;
+
+    /* Échelle d'espacement Kadence (rythme du contenu Gutenberg) câblée sur NOS tokens
+       → source unique. !important pour battre le CSS inline du personnalisateur. */
+    --global-xs-spacing:  var(--pf-space-4)  !important;
+    --global-sm-spacing:  var(--pf-space-6)  !important;
+    --global-md-spacing:  var(--pf-space-8)  !important;
+    --global-lg-spacing:  var(--pf-space-10) !important;
+    --global-xl-spacing:  var(--pf-space-14) !important;
+    --global-xxl-spacing: var(--pf-space-20) !important;
+
+    /* Boutons secondaires Kadence — repos & survol pilotés par les variables
+       (pas de background !important → les surcharges par page restent prioritaires).
+       Bordure/ombre supprimées + état actif distinct : voir bloc .button-style-secondary plus bas. */
+    --global-palette-btn-sec-bg:       var(--pf-red-soft) !important;
+    --global-palette-btn-sec:          var(--global-palette1) !important;
+    --global-palette-btn-sec-bg-hover: var(--pf-red-soft-strong) !important;
+    --global-palette-btn-sec-hover:    var(--global-palette2) !important;
+}
+
+/* Titres — la balise (h1-h6) porte la sémantique/SEO,
+   ces classes portent l'apparence, indépendamment du niveau. */
+.pf-titre-1 {
+    color: var(--pf-heading);
+    font-family: var(--pf-font-heading);
+    font-size: var(--pf-text-2xl) !important;
+    font-weight: var(--pf-weight-semibold);
+    line-height: var(--pf-leading-tight);
+    text-transform: none;
+}
+.pf-titre-2 {
+    color: var(--pf-text);
+    font-family: var(--pf-font-body);
+    font-size: var(--pf-text-xl) !important;
+    font-weight: var(--pf-weight-semibold);
+    line-height: var(--pf-leading-tight);
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+}
+.pf-titre-3, .pf-titre-3 a {
+    color: var(--pf-text);
+    font-family: var(--pf-font-body);
+    font-size: var(--pf-text-base) !important;
+    font-weight: var(--pf-weight-normal);
+    line-height: var(--pf-leading-tight);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+}
+/* Étiquette / valeur réutilisables : petite voix typo en capitales espacées, ton atténué.
+   .pf-value partage la même voix que .pf-label mais reste pleine opacité (et cliquable)
+   quand c'est un lien. */
+.pf-label,
+.pf-value,
+.pf-value-container a,
+a.pf-value-highlight,
+.pf-value-highlight-container a {
+    font-family: var(--pf-font-body);
+    font-weight: var(--pf-weight-normal);
+    line-height: var(--pf-leading-snug);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--pf-text) !important;
+    opacity: 0.7;
+}
+a.pf-value-highlight, .pf-value-highlight-container a {
+    color: var(--pf-accent) !important;
+}
+a.pf-value, .pf-value-container a, a.pf-value-highlight, .pf-value-highlight-container a {
+    opacity: 1;
+    text-decoration: none !important;
+}
+a.pf-value:hover, .pf-value-container a:hover, a.pf-value-highlight:hover, .pf-value-highlight-container a:hover {
+    color: var(--pf-accent-dark) !important;
+}
+
+/* Boutons — .pf-btn porte la forme commune ; un modificateur porte la couleur.
+   Boutons custom : appliquer ces classes dans le markup.
+   Boutons WooCommerce/plugins : garder le sélecteur existant et pointer ses valeurs sur les mêmes tokens. */
+.pf-btn {
+    display: inline-block;
+    padding: var(--pf-btn-pad);
+    border: 1px solid transparent;
+    border-radius: var(--pf-radius);
+    font-family: var(--pf-font-body);
+    font-size: 0.9rem;
+    font-weight: var(--pf-btn-weight);
+    line-height: var(--pf-leading-tight);
+    text-align: center;
+    text-decoration: none;
+    cursor: pointer;
+    transition: var(--pf-btn-transition);
+}
+.pf-btn--primary {
+    background: var(--pf-accent);
+    border-color: var(--pf-accent);
+    color: var(--pf-surface);
+}
+.pf-btn--primary:hover,
+.pf-btn--primary:focus,
+.pf-btn--primary:active {
+    background: var(--pf-accent-dark);
+    border-color: var(--pf-accent-dark);
+    color: var(--pf-surface);
+    box-shadow: none;
+}
+.pf-btn--outline {
+    background: transparent;
+    border-color: var(--pf-accent);
+    color: var(--pf-accent);
+}
+.pf-btn--outline:hover,
+.pf-btn--outline:focus,
+.pf-btn--outline:active {
+    background: var(--pf-red-soft);
+    color: var(--pf-accent);
+    box-shadow: none;
+}
+.pf-btn--neutral {
+    background: var(--pf-surface);
+    border-color: var(--pf-border);
+    color: var(--pf-text);
+}
+.pf-btn--neutral:hover,
+.pf-btn--neutral:focus,
+.pf-btn--neutral:active {
+    background: var(--pf-surface);
+    border-color: var(--pf-accent);
+    color: var(--pf-accent);
+    box-shadow: none;
+}
+.pf-btn--sm {
+    padding: var(--pf-btn-pad-sm);
+    font-size: 0.85rem;
+}
+.pf-btn--block {
+    display: block;
+    width: 100%;
+}
+
+/* Boutons natifs (Gutenberg core, Kadence, shortcodes) — alignés sur nos tokens de forme
+   pour que le contenu créé par les admins reste cohérent. La couleur vient de la palette Kadence. */
+.wp-block-button__link,
+.wp-element-button,
+.button,
+.button-style-fill,
+.button-style-outline {
+    border-radius: var(--pf-radius);
+    font-weight: var(--pf-btn-weight);
+    box-shadow: none;
+    transition: var(--pf-btn-transition);
+}
+.wp-block-button__link:hover, .wp-block-button__link:focus, .wp-block-button__link:active,
+.wp-element-button:hover,    .wp-element-button:focus,    .wp-element-button:active,
+.button:hover,               .button:focus,               .button:active {
+    box-shadow: none;
+}
+
+/* Défauts de titres — s'appliquent aussi au contenu créé par les admins (Gutenberg).
+   h1 serif, h2–h6 sans. Les classes .pf-titre-* / .pf-label surchargent au besoin. */
+h1,h2,h3,h4,h5,h6 {
+    line-height: var(--pf-leading-tight);
+}
+h1 { font-family: var(--pf-font-heading); font-weight: var(--pf-weight-semibold); color: var(--pf-heading);     font-size: var(--pf-text-2xl)  !important; text-transform: none; }
+h2 { font-family: var(--pf-font-body);    font-weight: var(--pf-weight-normal);   color: var(--pf-text-dim);    font-size: var(--pf-text-base) !important; text-transform: uppercase; letter-spacing: 0.1em; }
+h3 { font-family: var(--pf-font-body);    font-weight: var(--pf-weight-normal);   color: var(--pf-text-dim);    font-size: var(--pf-text-base) !important; }
+h4 { font-family: var(--pf-font-body);    font-weight: var(--pf-weight-normal);   color: var(--pf-text-dim);    font-size: var(--pf-text-sm)   !important; }
+h5 { font-family: var(--pf-font-body);    font-weight: var(--pf-weight-normal);   color: var(--pf-text-dim);    font-size: var(--pf-text-xs)   !important; }
+h6 { font-family: var(--pf-font-body);    font-weight: var(--pf-weight-normal);   color: var(--pf-text-dim);    font-size: var(--pf-text-xs)   !important; }
+
+/* Carte / tuile — motif partagé du site (fond blanc, coins arrondis, ombre "glow"
+   qui s'intensifie au survol). Le contenu interne (zoom image, titre qui rougit…)
+   reste spécifique à chaque composant. */
+.pf-card {
+    display: flex;
+    flex-direction: column;
+    background: var(--pf-surface);
+    border-radius: var(--pf-radius-card);
+    overflow: hidden;
+    color: inherit;
+    text-decoration: none !important; /* la carte est souvent un <a> dans .entry-content */
+    box-shadow: var(--pf-shadow);
+    transition: box-shadow var(--pf-transition);
+}
+.pf-card:hover,
+.pf-card:focus {
+    box-shadow: var(--pf-shadow-hover);
+    color: inherit;
+    opacity: 1 !important; /* annule l'opacité .8 des liens de contenu */
+}
+/* Variante NON cliquable : encadrée (bordure sable, pas d'ombre) et sans aucun
+   effet au survol. Style commun des cartes non cliquables : tuiles événements,
+   carte « auteur texte », cartes média (presse/vidéos/podcasts). */
+.pf-card--static {
+    border: 1px solid var(--pf-border);
+}
+.pf-card--static,
+.pf-card--static:hover,
+.pf-card--static:focus {
+    box-shadow: none;
+}
+/* Zoom de l'image au survol — uniquement sur les cartes cliquables ; les --static
+   n'ont aucun effet de survol. */
+.pf-card img {
+    transition: transform var(--pf-transition);
+}
+.pf-card:not(.pf-card--static):hover img,
+.pf-card:not(.pf-card--static):focus img {
+    transform: scale(1.05);
+}
+
+/* Titre de carte — style global unifié (taille, graisse, couleur, interligne).
+   Rougit au survol des cartes cliquables uniquement. Les composants ne
+   redéfinissent que leurs écarts (ex. .pf-auteur-card : graisse normale +
+   layout inline-flex pour nom/prénom). */
+.pf-card-title {
+    margin: 0;
+    font-size: var(--pf-text-base);
+    font-weight: var(--pf-weight-semibold);
+    line-height: var(--pf-leading-snug);
+    color: var(--pf-heading);
+    transition: color var(--pf-transition);
+}
+.pf-card:not(.pf-card--static):hover .pf-card-title,
+.pf-card:not(.pf-card--static):focus .pf-card-title {
+    color: var(--pf-accent);
+}
+/* Corps interne paddé : occupe la hauteur restante. Le média (image) reste enfant
+   direct de .pf-card pour rester plein-cadre, donc hors de ce padding. */
+.pf-card-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: var(--pf-space-3);
+    padding: var(--pf-space-5);
+}
+/* Interlignes resserrés sur les cartes compactes. */
+.pf-card--compact .pf-card-content {
+    padding: var(--pf-space-4);
+    gap: var(--pf-space-2);
+}
+/* Sections séparées par un filet (cartes événement) : un filet au-dessus de chaque
+   bloc sauf le premier ; l'espace vient du gap (au-dessus) + du padding-top (en dessous). */
+.pf-card-content--separated {
+    gap: var(--pf-space-3);
+}
+.pf-card-content--separated > * + * {
+    border-top: 1px solid var(--tec-color-border-default, var(--pf-border)) !important;
+    padding-top: var(--pf-space-3);
+}
+/* Texte descriptif (bio, extrait…) — secondaire, donc en gris atténué. */
+.pf-card-text {
+    font-size: var(--pf-text-sm);
+    color: var(--pf-muted);
+    margin: 0;
+}
+
+/* Carte auteur — composant. Mêmes specs quel que soit le contexte (/auteurs, présence
+   d'événement, fiche livre) ; défini ici car style.css est toujours chargé, contrairement
+   à auteurs.css. Le conteneur/zoom/survol viennent de .pf-card. */
+.pf-auteur-photo {
+    aspect-ratio: 1 / 1;
+    overflow: hidden;
+    background: var(--pf-cream);
+}
+.pf-auteur-photo img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: top center;
+    display: block;
+}
+/* Carte auteur : graisse normale (le nom de famille est mis en gras à part) +
+   couleur atténuée + layout inline pour nom/prénom. Taille/interligne : global. */
+.pf-auteur-card .pf-card-title {
+    font-weight: var(--pf-weight-normal);
+    color: var(--pf-text);
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: var(--pf-space-1);
+}
+.pf-auteur-nom-de-famille {
+    font-weight: var(--pf-weight-bold);
+}
+.pf-auteur-card .pf-card-text {
+    font-size: var(--pf-text-xs);
+    line-height: var(--pf-leading-normal);
+}
+
+p a:not(.button):not(.wp-block-button__link):not(.wp-element-button):not(.pf-value),
+span a:not(.button):not(.wp-block-button__link):not(.wp-element-button),
+.entry-content a:not(.button):not(.wp-block-button__link):not(.wp-element-button):not(.pf-card):not(.menu-item-link):not(.tribe-events-c-subscribe-dropdown__list-item-link) {
+    color: var(--pf-accent) !important;
+    text-decoration: underline !important;
+    text-underline-offset: .15em !important;
+}
+.contact-info-footer {
+    color: var(--pf-text) !important;
+    text-decoration: underline !important;
+    text-underline-offset: .15em !important;
+}
+p a:not(.button):not(.wp-block-button__link):not(.wp-element-button):not(.pf-value):hover,
+span a:not(.button):not(.wp-block-button__link):not(.wp-element-button):hover,
+.entry-content a:not(.button):not(.wp-block-button__link):not(.wp-element-button):not(.pf-card):not(.menu-item-link):not(.tribe-events-c-subscribe-dropdown__list-item-link):hover,
+.contact-info-footer:hover {
+    opacity: 0.8 !important;
+    text-decoration: underline !important;
+    text-underline-offset: .15em !important;
+}
+
+/* Formulaires : base unifiée (Contact, commentaires, recherche, WooCommerce…). */
+input[type="text"], input[type="email"], input[type="tel"], input[type="url"],
+input[type="search"], input[type="password"], input[type="number"], textarea, select {
+    border: 1px solid var(--pf-border);
+    border-radius: var(--pf-radius);
+    transition: border-color .15s ease, box-shadow .15s ease, background .15s ease;
+}
+input[type="text"]:focus:not(:read-only), input[type="email"]:focus:not(:read-only), input[type="tel"]:focus:not(:read-only),
+input[type="url"]:focus:not(:read-only), input[type="search"]:focus:not(:read-only), input[type="password"]:focus:not(:read-only),
+input[type="number"]:focus:not(:read-only), textarea:focus:not(:read-only), select:focus:not(:read-only) {
+    border-color: transparent !important; /* l'anneau (box-shadow) + le fond blanc signalent le focus */
+    box-shadow: var(--pf-focus-ring);
+    background: var(--pf-surface);
+    outline: none;
+}
+
+/* Barre sticky full-bleed avec smart-hide au scroll — partagée par la barre de
+   recherche auteurs (/auteurs) et la barre du catalogue. Le contenu et les champs
+   restent propres à chaque composant. JS (recherche-auteurs.js / catalogue.js)
+   togglent .is-hidden (glisse vers le haut) et .is-stuck (ombre détachée). */
+.pf-sticky-bar {
+    position: sticky;
+    top: var(--pf-sticky-offset, 0px);
+    z-index: 10; /* sous le header sticky Kadence : glisse derrière lui */
+    background: var(--pf-cream);
+    transition: transform 0.25s cubic-bezier(0.25, 0.46, 0.45, 0.94), box-shadow 0.25s ease, opacity 0.25s ease;
+    /* Full-bleed : le fond couvre la largeur du viewport, le contenu reste aligné. */
+    width: calc(100vw - var(--scrollbar-offset, 0px));
+    margin-left:  calc(50% - 50vw + var(--scrollbar-offset, 0px) / 2);
+    margin-right: calc(50% - 50vw + var(--scrollbar-offset, 0px) / 2);
+    margin-bottom: var(--pf-space-6);
+    padding-left:  calc(50vw - 50% - var(--scrollbar-offset, 0px) / 2);
+    padding-right: calc(50vw - 50% - var(--scrollbar-offset, 0px) / 2);
+    box-sizing: border-box;
+}
+/* Smart-hide : la barre glisse vers le haut ET s'estompe en se cachant derrière
+   le header (évite qu'elle transparaisse à travers le verre pendant l'animation). */
+.pf-sticky-bar.is-hidden { transform: translateY(-100%); opacity: 0; }
+.pf-sticky-bar.is-stuck {
+    box-shadow: var(--pf-shadow-stuck);
+}
+
+/* Kadence pose #masthead en position:relative + z-index:11 (header.min.css) —
+   donc un contexte d'empilement à part entière, comparé aux AUTRES contextes
+   d'empilement du document (pas à ce qu'il contient). .tribe-events-calendar-
+   list__month-separator (events.css) utilise aussi z-index:11 (position:sticky).
+   Égalité de z-index entre deux contextes frères → départage par l'ordre du
+   DOM : le séparateur, plus bas dans le document que le header, l'emportait
+   sur TOUT #masthead — y compris le sous-menu du panier (z-index:1000), qui ne
+   rivalise jamais directement : il perd déjà au niveau de son ancêtre #masthead.
+   On relève #masthead au-dessus de l'échelle z-index locale du site (10/11 ci-
+   dessus) plutôt que de toucher au 11 d'events.css, calibré finement contre
+   .pf-sticky-bar (10) sur la page événements elle-même. */
+#masthead {
+    z-index: 20 !important;
+}
+
+/* Sous-en-tête : le contenu (barre de recherche auteurs, menu de filtres catalogue)
+   à l'intérieur d'une .pf-sticky-bar. Ne porte que le rythme vertical ; la mise en
+   page reste propre à chaque barre. */
+.pf-sub-header {
+    padding: var(--pf-space-3) 0;
+}
+@media (max-width: 1023px) {
+    .pf-sub-header { padding: var(--pf-space-2) 0; }
+}
+
+/* Champ de recherche — composant réutilisable : loupe + champ + bouton effacer.
+   Le bord, la transition et le focus (bord transparent + anneau) viennent de la règle
+   globale input. Géométrie surchargeable via les variables locales (cf. .pf-search--sm). */
+.pf-search {
+    --search-h:     44px;              /* hauteur du champ */
+    --search-icon:  18px;             /* taille de l'icône loupe */
+    --search-inset: 14px;             /* marge latérale de l'icône */
+    --search-clear: 26px;             /* diamètre du bouton effacer */
+    --search-pad-y: var(--pf-space-3); /* padding vertical du champ */
+    position: relative;
+    flex: 1 1 auto;
+    width: 100%;
+    height: var(--search-h);
+}
+/* L'icône peut être un .pf-search-icon ou un <svg> nu enfant direct (cf. recherche globale). */
+.pf-search-icon,
+.pf-search > svg {
+    position: absolute;
+    left: var(--search-inset);
+    top: 50%;
+    transform: translateY(-50%);
+    width: var(--search-icon);
+    height: var(--search-icon);
+    color: var(--pf-muted);
+    pointer-events: none;
+    z-index: 2;
+}
+.pf-search-input {
+    width: 100%;
+    height: var(--search-h);
+    box-sizing: border-box;
+    /* Dégagement gauche (icône) ; à droite, padding réduit au repos —
+       élargi seulement quand le bouton effacer apparaît (cf. :has plus bas). */
+    padding: var(--search-pad-y) var(--search-pad-y) var(--search-pad-y) calc(var(--search-inset) + var(--search-icon) + var(--pf-space-3)) !important;
+    border-radius: var(--pf-radius-lg) !important; /* plus arrondi que le radius global */
+    background: var(--pf-surface-alt) !important;  /* fond crème au repos (le global ne pose le fond qu'au focus) */
+    font-family: inherit;
+    font-size: var(--pf-text-sm);
+    line-height: var(--pf-leading-tight);
+    color: var(--pf-text) !important;
+}
+.pf-search-input:focus {
+    box-shadow: var(--pf-focus-ring-accent) !important; /* anneau rouge */
+    background: var(--pf-surface) !important; /* fond blanc au focus */
+}
+.pf-search-input::placeholder { color: var(--pf-muted); }
+.pf-search-input::-webkit-search-decoration,
+.pf-search-input::-webkit-search-cancel-button,
+.pf-search-input::-webkit-search-results-button,
+.pf-search-input::-webkit-search-results-decoration { display: none; }
+.pf-search-clear {
+    position: absolute;
+    right: var(--pf-space-2);
+    top: 50%;
+    transform: translateY(-50%);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    width: var(--search-clear);
+    height: var(--search-clear);
+    border: none;
+    background: transparent;
+    color: var(--pf-muted);
+    font-size: 20px; /* glyphe « × » */
+    line-height: var(--pf-leading-none);
+    cursor: pointer;
+    border-radius: 50%;
+    z-index: 3;
+}
+.pf-search-clear:hover {
+    color: var(--pf-accent) !important;
+    background: none;
+    box-shadow: none;
+}
+.pf-search:has(.pf-search-input:not(:placeholder-shown)) .pf-search-clear {
+    display: flex;
+}
+/* Du texte est saisi → on réserve la place du bouton effacer à droite. */
+.pf-search:has(.pf-search-input:not(:placeholder-shown)) .pf-search-input {
+    padding-right: calc(var(--search-inset) + var(--search-icon) + var(--pf-space-3)) !important;
+}
+/* Variante compacte — recherche globale du header (le catalogue reste bespoke). */
+.pf-search--sm {
+    --search-h:     36px;
+    --search-icon:  16px;
+    --search-inset: 11px;
+    --search-clear: 22px;
+    --search-pad-y: var(--pf-space-2);
+}
+.pf-search--sm .pf-search-clear {
+    font-size: 18px;
+}
+
+.header-navigation .menu {
+    gap: .2rem;
+}
+
+#cart-menu {
+    gap: 0;
+    padding: .3em .7em;
+    border-radius: 5px;
+}
+
+#cart-menu:hover {
+    background: rgba(198, 40, 54, 0.08);
+}
+
+#cart-menu .kadence-svg-iconset {
+    color: var(--pf-accent);
+}
+
+.button-style-outline, #main-header .header-button.button-style-outline {
+    color: var(--pf-text) !important;
+}
+
+.button-style-outline:hover, #main-header .header-button.button-style-outline:hover {
+    color: var(--pf-accent) !important;
+    background: var(--pf-red-soft) !important;
+}
+
+/* Boutons secondaires Kadence — sans bordure ni ombre ; état actif distinct.
+   Repos & survol (couleurs) pilotés par les variables --global-palette-btn-sec-* (voir :root).
+   Spécificité égale à Kadence + chargement plus tardif → priment sans !important. */
+.button.button-style-secondary,
+.button.button-style-secondary:hover,
+.button.button-style-secondary:focus,
+.button.button-style-secondary:active {
+    border: none;
+    box-shadow: none;
+}
+.button.button-style-secondary:active {
+    background: var(--global-palette1);
+    color: var(--global-palette8);
+}
+
+.main-navigation .primary-menu-container > ul > li.menu-item.current-menu-item > a, .main-navigation .primary-menu-container > ul > li.menu-item.current-menu-ancestor > a, .main-navigation .primary-menu-container > ul > li.menu-item.current-page-parent > a, .main-navigation .primary-menu-container > ul > li.menu-item.current-product-ancestor > a, .main-navigation .primary-menu-container > ul > li.menu-item > a:hover {
+    border-radius: 5px;
+}
+
+.woocommerce-account #main-header .passiflore-account-btn.is-logged-in {
+    background: var(--pf-accent) !important;
+    border-color: var(--pf-accent);
+    color: var(--pf-cream) !important;
+}
+
+.woocommerce-account .passiflore-account-btn.is-logged-out {
+    background-color: var(--pf-accent);
+    color: var(--pf-cream);
+}
+
+.woocommerce-cart .kadence-shopping-bag-svg {
+    fill: var(--pf-accent);
+}
+
+/* Compteur non vide : pastille pleine (fond accent + chiffre cream) plutôt que
+   cercle au contour accent — plus lisible, cohérent avec le badge « Mon compte »
+   plein. La bordure reprend la couleur du fond (pas de contour visible) : elle
+   sert seulement à préserver la taille de la pastille (déjà comptée dans les
+   2.1em de Kadence), pas à dessiner un anneau. */
+.header-cart-wrap .header-cart-button .header-cart-total.header-cart-is-empty-false {
+    background: var(--pf-accent) !important;
+    border: 2px solid var(--pf-accent) !important;
+    color: var(--pf-cream) !important;
+    font-weight: var(--pf-weight-semibold);
+}
+
+/* Sur la page panier (donc panier non vide, cf. redirection auto vers le
+   catalogue sinon), le bouton panier du header passe en plein accent — même
+   traitement que le bouton « Mon compte » connecté
+   (.woocommerce-account #main-header .passiflore-account-btn.is-logged-in) :
+   fond accent, icône + compteur (chiffre et cercle) en pf-cream pour rester
+   lisibles. Scopé aussi à l'état « non vide » (fragment header-cart-empty-check)
+   pour ne pas rester accent si on s'attarde après avoir vidé le panier. */
+.woocommerce-cart #main-header .header-cart-empty-check.header-cart-is-empty-false ~ .header-cart-inner-wrap #cart-menu {
+    background: var(--pf-accent);
+}
+
+.woocommerce-cart #main-header .header-cart-empty-check.header-cart-is-empty-false ~ .header-cart-inner-wrap #cart-menu .kadence-svg-iconset {
+    color: var(--pf-cream);
+}
+
+/* Le SVG panier a un fill="currentColor" présentation — mais la règle
+   .woocommerce-cart .kadence-shopping-bag-svg (ci-dessus, `fill: var(--pf-accent)`)
+   le court-circuite : un `fill` CSS prime toujours sur currentColor, donc
+   `color` seul (règle ci-dessus) restait sans effet visuel (icône rouge
+   invisible sur fond rouge). On surcharge `fill` explicitement ici, avec une
+   spécificité supérieure (id #cart-menu en plus). */
+.woocommerce-cart #main-header .header-cart-empty-check.header-cart-is-empty-false ~ .header-cart-inner-wrap #cart-menu .kadence-shopping-bag-svg {
+    fill: var(--pf-cream);
+}
+
+/* Sur la page panier, le fond du bouton est déjà accent (règle plus haut) :
+   la pastille s'inverse (fond cream + chiffre accent) pour rester lisible,
+   plutôt que fond accent sur fond accent. */
+.woocommerce-cart #main-header .header-cart-empty-check.header-cart-is-empty-false ~ .header-cart-inner-wrap #cart-menu .header-cart-total.header-cart-is-empty-false {
+    background: var(--pf-cream) !important;
+    border-color: var(--pf-cream) !important;
+    color: var(--pf-accent) !important;
+}
+
+/* Panier vide : on garde l'icône panier visible (pour signaler d'emblée qu'on
+   est sur un site marchand) et on masque seulement la pastille de compteur « 0 ».
+   `header-cart-total` est un fragment WooCommerce (rafraîchi en AJAX) → la
+   bascule vide/rempli est live, sans rechargement. */
+.header-cart-total.header-cart-is-empty-true {
+    display: none;
+}
+
+/* …et l'icône prend la couleur du texte du menu (= texte du bouton « Mon
+   compte », var(--pf-text)) au lieu de l'accent : état « vide » neutre et
+   discret. Portée « panier vide » via le fragment header-cart-empty-check (~),
+   donc live. Style panier = « dropdown » → le bouton est enveloppé dans
+   #cart-menu (id), qui colore déjà l'icône (règle ci-dessus, `#cart-menu
+   .kadence-svg-iconset`, spécificité (1,1,0)) : on doit inclure cet id dans
+   notre sélecteur pour égaler puis dépasser sa spécificité via les classes
+   (1,4,0) > (1,1,0), sinon une pile de classes seules ne bat jamais un id. */
+.header-cart-empty-check.header-cart-is-empty-true ~ .header-cart-inner-wrap #cart-menu .kadence-svg-iconset {
+    color: var(--pf-text);
+}
+
+/* Au survol, même à vide, l'icône repasse en accent (cohérent avec le pill de
+   fond de #cart-menu:hover ci-dessus). Spécificité (1,5,0) pour battre la
+   règle « vide » juste au-dessus (1,4,0). */
+.header-cart-empty-check.header-cart-is-empty-true ~ .header-cart-inner-wrap #cart-menu:hover .kadence-svg-iconset {
+    color: var(--pf-accent);
+}
+
+/* =========================================================
+   Header mobile — panier injecté dans la barre mobile (inc/header-hooks.php).
+   Kadence ne génère son CSS dynamique que pour un élément configuré en
+   customizer, on calque donc ici les couleurs du panier desktop.
+   (« Mon compte » est une entrée du menu mobile → style natif des liens.) ========================================================= */
+/* Icône : accent par défaut (panier non vide), neutre (texte menu) à vide,
+   ré-accent au survol même à vide — parité avec le comportement desktop
+   (#cart-menu .kadence-svg-iconset). Le style « link » mobile ne pose pas de
+   modifier is-empty-* sur le bouton lui-même : on passe donc par le fragment
+   frère header-cart-empty-check (comme la règle de masquage du compteur
+   ci-dessous, déjà sur ce principe). */
+.header-mobile-cart-wrap .header-cart-button {
+    color: var(--pf-accent);
+}
+.header-mobile-cart-wrap .header-cart-empty-check.header-cart-is-empty-true ~ .header-cart-inner-wrap .header-cart-button {
+    color: var(--pf-text);
+}
+.header-mobile-cart-wrap .header-cart-empty-check.header-cart-is-empty-true ~ .header-cart-inner-wrap .header-cart-button:hover {
+    color: var(--pf-accent);
+}
+
+/* Compteur : pastille pleine (fond accent + chiffre cream), parité avec le
+   compteur desktop. Le style « link » mobile ne pose pas de modifier is-empty-*
+   sur le compteur lui-même (contrairement au desktop) → ciblage par le même
+   fragment frère plutôt que `.header-cart-total.header-cart-is-empty-false`. */
+.header-mobile-cart-wrap .header-cart-empty-check.header-cart-is-empty-false ~ .header-cart-inner-wrap .header-cart-total {
+    background: var(--pf-accent) !important;
+    border: 2px solid var(--pf-accent) !important;
+    color: var(--pf-cream) !important;
+    font-weight: var(--pf-weight-semibold);
+}
+
+/* Masqué quand le panier est vide. */
+.header-mobile-cart-wrap .header-cart-empty-check.header-cart-is-empty-true ~ .header-cart-inner-wrap .header-cart-total {
+    display: none;
+}
+
+/* Page panier (donc panier non vide) : même traitement plein-accent que le
+   bouton desktop. Pas d'id #cart-menu sur mobile (style « link ») → le fond
+   accent + la mise en forme pilule se posent directement sur le bouton. */
+.woocommerce-cart .header-mobile-cart-wrap .header-cart-empty-check.header-cart-is-empty-false ~ .header-cart-inner-wrap .header-cart-button {
+    background: var(--pf-accent);
+    padding: .3em .7em;
+    border-radius: 5px;
+}
+.woocommerce-cart .header-mobile-cart-wrap .header-cart-empty-check.header-cart-is-empty-false ~ .header-cart-inner-wrap .header-cart-button .kadence-svg-iconset {
+    color: var(--pf-cream);
+}
+/* Même contournement que sur desktop : .woocommerce-cart .kadence-shopping-bag-svg
+   (fill: accent, plus haut) s'applique aussi à l'icône mobile — un `fill` CSS
+   prime toujours sur le fill="currentColor" du SVG, donc `color` seul ne suffit
+   pas ici. */
+.woocommerce-cart .header-mobile-cart-wrap .header-cart-empty-check.header-cart-is-empty-false ~ .header-cart-inner-wrap .header-cart-button .kadence-shopping-bag-svg {
+    fill: var(--pf-cream);
+}
+.woocommerce-cart .header-mobile-cart-wrap .header-cart-empty-check.header-cart-is-empty-false ~ .header-cart-inner-wrap .header-cart-total {
+    background: var(--pf-cream) !important;
+    border-color: var(--pf-cream) !important;
+    color: var(--pf-accent) !important;
+}
+
+/* =========================================================
+   Tiroir de navigation mobile — calqué sur le header desktop.
+   Par défaut Kadence le rend sur fond sombre (#090c10) avec liens clairs ;
+   on reprend le style du nav desktop : fond crème (palette7), liens en gris
+   chaud, survol rouge translucide, item actif rouge plein + texte crème.
+   Scopé à #mobile-drawer pour ne pas toucher le tiroir panier (#cart-drawer). ========================================================= */
+#mobile-drawer .drawer-inner {
+    background: var(--pf-cream-dark);
+    color: var(--pf-text);
+}
+/* Liens : couleur texte + séparateurs sable (au lieu du clair sur fond sombre). */
+#mobile-drawer .mobile-navigation ul li > a,
+#mobile-drawer .mobile-navigation ul li.menu-item-has-children > .drawer-nav-drop-wrap {
+    color: var(--pf-text);
+}
+#mobile-drawer .mobile-navigation ul li.menu-item-has-children .drawer-nav-drop-wrap,
+#mobile-drawer .mobile-navigation ul li:not(.menu-item-has-children) a {
+    border-bottom-color: var(--pf-border);
+}
+/* Survol : rouge translucide + texte accent (comme le nav desktop). */
+#mobile-drawer .mobile-navigation ul li > a:hover {
+    color: var(--pf-accent);
+    background: var(--pf-red-soft);
+}
+/* Item actif : rouge plein + texte crème (comme le nav desktop). */
+#mobile-drawer .mobile-navigation ul li.current-menu-item > a,
+#mobile-drawer .mobile-navigation ul li.current-menu-item.menu-item-has-children > .drawer-nav-drop-wrap {
+    color: var(--pf-cream);
+    background: var(--pf-accent);
+    border-radius: var(--pf-radius-lg);
+    border-bottom-color: transparent;
+}
+
+.pf-auteur-events-date, .tribe-events-calendar-list__event-datetime, .tribe-events-calendar-month__calendar-event-datetime, .tribe-events-calendar-month__calendar-event-tooltip-datetime, .tribe-events-calendar-day__event-datetime {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--pf-muted);
+}
+
+.tribe-events-calendar-month__calendar-event-datetime, .tribe-events-calendar-month__calendar-event-tooltip-datetime {
+    font-size: 0.6rem !important;
+}
+
+/* =========================================================
+   Offset barre d'admin — élève --pf-adminbar quand la barre WP est présente.
+   Consommé par les éléments sticky (ex. nav fiche livre). ========================================================= */
+body.admin-bar { --pf-adminbar: 32px; }
+@media screen and (max-width: 782px) {
+    body.admin-bar { --pf-adminbar: 46px; }
+}
+
+/* =========================================================
+   Pastille de statut « badge » — petite étiquette pilule en capitales.
+   La forme/typo est commune ; la couleur vient d'un modificateur sémantique. ========================================================= */
+.pf-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35em;
+    padding: 0.25em 0.75em;
+    border-radius: 999px;
+    font-family: var(--pf-font-body);
+    font-size: 0.78rem;
+    font-weight: var(--pf-weight-semibold);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+.pf-badge--success { background: var(--pf-success-bg); color: var(--pf-success); }
+.pf-badge--info    { background: var(--pf-info-bg);    color: var(--pf-info); }
+.pf-badge--warning { background: var(--pf-warning-bg); color: var(--pf-warning); }
+.pf-badge--danger  { background: var(--pf-danger-bg);  color: var(--pf-danger); }
+.pf-badge--muted   { background: #eee;    color: var(--pf-muted); }
+.pf-badge--accent  { background: var(--pf-red-soft); color: var(--pf-accent); }
+.pf-badge--attente { background: var(--pf-sand); color: #6b5836; /* brun foncé lisible sur sable */ }
+
+/* =========================================================
+   Titre de section — ornements partagés (accueil, réutilisable site-wide).
+   La typo vient des classes .pf-titre-2 / .pf-titre-3 portées par le markup ;
+   .pf-section-titre n'ajoute que l'ornement : trait rouge (titre simple) ou
+   flèche ➜ animée (titre-lien). Les h2 de grande section restent nus. ========================================================= */
+.pf-section-titre:not(:has(a))::after {
+    content: '';
+    display: inline-block;
+    width: 2.5rem;
+    height: 2px;
+    background: var(--pf-accent);
+}
+/* Titres-liens : le <a> devient le conteneur flex (texte + flèche cliquables) */
+.pf-section-titre a {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4em;
+    color: inherit;
+    text-decoration: none;
+}
+.pf-section-titre a::after {
+    content: '➜';
+    transition: transform 0.2s ease;
+}
+.pf-section-titre a:hover {
+    color: var(--pf-accent);
+    text-decoration: none;
+}
+.pf-section-titre a:hover::after {
+    transform: translateX(8px);
+}
+h2.pf-section-titre::after,
+h2.pf-section-titre a::after {
+    display: none;
+}
+
+/* =========================================================
+   Panneau encadré — motif partagé : bordure claire, coins arrondis, fond
+   blanc ou crème. Récap commande, encart paiement, nav compte, cartes d'avis…
+   Boutons WooCommerce du même motif : garder le sélecteur, consommer les tokens.
+   Le padding vient de --pf-panel-pad (surchargeable localement si densité voulue). ========================================================= */
+.pf-panel {
+    border: 1px solid var(--pf-border-light);
+    border-radius: var(--pf-radius-lg);
+    background: var(--pf-surface);
+    padding: var(--pf-panel-pad);
+}
+.pf-panel--alt {
+    background: var(--pf-surface-alt);
+}
+/* Zone sensible (suppression de compte…) : cadre + fond rouges translucides. */
+.pf-panel--danger {
+    border-color: var(--pf-accent);
+    background: var(--pf-red-soft);
+}
+
+/* =========================================================
+   Citation / encart à filet gauche — fond crème clair, filet 3px, coins
+   arrondis côté droit. Couleur du filet via --pf-quote-rule (sable par défaut,
+   accent pour la réponse de l'éditeur). Padding/margin contextuels. ========================================================= */
+.pf-quote,
+.pf-avis-reponse {
+    background: var(--pf-surface-alt);
+    border-left: 3px solid var(--pf-quote-rule, var(--pf-border));
+    border-radius: 0 var(--pf-radius) var(--pf-radius) 0;
+}
+.pf-quote--accent {
+    --pf-quote-rule: var(--pf-accent);
+}
+
+/* =========================================================
+   Notice de statut — bandeau à filet accent (erreur de formulaire, confirmation).
+   Pour un simple texte de feedback sans bandeau, consommer directement
+   --pf-success / --pf-danger. ========================================================= */
+.pf-notice {
+    padding: 0.85rem 1.1rem;
+    border-left: 3px solid var(--pf-accent);
+    border-radius: 0 var(--pf-radius) var(--pf-radius) 0;
+    font-size: 0.95rem;
+}
+.pf-notice--error   { background: var(--pf-danger-bg);  color: var(--pf-danger); }
+.pf-notice--success { background: var(--pf-success-bg); color: var(--pf-success); }
+
+/* =========================================================
+   Bouton rond à icône — rouge plein, icône crème (chargement des événements
+   passés, fermeture de la recherche globale…). !important nécessaires : bat le style
+   générique des boutons de contenu (.entry-content button) où qu'il soit rendu.
+   L'ombre reste propre au composant (pas un token). ========================================================= */
+.pf-roundbtn {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px !important;
+    height: 40px !important;
+    padding: 0 !important;
+    border: none !important;
+    border-radius: 50% !important;
+    background: var(--pf-accent) !important;
+    color: var(--pf-cream) !important;
+    cursor: pointer;
+    box-shadow: 0 4px 14px -4px rgba(94, 82, 77, 0.4);
+    transition: background-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+}
+.pf-roundbtn:hover,
+.pf-roundbtn:focus-visible {
+    background: var(--pf-accent-dark) !important;
+    outline: none;
+}
+
+/* =========================================================
+   Spinner — anneau qui tourne (chargements). La classe pose la géométrie par
+   défaut ; les pseudo-éléments peuvent réutiliser directement @keyframes pf-spin. ========================================================= */
+@keyframes pf-spin { to { transform: rotate(360deg); } }
+.pf-spinner {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    border: 2px solid currentColor;
+    border-top-color: transparent;
+    animation: pf-spin 0.7s linear infinite;
+}
+
+/* =========================================================
+   Bloc « réponse de l'éditeur » sous un avis (compte client + fiche livre).
+   Base visuelle : .pf-quote (ci-dessus) avec filet accent. ========================================================= */
+.pf-avis-reponse {
+    --pf-quote-rule: var(--pf-accent);
+    margin: var(--pf-space-3) 0 0;
+    padding: var(--pf-space-3) var(--pf-space-4);
+}
+.pf-avis-reponse > strong {
+    display: block;
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--pf-accent);
+    margin: 0 0 0.3rem;
+}
+.pf-avis-reponse__text { margin: 0; font-size: 0.92rem; line-height: 1.55; color: var(--pf-text); }
+.pf-avis-reponse__date { display: block; margin: 0.4rem 0 0; font-size: 0.75rem; color: var(--pf-text-dim); }
+
+/* =========================================================
+   Scroll horizontal — utilitaire : scrollbar fine et discrète.
+   Le flex/gap/padding restent propres à chaque liste qui l'utilise. ========================================================= */
+.pf-hscroll {
+    overflow-x: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--pf-border) transparent;
+    -webkit-overflow-scrolling: touch;
+}
+.pf-hscroll::-webkit-scrollbar { height: 6px; }
+.pf-hscroll::-webkit-scrollbar-track { background: transparent; }
+.pf-hscroll::-webkit-scrollbar-thumb { background: var(--pf-border); border-radius: 3px; }
+
+/* =========================================================
+   Switch segmenté — conteneur bordé + segments ; actif = rouge translucide.
+   Markup : catalogue (display/format/univers), événements (vue liste/mois).
+   Variante --solid : segment actif en aplat rouge (sélecteur de vue TEC). ========================================================= */
+.pf-switch {
+    display: inline-flex;
+    border: 1px solid var(--pf-border-light);
+    border-radius: var(--pf-radius-md);
+    overflow: hidden;
+}
+.pf-switch__btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 8px 14px;
+    border: 0;
+    background: var(--pf-cream);
+    color: var(--pf-text);
+    font-family: inherit;
+    font-size: 14px;
+    line-height: 1.2;
+    cursor: pointer;
+    white-space: nowrap;
+    text-decoration: none;
+    box-shadow: none;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+.pf-switch__btn:not(:last-child) { border-right: 1px solid var(--pf-border-light); }
+.pf-switch__btn.is-active { background: var(--pf-red-soft); color: var(--pf-accent); box-shadow: none; }
+.pf-switch__btn:not(.is-active):hover { background: var(--pf-red-soft-strong); color: var(--pf-accent); box-shadow: none; }
+.pf-switch__btn:disabled { opacity: 0.35; cursor: not-allowed; }
+/* Variante --solid : segment actif en aplat rouge (sélecteur de vue Liste/Mois TEC). */
+.pf-switch--solid .pf-switch__btn.is-active { background: var(--pf-accent); color: var(--pf-surface); }
+.pf-switch--solid .pf-switch__btn:not(.is-active):hover { background: var(--pf-cream-dark); color: var(--pf-accent); }
+
+/* =========================================================
+   Menu déroulant — trigger bordé + menu flottant (position:fixed, placé en JS).
+   Markup : catalogue (tri/filtres/PDF), recherche globale (type). ========================================================= */
+.pf-dropdown { position: relative; }
+.pf-dropdown__trigger {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 12px;
+    border: 1px solid var(--pf-border-light);
+    border-radius: var(--pf-radius-md);
+    background: var(--pf-cream);
+    color: var(--pf-text);
+    font-family: inherit;
+    font-size: 14px;
+    line-height: 1.2;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+.pf-dropdown__trigger:hover, .pf-dropdown__trigger:focus {
+    border-color: var(--pf-accent);
+    color: var(--pf-accent);
+    background: var(--pf-red-soft);
+    box-shadow: none;
+}
+.pf-dropdown.is-open > .pf-dropdown__trigger,
+.pf-dropdown.is-active > .pf-dropdown__trigger {
+    border-color: var(--pf-accent);
+    color: var(--pf-accent);
+}
+.pf-dropdown__menu {
+    position: fixed;
+    top: 0;
+    left: 0;
+    min-width: max-content;
+    background: var(--pf-surface);
+    border: 1px solid var(--pf-border-light);
+    border-radius: var(--pf-radius-md);
+    box-shadow: var(--pf-shadow-float);
+    padding: 4px;
+    z-index: 1000;
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(-4px);
+    transition: opacity 0.18s ease, transform 0.18s ease;
+}
+.pf-dropdown__menu.is-open { opacity: 1; pointer-events: auto; transform: translateY(0); }
+.pf-dropdown__option {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+    padding: 8px 12px;
+    border: 0;
+    background: transparent;
+    color: var(--pf-text);
+    font-family: inherit;
+    font-size: 14px;
+    text-align: left;
+    cursor: pointer;
+    border-radius: var(--pf-radius);
+    white-space: nowrap;
+}
+.pf-dropdown__option:hover:not(.is-disabled) { background: var(--pf-red-soft); color: var(--pf-accent); box-shadow: none; }
+.pf-dropdown__option.is-selected { color: var(--pf-accent); font-weight: var(--pf-weight-semibold); }
+.pf-dropdown__option.is-disabled { opacity: 0.4; cursor: not-allowed; }
+
+.nav-drop-title-wrap {
+    padding-right: 0;
+}
+
+/* Sous-menus du header (Kadence primary/mobile nav) : même style que .pf-dropdown__menu
+   ci-dessus (filtres catalogue) — carte blanche bordée, ombre flottante, survol rouge doux.
+   !important nécessaire : écrase le CSS généré par le Customizer (réglages « Dropdown Nav »). */
+.header-navigation .header-menu-container ul ul.sub-menu,
+.header-navigation .header-menu-container ul ul.submenu {
+    background: var(--pf-surface) !important;
+    border: 1px solid var(--pf-border-light);
+    border-radius: var(--pf-radius-md) !important;
+    box-shadow: var(--pf-shadow-float) !important;
+    padding: 4px;
+    margin-top: 4px;
+}
+/* Pont invisible : comble le vide du margin-top pour que le survol de l'ancêtre <li>
+   ne se coupe pas en le traversant (le sous-menu est position:absolute, hors du flux
+   du <li> ; un vrai espace vide entre déclencheur et sous-menu referme le menu avant
+   qu'on l'atteigne). Un ::before n'a aucun rendu visible mais reste dans la boîte de
+   .sub-menu, donc dans le sous-arbre DOM du <li> survolé — contrairement à une bordure
+   transparente, ça ne change rien à l'apparence du panneau (bordure/ombre intactes). */
+.header-navigation .header-menu-container ul ul.sub-menu::before,
+.header-navigation .header-menu-container ul ul.submenu::before {
+    content: '';
+    position: absolute;
+    top: -6px;
+    left: 0;
+    right: 0;
+    height: 6px;
+}
+.header-navigation .header-menu-container ul ul.sub-menu ul.sub-menu,
+.header-navigation .header-menu-container ul ul.submenu ul.submenu {
+    margin-top: 0;
+    margin-left: 8px;
+}
+.header-navigation .header-menu-container ul ul.sub-menu ul.sub-menu::before,
+.header-navigation .header-menu-container ul ul.submenu ul.submenu::before {
+    top: 0;
+    bottom: 0;
+    left: -8px;
+    right: auto;
+    width: 8px;
+    height: auto;
+}
+.header-navigation .header-menu-container ul ul li.menu-item > a {
+    padding: 8px 12px !important;
+    font-size: var(--pf-text-sm) !important;
+    color: var(--pf-text) !important;
+    border-radius: var(--pf-radius) !important;
+}
+.header-navigation .header-menu-container ul ul li.menu-item > a:hover,
+.header-navigation .header-menu-container ul ul li.menu-item > a:focus {
+    background: var(--pf-red-soft) !important;
+    color: var(--pf-accent) !important;
+}
+.header-navigation .header-menu-container ul ul li.menu-item.current-menu-item > a,
+.header-navigation .header-menu-container ul ul li.menu-item.current-product_cat-ancestor > a {
+    background: transparent !important;
+    color: var(--pf-accent) !important;
+    font-weight: var(--pf-weight-semibold);
+}
+/* Masque le chevron du menu déroulant sur les onglets de premier niveau du header
+   ordinateur (aujourd'hui : Catalogue) — les flèches des sous-menus imbriqués
+   (Littérature, Culture Sud-Ouest…) ne sont pas concernées. */
+.header-navigation .header-menu-container > ul > li.menu-item-has-children > a .dropdown-nav-toggle {
+    display: none;
+}
+
+/* =========================================================
+   Tableaux WooCommerce — cadre + en-tête crème majuscule.
+   Partagé par Mon compte, Panier, récapitulatif de commande.
+   Le padding des cellules reste propre à chaque page (densités différentes). ========================================================= */
+.woocommerce table.shop_table {
+    border: 1px solid var(--pf-border-light);
+    border-radius: var(--pf-radius-lg);
+    border-collapse: separate;
+    border-spacing: 0;
+    overflow: hidden;
+}
+.woocommerce table.shop_table thead th {
+    background: var(--pf-surface-alt);
+    color: var(--pf-heading);
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+/* =========================================================
+   Éléments sticky — léger effet « aéro » (verre dépoli) au scroll.
+   Principe commun : au repos le fond reste opaque ; une fois collé et défilé
+   (l'élément chevauche le contenu qui défile), on rend son fond translucide et
+   on ajoute un flou d'arrière-plan (--pf-aero-blur). Sous @supports →
+   dégradation propre (fond opaque) si backdrop-filter est absent.
+   Ici : header Kadence + .pf-sticky-bar. Les barres propres à une page (accueil,
+   événements, fiche livre mobile) reçoivent le même traitement dans leurs CSS.
+   ========================================================= */
+@supports ((backdrop-filter: blur(2px)) or (-webkit-backdrop-filter: blur(2px))) {
+    /* Header : Kadence bascule en fond blanc opaque une fois fixé → translucide + flou.
+       Le fond crème opaque de la rangée interne est neutralisé, sinon il masque le flou. */
+    #masthead .site-header-inner-wrap.kadence-sticky-header.item-is-fixed:not(.item-at-start) {
+        background: rgba(245, 240, 232, 0.9) !important; /* --pf-cream-dark (palette7) translucide */
+        -webkit-backdrop-filter: blur(var(--pf-aero-blur));
+        backdrop-filter: blur(var(--pf-aero-blur));
+    }
+    #masthead .kadence-sticky-header.item-is-fixed:not(.item-at-start) .site-header-row-container-inner {
+        background: transparent;
+    }
+    /* Bascule opaque → translucide+flou en fondu (évite le « pop » au moment où
+       le header se colle). La couche GPU ne peut pas être pré-chauffée : le header
+       contient des sous-menus + un panier en position absolue qu'un bloc conteneur
+       (will-change/transform) décalerait. D'où une simple transition de fond. */
+    #masthead .site-header-inner-wrap.kadence-sticky-header,
+    #masthead .kadence-sticky-header .site-header-row-container-inner {
+        transition: background-color 0.3s ease;
+    }
+    /* Barre catalogue / recherche auteurs — translucide à l'état collé. */
+    .pf-sticky-bar.is-stuck {
+        background: rgba(250, 246, 240, 0.9); /* --pf-cream translucide */
+        -webkit-backdrop-filter: blur(var(--pf-aero-blur));
+        backdrop-filter: blur(var(--pf-aero-blur));
+    }
+}
+
+.kadence-svg-iconset:hover {
+    color: var(--pf-accent);
+}
+
+/* =========================================================
+   Encart newsletter — bande footer (site-wide), page /contact, Détails du compte.
+   Vit dans style.css car chargé sur toutes les pages (ex-newsletter.css, fusionné
+   le 2026-07-02). Le bouton est un `.button` Kadence : couleurs héritées des
+   variables --global-palette-btn-*, seule la forme est alignée sur les tokens. ========================================================= */
+.pf-newsletter {
+    background: var(--pf-cream-dark);
+    border-top: 1px solid var(--pf-border);
+    padding: 2.5rem 1.5rem 0 1.5rem;
+}
+.pf-newsletter__inner {
+    max-width: 640px;
+    margin: 0 auto;
+    text-align: center;
+}
+.pf-newsletter__titre {
+    margin: 0 0 .4rem;
+    color: var(--pf-heading);
+    font-size: 1.5rem;
+}
+.pf-newsletter__intro {
+    margin: 0 0 .5rem;
+    color: var(--pf-text);
+}
+.pf-newsletter__note {
+    margin: 0 0 1.25rem;
+    font-size: .82rem;
+    font-style: italic;
+    color: var(--pf-text);
+}
+.pf-newsletter__fields {
+    display: flex;
+    flex-direction: column;
+    gap: .6rem;
+    text-align: left;
+}
+/* Bordure, radius et transition : base globale des inputs (plus haut). */
+.pf-newsletter__input {
+    width: 100%;
+    padding: .7rem .9rem;
+    background: var(--pf-surface);
+    font-size: 1rem;
+}
+/* Anneau rouge (comme les barres de recherche) — !important : la base globale
+   input:focus (spécificité supérieure) pose sinon l'anneau sable. */
+.pf-newsletter__input:focus {
+    box-shadow: var(--pf-focus-ring-accent) !important;
+}
+.pf-newsletter__input[readonly] {
+    background: #f3ede2; /* un cran plus foncé que le fond crème → distingue le champ verrouillé */
+    color: var(--pf-text);
+    cursor: not-allowed;
+}
+.pf-newsletter__consent {
+    display: flex;
+    align-items: flex-start;
+    gap: .5rem;
+    margin: .9rem 0 0;
+    text-align: left;
+    font-size: .85rem;
+    color: var(--pf-text);
+}
+.pf-newsletter__consent input {
+    margin-top: .2rem;
+    flex: 0 0 auto;
+}
+.pf-newsletter__consent a {
+    color: var(--pf-accent);
+    text-decoration: underline;
+}
+.pf-newsletter__btn {
+    margin-top: 1rem;
+    border: none;
+    border-radius: var(--pf-radius);
+    padding: var(--pf-btn-pad);
+    font-weight: var(--pf-btn-weight);
+    cursor: pointer;
+}
+.pf-newsletter__btn:disabled {
+    opacity: .6;
+    cursor: default;
+}
+.pf-newsletter__message {
+    min-height: 1.2em;
+    margin: .75rem 0 0;
+    font-size: .9rem;
+}
+.pf-newsletter__message.is-success {
+    color: var(--pf-success);
+}
+.pf-newsletter__message.is-error {
+    color: var(--pf-accent-dark);
+}
+.pf-newsletter__subscribed {
+    margin: 0;
+    color: var(--pf-success);
+    font-weight: var(--pf-weight-semibold);
+}
+.pf-newsletter__unsub-btn {
+    margin-top: .75rem;
+}
+/* Seuil propre au composant (formulaire max-width 640px), pas un breakpoint de page. */
+@media ( max-width: 540px ) {
+    .pf-newsletter__btn {
+        width: 100%;
+    }
+}

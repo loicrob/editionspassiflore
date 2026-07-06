@@ -1,0 +1,132 @@
+/* ─── Passiflore — Tunnel de commande (checkout) ─────────────────── */
+/* Tokens + cadre des tableaux (.shop_table) + base des champs : style.css.
+   Ne reste ici que le spécifique au tunnel. */
+
+/* ─── Titres de section ──────────────────────────────────────────── */
+
+.woocommerce-checkout h3,
+.woocommerce-checkout #order_review_heading {
+	color: var(--pf-heading);
+	border-bottom: 2px solid var(--pf-accent);
+	padding-bottom: 0.4em;
+	margin-bottom: 1rem;
+}
+
+/* ─── Champs de formulaire ───────────────────────────────────────── */
+/* Bord + focus des input/select : base formulaire globale (style.css).
+   Ici : libellés + select2 (non couvert par la base). */
+
+.woocommerce-checkout .form-row label {
+	color: var(--pf-heading);
+	font-size: 0.9rem;
+}
+
+.woocommerce-checkout .select2-selection {
+	border: 1px solid var(--pf-border-light) !important;
+	border-radius: var(--pf-radius);
+	padding: 0.55em 0.7em;
+	background: var(--pf-surface);
+}
+
+/* ─── Récapitulatif de commande ──────────────────────────────────── */
+
+/* Récap : motif .pf-panel--alt (markup WooCommerce → sélecteur conservé, tokens). */
+.woocommerce-checkout #order_review {
+	border: 1px solid var(--pf-border-light);
+	border-radius: var(--pf-radius-lg);
+	padding: var(--pf-panel-pad);
+	background: var(--pf-surface-alt);
+}
+
+/* Le tableau de récap est dans un panneau déjà bordé → on retire son cadre
+   (sinon double bordure) ; en-tête + couleur d'en-tête viennent du global. */
+.woocommerce-checkout .woocommerce-checkout-review-order-table {
+	border: 0;
+}
+
+.woocommerce-checkout .woocommerce-checkout-review-order-table td,
+.woocommerce-checkout .woocommerce-checkout-review-order-table th {
+	padding: 0.6em 0.5em;
+	color: var(--pf-text);
+}
+
+.woocommerce-checkout .woocommerce-checkout-review-order-table .order-total .amount {
+	color: var(--pf-accent);
+	font-size: 1.15rem;
+}
+
+/* ─── Encart de paiement ─────────────────────────────────────────── */
+
+.woocommerce-checkout #payment {
+	background: var(--pf-surface);
+	border: 1px solid var(--pf-border-light);
+	border-radius: var(--pf-radius-lg);
+}
+
+.woocommerce-checkout #payment ul.payment_methods {
+	border-bottom: 1px solid var(--pf-border-light);
+}
+
+.woocommerce-checkout #payment .payment_box {
+	background: var(--pf-surface-alt);
+	color: var(--pf-text);
+}
+
+.woocommerce-checkout #payment .payment_box::before {
+	border-bottom-color: var(--pf-surface-alt);
+}
+
+/* Case CGV. */
+.woocommerce-checkout .woocommerce-terms-and-conditions-wrapper {
+	margin: 1rem 0;
+}
+
+.woocommerce-checkout .woocommerce-terms-and-conditions-wrapper a {
+	color: var(--pf-accent);
+}
+
+/* ─── Bouton « Commander » ───────────────────────────────────────── */
+/* #place_order est un bouton .alt → rougi par le câblage global ; ici, layout. */
+
+.woocommerce-checkout #place_order {
+	display: block;
+	width: 100%;
+	font-size: 1.05rem;
+	padding: 0.85em 1.2em;
+}
+
+/* ─── Identifiant / coupon (bandeaux d'info) ─────────────────────── */
+
+.woocommerce-checkout .woocommerce-form-login-toggle .woocommerce-info,
+.woocommerce-checkout .woocommerce-form-coupon-toggle .woocommerce-info {
+	border-top-color: var(--pf-accent);
+}
+
+.woocommerce-checkout .woocommerce-info a,
+.woocommerce-checkout .showcoupon {
+	color: var(--pf-accent);
+}
+
+/* ─── Page de confirmation (commande reçue) ──────────────────────── */
+
+/* Aperçu de commande : motif .pf-panel--alt. */
+.woocommerce-order .woocommerce-order-overview {
+	border: 1px solid var(--pf-border-light);
+	border-radius: var(--pf-radius-lg);
+	padding: var(--pf-panel-pad);
+	background: var(--pf-surface-alt);
+}
+
+.woocommerce-order .woocommerce-thankyou-order-received {
+	color: var(--pf-accent);
+	font-size: 1.25rem;
+	font-weight: var(--pf-weight-semibold);
+}
+
+/* ─── Responsive ─────────────────────────────────────────────────── */
+
+@media (max-width: 768px) {
+	.woocommerce-checkout #order_review {
+		margin-top: 1.5rem;
+	}
+}

@@ -1,0 +1,138 @@
+/**
+ * Scroll infini bidirectionnel — vue liste The Events Calendar.
+ * Chargé sur toutes les vues d'archive (liste/mois/jour) pour survivre aux bascules
+ * de vue AJAX ; les règles propres à la liste sont scopées à `.tribe-events-view--list`.
+ */
+
+/* Top-bar TEC (today / préc.-suiv. / datepicker) masqué EN VUE LISTE uniquement :
+   la navigation s'y fait au scroll infini. La vue mois garde son top-bar (à gauche). */
+.tribe-events-view--list .tribe-events-header__top-bar {
+	display: none !important;
+}
+
+/* Liste + son échafaudage (bouton passés, sentinelle bas, bouton retour) suspendus
+   PENDANT une recherche (assets/js/events-search.js) : masqués sans être détruits,
+   pour préserver les lots déjà chargés et la position de scroll, restaurés tels
+   quels à la fermeture de la recherche. */
+.pf-ev-search-hidden {
+	display: none !important;
+}
+
+/* ─── Boutons ronds : composant global .pf-roundbtn (style.css) ──────
+   Le JS pose `pf-roundbtn pf-ev-roundbtn …` ; ne restent ici que les
+   comportements propres au scroll infini (états de chargement). */
+.pf-ev-arrow { display: block; }
+
+/* ─── Déclencheur du chargement des passés (haut, dans le flux) ─── */
+.pf-ev-top {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 0.5rem;
+	padding: 1.25rem 0 1.5rem !important;
+}
+
+/* ─── Bouton fixe « retour vers les à-venir » (bas) ──────────────── */
+.pf-ev-tofuture {
+	position: fixed;
+	left: 50%;
+	bottom: 22px;
+	z-index: 50;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 0.5rem;
+	opacity: 0;
+	pointer-events: none;
+	transform: translateX(-50%) translateY(14px);
+	transition: opacity 0.22s ease, transform 0.22s ease;
+}
+.pf-ev-tofuture.is-visible {
+	opacity: 1;
+	pointer-events: auto;
+	transform: translateX(-50%) translateY(0);
+}
+
+/* ─── Labels texte des boutons ronds — pilule « verre dépoli » (même
+   traitement que les headers sticky, cf. bloc « Éléments sticky » de
+   style.css) : le contenu défile dessous, flou + fond crème translucide. */
+.pf-ev-btn-label {
+	padding: 0.35rem 0.9rem !important;
+	border-radius: 999px;
+	background: var(--pf-surface-alt);
+	color: var(--pf-text);
+	font-size: var(--pf-text-xs);
+	font-weight: var(--pf-weight-semibold);
+	white-space: nowrap;
+}
+@supports ((backdrop-filter: blur(2px)) or (-webkit-backdrop-filter: blur(2px))) {
+	.pf-ev-btn-label {
+		background: color-mix(in srgb, var(--pf-surface-alt) 50%, transparent);
+		-webkit-backdrop-filter: blur(var(--pf-aero-blur));
+		backdrop-filter: blur(var(--pf-aero-blur));
+	}
+}
+
+/* ─── Spinner (bouton du haut pendant le chargement) ───────────────
+   Logo Passiflore qui tourne, à la place de l'anneau générique .pf-spinner
+   (composant global — resté inchangé pour ses autres usages sur le site).
+   Repos : bouton rond rouge + flèche. Chargement : le bouton perd son fond
+   rouge/ombre (le logo prend toute sa place, à sa taille — inset:0 sur ce
+   bouton en position:relative) et sa flèche se cache ; seul le logo tourne. */
+.pf-ev-spinner {
+	display: none;
+	position: absolute;
+	inset: 0;
+	background-image: url("/wp-content/uploads/2026/04/cropped-icone-192x192.png");
+	background-size: contain;
+	background-repeat: no-repeat;
+	background-position: center;
+	border-radius: 50%;
+}
+.pf-ev-top.is-loading .pf-ev-arrow     { visibility: hidden; }
+.pf-ev-top.is-loading .pf-ev-spinner   { display: block; animation: pf-spin 1.6s linear infinite; }
+.pf-ev-top.is-loading .pf-ev-btn-label { display: none; }
+.pf-ev-top.is-loading .pf-ev-pastbtn {
+	background: transparent !important;
+	box-shadow: none !important;
+}
+
+/* ─── Bas : sentinelle, loader, fin de liste ─────────────────────── */
+.pf-ev-bottom {
+	position: relative;
+	min-height: 1px;
+}
+.pf-ev-sentinel {
+	height: 1px;
+}
+/* Même logo tournant, même taille que le bouton du haut (cf. .pf-ev-spinner,
+   40px) — seul ici (pas de flèche à masquer), donc pas besoin de superposition. */
+.pf-ev-bottom.is-loading::before {
+	content: "";
+	display: block;
+	width: 40px;
+	height: 40px;
+	margin: 1.25rem auto;
+	border-radius: 50%;
+	background-image: url("/wp-content/uploads/2026/04/cropped-icone-192x192.png");
+	background-size: contain;
+	background-repeat: no-repeat;
+	background-position: center;
+	animation: pf-spin 1.6s linear infinite; /* keyframes globales (style.css) */
+}
+
+.pf-ev-msg {
+	display: none;
+	text-align: center;
+	color: var(--pf-muted);
+	font-size: 0.85rem;
+	padding: 1.5rem 1rem 2rem;
+}
+.pf-ev-msg.is-visible { display: block; }
+
+@media (prefers-reduced-motion: reduce) {
+	.pf-ev-roundbtn,
+	.pf-ev-tofuture { transition: none; }
+	.pf-ev-spinner,
+	.pf-ev-bottom.is-loading::before { animation-duration: 3s; }
+}

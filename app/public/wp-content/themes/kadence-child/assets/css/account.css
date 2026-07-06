@@ -1,0 +1,286 @@
+/* ─── Passiflore — Espace « Mon compte » ─────────────────────────── */
+/* Tokens, cadre des tableaux (.shop_table), base des champs (bord + focus) et
+   couleur des boutons .alt : tout vient de style.css. Ne reste ici que le
+   layout et les surcharges propres à l'espace compte. */
+
+/* ─── Layout : navigation + contenu ──────────────────────────────── */
+
+.woocommerce-account .woocommerce {
+	display: flex;
+	flex-wrap: wrap;
+	gap: clamp(1.5rem, 4vw, 3rem);
+	align-items: flex-start;
+}
+
+.woocommerce-account .woocommerce-MyAccount-navigation {
+	flex: 0 0 auto;
+	width: 240px;
+}
+
+.woocommerce-account .woocommerce-MyAccount-content {
+	flex: 1 1 320px;
+	min-width: 0;
+	color: var(--pf-text);
+}
+
+/* ─── Navigation latérale ────────────────────────────────────────── */
+
+.woocommerce-MyAccount-navigation ul {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	border: 1px solid var(--pf-border-light);
+	border-radius: var(--pf-radius-lg);
+	overflow: hidden;
+	background: var(--pf-surface);
+}
+
+.woocommerce-MyAccount-navigation li {
+	margin: 0;
+	border-bottom: 1px solid var(--pf-border-light);
+}
+
+.woocommerce-MyAccount-navigation li:last-child {
+	border-bottom: 0;
+}
+
+.woocommerce-MyAccount-navigation li a {
+	display: block;
+	padding: 0.7em 1.1em;
+	color: var(--pf-text) !important;
+	text-decoration: none !important;
+	font-size: 0.95rem;
+	transition: background 0.15s, color 0.15s;
+	border-left: none !important;
+}
+
+.woocommerce-MyAccount-navigation li a:hover {
+	background: var(--pf-red-soft);
+	color: var(--pf-accent) !important;
+}
+
+.woocommerce-MyAccount-navigation li.is-active a {
+	background: var(--pf-accent);
+	color: var(--pf-cream) !important;
+	font-weight: var(--pf-weight-semibold);
+}
+
+.woocommerce-MyAccount-navigation li.woocommerce-MyAccount-navigation-link--customer-logout a {
+	color: var(--pf-text-dim);
+}
+
+/* Neutralise le filet vertical que Kadence (thème parent) pose sur le conteneur
+   de navigation en ≥768px. Spécificité (0,2,1) > règle parente (0,2,0) → gagne
+   quel que soit l'ordre de chargement des feuilles. */
+body.woocommerce-account .account-navigation-wrap {
+	border-left: 0;
+}
+
+/* ─── Tableau de bord : salutation ───────────────────────────────── */
+
+.pf-account-hello {
+	margin: 0 0 1.5rem;
+	font-family: var(--pf-font-heading);
+	font-size: var(--pf-text-xl);
+	line-height: var(--pf-leading-snug);
+	color: var(--pf-heading);
+}
+
+/* ─── Tableaux (commandes, téléchargements, adresses) ────────────── */
+/* Cadre + en-tête : règle globale .woocommerce table.shop_table (style.css).
+   Ici : densité des cellules + zébrage propres à l'espace compte. */
+
+.woocommerce-account .woocommerce-MyAccount-content table.shop_table td,
+.woocommerce-account .woocommerce-MyAccount-content table.shop_table th {
+	padding: 0.75em 1em;
+}
+
+.woocommerce-account .woocommerce-MyAccount-content table.shop_table tbody tr:nth-child(even) {
+	background: var(--pf-surface-alt);
+}
+
+/* ─── Boutons ────────────────────────────────────────────────────── */
+/* Les primaires .alt (WooCommerce) sont rougis par le câblage global Kadence ;
+   les submits non-.alt (compte, connexion, inscription) sont alignés ici. */
+
+.woocommerce-account .woocommerce-MyAccount-content .button,
+.woocommerce-account .woocommerce-MyAccount-content .woocommerce-button,
+.woocommerce form.login .button,
+.woocommerce form.register .button {
+	background: var(--pf-accent);
+	border: 1px solid var(--pf-accent);
+	color: var(--pf-surface);
+	border-radius: var(--pf-radius);
+	transition: background 0.2s, border-color 0.2s;
+}
+
+.woocommerce-account .woocommerce-MyAccount-content .button:hover,
+.woocommerce-account .woocommerce-MyAccount-content .woocommerce-button:hover,
+.woocommerce form.login .button:hover,
+.woocommerce form.register .button:hover {
+	background: var(--pf-accent-dark);
+	border-color: var(--pf-accent-dark);
+	box-shadow: none;
+}
+
+.woocommerce-account .woocommerce-MyAccount-content .button.view {
+	background: transparent;
+	color: var(--pf-accent);
+}
+
+.woocommerce-account .woocommerce-MyAccount-content .button.view:hover {
+	background: var(--pf-red-soft);
+	box-shadow: none;
+}
+
+/* ─── Formulaires ────────────────────────────────────────────────── */
+/* Bord + focus des champs : base formulaire globale (style.css). Ici : libellés. */
+
+.woocommerce-account .woocommerce-MyAccount-content label,
+.woocommerce form.login label,
+.woocommerce form.register label {
+	color: var(--pf-heading);
+	font-size: 0.9rem;
+}
+
+/* ─── Connexion / Inscription (deux colonnes) ────────────────────── */
+
+.woocommerce #customer_login.col2-set {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: clamp(1.5rem, 4vw, 3rem);
+	float: none;
+	width: 100%;
+}
+
+/* Kadence ajoute un clearfix ::before/::after sur .col2-set ; en contexte grid
+   ces pseudo-éléments deviennent des items et décalent les colonnes. */
+.woocommerce #customer_login.col2-set::before,
+.woocommerce #customer_login.col2-set::after {
+	display: none;
+}
+
+.woocommerce #customer_login .col-1,
+.woocommerce #customer_login .col-2 {
+	width: auto;
+	float: none;
+	padding: clamp(1.2rem, 3vw, 2rem);
+	border: 1px solid var(--pf-border-light);
+	border-radius: var(--pf-radius-lg);
+	background: var(--pf-surface);
+}
+
+.woocommerce #customer_login h2 {
+	margin-top: 0;
+	color: var(--pf-heading);
+}
+
+.woocommerce-LostPassword a {
+	color: var(--pf-text-dim);
+}
+
+.woocommerce-LostPassword a:hover {
+	color: var(--pf-accent);
+}
+
+/* ─── Résumé compact (chips) ─────────────────────────────────────── */
+
+.pf-account-summary {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.75rem;
+	margin: 0 0 1.75rem;
+}
+
+/* Chip = .pf-card (style.css) + valeur .pf-card-title. Ici : disposition + densité. */
+.pf-account-summary__chip {
+	gap: 0.15rem;
+	min-width: 160px;
+	padding: 0.7rem 1rem;
+}
+
+.pf-account-summary__label {
+	font-size: 0.72rem;
+	text-transform: uppercase;
+	letter-spacing: 0.06em;
+	color: var(--pf-text-dim);
+}
+
+.pf-account-summary__meta {
+	font-size: 0.8rem;
+	color: var(--pf-text-dim);
+}
+
+/* ─── Suggestions de livres ──────────────────────────────────────── */
+/* L'étagère apporte son propre bookshelf.css ; ici, juste le chrome de section. */
+
+.pf-account-reco,
+.pf-reco {
+	margin-top: 2.5rem;
+}
+
+.pf-account-reco > h2,
+.pf-reco > h2 {
+	margin: 0 0 1rem;
+}
+
+/* Titres de section greffés (adresses dans le compte, téléchargements dans les commandes). */
+.pf-account-section-title {
+	margin-top: 2.5rem;
+}
+
+/* ─── Zone de suppression du compte ──────────────────────────────── */
+
+/* Motif .pf-panel--danger (valeurs identiques au composant global). */
+.pf-account-danger {
+	margin-top: 3rem;
+	padding: var(--pf-panel-pad);
+	border: 1px solid var(--pf-accent);
+	border-radius: var(--pf-radius-lg);
+	background: var(--pf-red-soft);
+}
+
+.pf-account-danger > h2 {
+	margin: 0 0 0.5rem;
+	color: var(--pf-accent);
+}
+
+.pf-account-danger p {
+	font-size: 0.9rem;
+	line-height: 1.5;
+}
+
+/* Bouton « danger » : contour rouge au repos, plein au survol — distinct des
+   submits pleins du compte (spécificité égale, défini plus bas → l'emporte). */
+.woocommerce-account .woocommerce-MyAccount-content .pf-delete-account-btn {
+	background: transparent;
+	color: var(--pf-accent);
+	border: 1px solid var(--pf-accent);
+}
+
+.woocommerce-account .woocommerce-MyAccount-content .pf-delete-account-btn:hover {
+	background: var(--pf-accent);
+	color: var(--pf-surface);
+}
+
+/* ─── Navigation latérale sticky (desktop) ───────────────────────── */
+
+@media (min-width: 769px) {
+	.woocommerce-account .woocommerce-MyAccount-navigation {
+		position: sticky;
+		top: calc(var(--pf-sticky-offset, 0px) + 1rem);
+		align-self: flex-start;
+	}
+}
+
+/* ─── Responsive ─────────────────────────────────────────────────── */
+
+@media (max-width: 768px) {
+	.woocommerce-account .woocommerce-MyAccount-navigation {
+		width: 100%;
+	}
+
+	.woocommerce #customer_login.col2-set {
+		grid-template-columns: 1fr;
+	}
+}

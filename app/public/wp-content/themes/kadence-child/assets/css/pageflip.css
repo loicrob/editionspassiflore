@@ -1,0 +1,168 @@
+.passiflore-book-display {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1.5em;
+    margin: 0 auto;
+    position: relative; /* anchor pour le summary positionné absolument */
+}
+
+#passiflore-flipbook {
+    margin: 0 auto;
+}
+
+/* Cache placeholders et pages PDF avant l'init de StPageFlip ;
+   la couverture reste visible immédiatement (rendue côté serveur). */
+#passiflore-flipbook > .pf-page--placeholder,
+#passiflore-flipbook > .pf-page--pdf {
+    display: none;
+}
+
+/* Skeleton subtil sur les placeholders en attendant le rendu PDF. */
+.pf-page--placeholder {
+    background: #f7f3ec;
+    background-image: linear-gradient(90deg, #f7f3ec 25%, #efe9df 50%, #f7f3ec 75%);
+    background-size: 200% 100%;
+    animation: pf-skeleton 1.6s linear infinite;
+}
+
+@keyframes pf-skeleton {
+    from { background-position: 200% 0; }
+    to   { background-position: -200% 0; }
+}
+
+/* Habillage commun du panneau d'infos : l'encart à côté du livre fermé
+   (summary) et la page d'infos face à la couverture (.pf-page--info). */
+.passiflore-flipbook-summary,
+.pf-page--info {
+    background: var(--pf-cream);
+    color: var(--pf-heading);
+    text-align: center;
+    font-family: var(--pf-font-heading);
+}
+
+/* Encart d'infos affiché à côté du livre fermé (ou au-dessus en portrait). */
+.passiflore-flipbook-summary {
+    max-width: 28em;
+    padding: 1.5em 1.25em;
+    border-radius: 4px;
+    box-sizing: border-box;
+}
+
+/* En landscape, on cale le summary sur l'emplacement réel de la page
+   vide à côté de la couverture (à gauche) ou de la 4e de couverture
+   (à droite), puisque StPageFlip garde le canvas en double largeur. */
+.passiflore-book-display[data-orientation="landscape"][data-state="closed"] .passiflore-flipbook-summary,
+.passiflore-book-display[data-orientation="landscape"][data-state="end"] .passiflore-flipbook-summary {
+    position: absolute;
+    top: 0;
+    width: var(--pf-page-w, 400px);
+    height: var(--pf-page-h, 570px);
+    max-width: var(--pf-page-w, 400px);
+    margin: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 5;
+}
+
+.passiflore-book-display[data-orientation="landscape"][data-state="closed"] .passiflore-flipbook-summary {
+    left: calc(50% - var(--pf-flipbook-w, 706px) / 2);
+}
+
+.passiflore-book-display[data-orientation="landscape"][data-state="end"] .passiflore-flipbook-summary {
+    right: calc(50% - var(--pf-flipbook-w, 706px) / 2);
+}
+
+/* Le summary est masqué uniquement en landscape pendant la lecture (open).
+   En portrait il reste affiché au-dessus du flipbook quel que soit l'état. */
+.passiflore-book-display[data-orientation="landscape"][data-state="open"] .passiflore-flipbook-summary {
+    display: none;
+}
+
+/* En fin de livre, on n'affiche plus l'invitation à feuilleter
+   puisque l'utilisateur a déjà parcouru l'extrait. */
+.passiflore-book-display[data-state="open"] .pf-info__flip {
+    display: none;
+}
+
+/* Pages — communes à la page d'infos et aux pages PDF. */
+.pf-page {
+    background: #fff;
+    overflow: hidden;
+    box-sizing: border-box;
+}
+
+.pf-page--pdf img,
+.pf-page--cover img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+/* Indicateur discret de chargement du PDF (curseur "wait" sur le flipbook). */
+#passiflore-flipbook.is-loading-pdf {
+    cursor: progress;
+}
+
+/* Page d'infos (face à la couverture). */
+.pf-page--info {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2.4em 2em;
+}
+
+.pf-info {
+    max-width: 100%;
+}
+
+.pf-info__authors {
+    font-size: 0.95em;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin: 0 0 1.2em;
+    color: #6b5b4d;
+}
+
+.pf-info__title {
+    font-size: 1.7em;
+    line-height: 1.15;
+    margin: 0 0 0.3em;
+    font-weight: 600;
+}
+
+.pf-info__subtitle {
+    font-size: 1.05em;
+    font-style: italic;
+    margin: 0 0 1.6em;
+    color: #4a3f36;
+}
+
+.pf-info__price {
+    font-size: 1.2em;
+    margin: 1.4em 0 0;
+    color: var(--pf-accent);
+}
+
+.pf-info__price .woocommerce-Price-amount {
+    font-weight: 600;
+}
+
+.pf-info__actions {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6em;
+    margin-top: 1.8em;
+}
+
+.pf-info__cart {
+    background: var(--pf-accent);
+    color: #fff;
+}
+.pf-info__cart:hover {
+    background: var(--pf-accent-dark);
+    color: #fff;
+}

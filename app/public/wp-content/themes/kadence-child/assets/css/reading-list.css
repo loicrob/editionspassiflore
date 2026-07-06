@@ -1,0 +1,47 @@
+/* Passiflore — Liste de lecture (bouton fiche livre + état vide compte) */
+
+/* Bouton liste de lecture : look via .pf-btn .pf-btn--outline (style.css) ; ici, layout flex + largeur. */
+.bs-hero__readlist {
+	display: flex;
+	flex-direction: row-reverse;
+	align-items: center;
+	justify-content: center;
+	gap: 0.5em;
+	width: 100%;
+}
+
+.bs-hero__readlist-icon {
+	flex: none;
+	transition: fill 0.2s;
+}
+
+.bs-hero__readlist.is-in-list {
+	border-color: var(--pf-accent);
+	color: var(--pf-accent);
+	background: var(--pf-red-soft);
+}
+
+.bs-hero__readlist.is-in-list .bs-hero__readlist-icon {
+	fill: var(--pf-accent);
+}
+
+.bs-hero__readlist.is-busy {
+	opacity: 0.6;
+	cursor: progress;
+}
+
+.bs-hero__readlist-label {
+	line-height: 1.2;
+}
+
+/* ─── État vide dans « Mon compte » ──────────────────────────────── */
+
+.pf-readlist-empty {
+	text-align: center;
+	padding: 2rem 0;
+}
+
+.pf-readlist-empty p {
+	margin-bottom: 1rem;
+	color: var(--pf-text);
+}

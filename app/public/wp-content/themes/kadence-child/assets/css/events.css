@@ -1,0 +1,897 @@
+/* ============================================================
+   Events Calendar — UI adjustments
+   ============================================================ */
+
+.tribe-common--breakpoint-medium.tribe-events .tribe-events-c-top-bar__today-button {
+    display: none !important;
+}
+
+/* ── View selector → switch (Liste / Mois) ──────────────────
+   Composant : .pf-switch .pf-switch--solid (style.css) — le markup
+   (tribe/.../events-bar/views.php) porte les classes globales.
+   Ci-dessous : uniquement des shims de spécificité qui re-imposent les valeurs
+   du composant (mêmes tokens) contre TEC et la classe `.button` Kadence. */
+
+/* Le reset `.tribe-common *` (0,1,0, chargé après style.css) annule la bordure
+   et le display du composant global (0,1,0 aussi → l'ordre décide) → (0,2,0). */
+.tribe-events-c-events-bar__views .pf-switch {
+    display: inline-flex;
+    border: 1px solid var(--pf-border-light);
+}
+.tribe-events-c-events-bar__views .pf-switch__btn:not(:last-child) {
+    border-right: 1px solid var(--pf-border-light);
+}
+
+/* `!important` : re-impose fond/couleur/padding contre `.button` Kadence. */
+.tribe-events-c-events-bar__views .pf-view-switch__btn {
+    display: flex !important;
+    padding: 8px 12px !important; /* même padding que les triggers du catalogue (le switch global est à 8px 14px) */
+    background: var(--pf-cream) !important;
+    color: var(--pf-text) !important;
+    font-size: 14px;
+    line-height: 1.2; /* aligne la hauteur sur le bouton « S'abonner » (la classe .button impose sinon ~1.6) */
+    text-decoration: none !important;
+    box-shadow: none !important;
+}
+
+.tribe-events-c-events-bar__views .pf-view-switch__btn:focus {
+    outline: none;
+}
+
+.tribe-events-c-events-bar__views .pf-view-switch__btn.is-active {
+    background: var(--pf-accent) !important;
+    color: var(--pf-surface) !important;
+}
+
+.tribe-events-c-events-bar__views .pf-view-switch__btn:not(.is-active):hover {
+    background: var(--pf-cream-dark) !important;
+    color: var(--pf-accent) !important;
+}
+
+/* ── Vue mois : header sticky « smart-hide » ──────────────────
+   Markup posé par l'override tribe/.../components/header.php :
+   .pf-sticky-bar (full-bleed + smart-hide + aéro, mécanisme commun style.css)
+   > .pf-sub-header.pf-events-header-bar__inner
+       > __left  : top-bar (préc./suiv. + datepicker du mois)
+       > __right : « S'abonner » + sélecteur de vue (Liste / Mois)              */
+
+/* TEC met `.tribe-events-header` en display:flex (titre/messages/barre comme items).
+   On repasse en bloc pour que la barre interne occupe toute la largeur du header. */
+.tribe-events-header.pf-events-header-bar {
+    display: block;
+}
+
+/* TEC pose `position: relative` + des marges/paddings sur `.tribe-events-header`
+   (spécificité 0,2,0), ce qui écrase le sticky ET le full-bleed de `.pf-sticky-bar`
+   (0,1,0) : le header gardait `margin-left:0`/`padding:0` → décalé à droite (la barre
+   débordait sous l'écran) et non collant. On réapplique les deux avec une spécificité
+   supérieure (0,3,0) ; valeurs identiques à `.pf-sticky-bar` de style.css. */
+.tribe-events-view .tribe-events-header.pf-sticky-bar {
+    position: sticky;
+    top: var(--pf-sticky-offset, 0px);
+    width: calc(100vw - var(--scrollbar-offset, 0px));
+    margin-left:  calc(50% - 50vw + var(--scrollbar-offset, 0px) / 2);
+    margin-right: calc(50% - 50vw + var(--scrollbar-offset, 0px) / 2);
+    padding-left:  calc(50vw - 50% - var(--scrollbar-offset, 0px) / 2);
+    padding-right: calc(50vw - 50% - var(--scrollbar-offset, 0px) / 2);
+    padding-top: var(--pf-space-3);
+    padding-bottom: var(--pf-space-3);
+    box-sizing: border-box;
+}
+
+.pf-events-header-bar__inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px 8px;
+    flex-wrap: wrap;
+    width: 100%;
+}
+
+.pf-events-header-bar__left,
+.pf-events-header-bar__right {
+    display: flex;
+    align-items: center;
+}
+
+/* __left grandit pour occuper l'espace restant (utile en vue liste : la
+   recherche événements — seule occupante de cette zone, le top-bar natif étant
+   masqué — s'étire d'autant, cf. .pf-ev-search plus bas). Sans effet visible en
+   vue mois : le top-bar y garde sa largeur propre (width:auto ci-dessous). */
+.pf-events-header-bar__left {
+    flex: 1 1 0%;
+    min-width: 0;
+}
+
+.pf-events-header-bar__right {
+    gap: 8px; /* même écart entre boutons que le header /catalogue (.pf-cat-bar-row) */
+    margin-left: auto;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+}
+/* Les enfants du groupe de droite ne s'étirent pas (sinon l'events-bar pousse
+   le bouton « S'abonner » au loin). */
+.pf-events-header-bar__right > * {
+    flex: 0 0 auto;
+}
+
+/* Le top-bar TEC se cale à gauche (et non étalé sur 100%). */
+.pf-events-header-bar__left .tribe-events-c-top-bar {
+    width: auto;
+    min-height: 0;
+    margin: 0 !important;
+    padding: 0;
+    justify-content: flex-start;
+    gap: 8px;
+}
+
+/* L'events-bar (sélecteur de vue) se réduit à son contenu (le switch Liste/Mois)
+   et se colle au bouton « S'abonner » : on neutralise la largeur pleine, la
+   bordure et le margin-left:auto que TEC applique pour étaler ses éléments. */
+.pf-events-header-bar__right .tribe-events-header__events-bar {
+    width: auto !important;
+    min-width: 0 !important;
+    min-height: 0;
+    flex: 0 0 auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+}
+.pf-events-header-bar__right .tribe-events-c-events-bar__views {
+    width: auto !important;
+    margin: 0 !important;
+    flex: 0 0 auto !important;
+}
+
+/* Bouton « S'abonner » : aligné avec le sélecteur, sans marge résiduelle.
+   On neutralise le centrage (left:50% / translateX) appliqué globalement plus bas
+   pour la vue liste : dans le header mois, le bouton se cale à droite près du switch. */
+.pf-events-header-bar__right .tribe-events-c-subscribe-dropdown__container {
+    margin: 0;
+}
+.pf-events-header-bar__right .tribe-events-c-subscribe-dropdown {
+    left: auto;
+    transform: none;
+    width: auto;
+    position: relative; /* ancre le menu flottant (TEC ne le pose qu'en single) */
+    /* TEC pose `margin: var(--tec-spacer-7) 0` (32px) sur le dropdown → ça gonflait le
+       header verticalement. On l'annule : l'espacement vertical du header est porté par
+       .pf-sub-header (padding), comme le header de /catalogue. */
+    margin: 0;
+}
+
+/* Menu déroulant flottant + animation d'apparition (même rendu que .pf-dropdown__menu
+   du header /catalogue : léger fondu + glissement vers le bas, ~0.18s). TEC ne
+   positionne le contenu en absolu qu'en vue single → on le rend flottant ici. On NE
+   touche PAS à `display` : TEC ouvre le menu en posant `style="display:block"` en inline
+   (et lit ce display pour l'état ouvert/fermé). L'animation d'entrée est posée sur la
+   règle de base → elle (re)joue à chaque passage display:none→block (réouvertures
+   incluses). Fond/bordure/ombre de __list déjà globaux chez TEC. */
+.pf-events-header-bar__right .tribe-events-c-subscribe-dropdown__content {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    width: 100%;
+    z-index: var(--tec-z-index-dropdown, 1000);
+    animation: pf-dd-in 0.18s ease;
+}
+.tribe-events-c-subscribe-dropdown__list {
+    border-radius: var(--pf-radius-md) !important;
+}
+@keyframes pf-dd-in {
+    from { opacity: 0; transform: translateY(-4px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Options du menu : mêmes couleurs/hover que .pf-dropdown__option (style.css).
+   `.tribe-events-c-subscribe-dropdown__list-item-link` (classe réelle posée par
+   TEC sur ces <a>) est exclue du rouge souligné générique des liens (règle
+   `.entry-content a:not(...)` de style.css) → pas de conflit à battre ici,
+   donc pas de `!important` sur la couleur/le soulignement (interdit entre
+   fichiers du thème enfant). `!important` conservé uniquement sur le fond,
+   contre le `:hover` natif de TEC (0,3,0). */
+.pf-events-header-bar__right .tribe-events-c-subscribe-dropdown__list-item {
+    background-color: transparent !important;
+}
+.pf-events-header-bar__right .tribe-events-c-subscribe-dropdown__list-item a {
+    color: var(--pf-text);
+    text-decoration: none;
+    font-size: 14px;
+}
+.pf-events-header-bar__right .tribe-events-c-subscribe-dropdown__list-item:hover,
+.pf-events-header-bar__right .tribe-events-c-subscribe-dropdown__list-item:focus-within {
+    background-color: var(--pf-red-soft) !important;
+}
+.pf-events-header-bar__right .tribe-events-c-subscribe-dropdown__list-item:hover a,
+.pf-events-header-bar__right .tribe-events-c-subscribe-dropdown__list-item:focus-within a {
+    color: var(--pf-accent);
+    text-decoration: none;
+}
+
+/* Le menu ouvert peut déborder sous le header et se faire recouvrir par le
+   séparateur de mois (z-index:11, > .pf-sticky-bar:10 — cf. commentaire
+   style.css) : sa propre pile z (0,1000) reste plafonnée par celle du header
+   qui la contient. Le temps de l'ouverture (TEC pose aria-expanded="true" sur
+   le bouton), on relève le header au-dessus du séparateur. */
+.tribe-events-view .tribe-events-header.pf-sticky-bar:has(.tribe-events-c-subscribe-dropdown__button-text[aria-expanded="true"]) {
+    z-index: 12;
+}
+
+/* « S'abonner » : bouton primary calqué sur le trigger primary du catalogue
+   (.pf-cat-pdf.pf-cat-primary .pf-cat-trigger) — padding/typo/rayon/gap identiques,
+   icône kebab ⋮ à droite (comme .pf-cat-caret) au lieu du chevron TEC.
+   `!important` car le survol natif de TEC est très spécifique (0,4,0). */
+.pf-events-header-bar__right .tribe-events-c-subscribe-dropdown__button {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 12px !important;
+    font-size: 14px;
+    font-weight: var(--pf-weight-normal);
+    line-height: 1.2;
+    border-radius: var(--pf-radius-md);
+    background-color: var(--pf-accent) !important;
+    border-color: var(--pf-accent) !important;
+    color: var(--pf-surface) !important;
+}
+/* `__button-text` est un <button> imbriqué dans le bouton rouge : sans le reset
+   de `.tribe-common-c-btn--clear` (absent de ce contexte), l'apparence native du
+   navigateur (fond, bordure, contour) ressort par-dessus le fond rouge → cadre
+   blanc autour du texte. On la neutralise nous-mêmes plutôt que de dépendre
+   d'une feuille de style tribe-common tierce. */
+.pf-events-header-bar__right .tribe-events-c-subscribe-dropdown__button-text {
+    background: transparent !important;
+    border: 0 !important;
+    outline: none !important;
+    padding: 0 !important;
+    color: inherit !important;
+    font-weight: var(--pf-weight-normal);
+    /* Sans ça, le texte repasse à la ligne pendant la transition mobile
+       is-searching (le conteneur rétrécit en continu jusqu'à max-width:0) →
+       le bouton grandit en hauteur et fait gonfler tout le header. Avec
+       nowrap, le texte déborde simplement du conteneur, dont l'overflow:hidden
+       (mobile, cf. plus bas) le rogne proprement sans jamais changer de hauteur. */
+    white-space: nowrap;
+}
+/* Chevron TEC remplacé par le kebab ⋮. */
+.pf-events-header-bar__right .tribe-events-c-subscribe-dropdown__button-icon {
+    display: none !important;
+}
+.pf-events-header-bar__right .tribe-events-c-subscribe-dropdown__button::after {
+    content: '⋮';
+    font-size: 16px;
+    line-height: 1;
+    letter-spacing: -1px;
+}
+.pf-events-header-bar__right .tribe-events-c-subscribe-dropdown__button:hover,
+.pf-events-header-bar__right .tribe-events-c-subscribe-dropdown__button:focus,
+.pf-events-header-bar__right .tribe-events-c-subscribe-dropdown__button:focus-within,
+.pf-events-header-bar__right .tribe-events-c-subscribe-dropdown__button.tribe-events-c-subscribe-dropdown__button--active {
+    background-color: var(--pf-accent-dark) !important;
+    border-color: var(--pf-accent-dark) !important;
+    color: var(--pf-surface) !important;
+}
+
+@media (max-width: 781px) {
+    .pf-events-header-bar__left,
+    .pf-events-header-bar__right {
+        width: 100%;
+    }
+    /* Empilage propre quand « S'abonner » + switch ne tiennent pas sur une ligne. */
+    .pf-events-header-bar__right {
+        justify-content: flex-start;
+    }
+}
+
+/* Vues Liste/Mois/Carte, mobile : réagencement propre du header. Au lieu
+   d'empiler __left (recherche en liste, date-picker en mois, vide en carte)
+   puis __right (S'abonner + switch) chacun sur sa ligne pleine largeur (règle
+   générale ci-dessus), on veut :
+     ligne 1 : contenu de __left (grandit) ─ S'abonner (calé à droite)
+     ligne 2 : switch Liste/Mois/Carte, seul, pleine largeur
+   __right regroupe S'abonner ET le switch dans un même conteneur : on le
+   « déballe » (display:contents) pour que ses deux enfants redeviennent des
+   flex items indépendants de __inner, replaçables séparément via `order`. */
+@media (max-width: 781px) {
+    .tribe-events-view--list .pf-events-header-bar__right,
+    .tribe-events-view--month .pf-events-header-bar__right,
+    .tribe-events-view--carte .pf-events-header-bar__right {
+        display: contents;
+    }
+    .tribe-events-view--list .pf-events-header-bar__left,
+    .tribe-events-view--month .pf-events-header-bar__left,
+    .tribe-events-view--carte .pf-events-header-bar__left {
+        width: auto;
+        /* Base à 0 (et non un chiffre proche de la largeur naturelle du
+           contenu) : sinon la somme des tailles hypothétiques (__left +
+           S'abonner) dépasse la largeur dispo et flex-wrap les envoie chacun
+           sur sa propre ligne AVANT même de considérer le grow/shrink. */
+        flex: 1 1 0%;
+        min-width: 0;
+        order: 1;
+    }
+    .tribe-events-view--list .tribe-events-c-subscribe-dropdown__container,
+    .tribe-events-view--month .tribe-events-c-subscribe-dropdown__container,
+    .tribe-events-view--carte .tribe-events-c-subscribe-dropdown__container {
+        order: 2;
+        flex: 0 0 auto;
+        /* Borne haute généreuse (le libellé « S'abonner au calendrier » est
+           large) : transition propre vers 0 au lieu d'un width figé. */
+        max-width: 280px;
+        overflow: hidden;
+        transition: max-width 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+                    opacity 0.2s ease;
+    }
+    /* `!important` : bat les règles desktop plus haut dans ce même fichier
+       (0,2,0 !important) qui figent l'events-bar/le switch à leur largeur
+       de contenu — nécessaires ici pour occuper toute la ligne 2. */
+    .tribe-events-view--list .tribe-events-header__events-bar,
+    .tribe-events-view--month .tribe-events-header__events-bar,
+    .tribe-events-view--carte .tribe-events-header__events-bar {
+        order: 3;
+        flex: 1 1 100% !important;
+        width: 100% !important;
+    }
+    /* Switch pleine largeur : les boutons se partagent l'espace à égalité. */
+    .tribe-events-view--list .tribe-events-c-events-bar__views,
+    .tribe-events-view--month .tribe-events-c-events-bar__views,
+    .tribe-events-view--carte .tribe-events-c-events-bar__views {
+        width: 100% !important;
+    }
+    .tribe-events-view--list .tribe-events-c-events-bar__views .pf-switch,
+    .tribe-events-view--month .tribe-events-c-events-bar__views .pf-switch,
+    .tribe-events-view--carte .tribe-events-c-events-bar__views .pf-switch {
+        width: 100%;
+    }
+    .tribe-events-view--list .tribe-events-c-events-bar__views .pf-view-switch__btn,
+    .tribe-events-view--month .tribe-events-c-events-bar__views .pf-view-switch__btn,
+    .tribe-events-view--carte .tribe-events-c-events-bar__views .pf-view-switch__btn {
+        flex: 1 1 0%;
+        justify-content: center;
+    }
+    /* Recherche active (focus ou texte, cf. events-search.js / events-map.js) :
+       le bouton « S'abonner » se réduit à 0, la recherche grandit dans l'espace
+       libéré — même mécanisme que .pf-cat-sort en desktop /catalogue. Liste et
+       carte seulement : seules vues où __left porte une recherche (le
+       date-picker de la vue mois n'a pas cette classe). */
+    .tribe-events-view--list .pf-sub-header.is-searching .tribe-events-c-subscribe-dropdown__container,
+    .tribe-events-view--carte .pf-sub-header.is-searching .tribe-events-c-subscribe-dropdown__container {
+        max-width: 0;
+        opacity: 0;
+        pointer-events: none;
+    }
+}
+
+/* Recherche événements — vue liste uniquement (Passiflore_Events_Search::render_bar(),
+   rendue dans __left par tribe/.../components/header.php ; en vue mois cet
+   emplacement reste occupé par le top-bar préc./suiv./datepicker). Composant
+   .pf-search/.pf-search--sm (style.css) : ici, seules la largeur (pleine largeur
+   de __left, qui grandit pour occuper l'espace disponible — cf. règle __left
+   ci-dessus) et la taille de texte (alignée sur les boutons 14px de cette même
+   barre — .pf-search-input utilise --pf-text-sm par défaut, un rem relatif à la
+   taille de base du thème, plus grand que ce 14px fixe) sont propres à cet
+   emplacement. */
+.pf-ev-search {
+    width: 100%;
+}
+.pf-ev-search .pf-search-input {
+    font-size: 14px;
+}
+
+/* ============================================================
+   Participants d'événement — vue liste & single event
+   ============================================================ */
+
+/* .tribe-events-calendar-list__event-details, .tribe-events-calendar-day__event-details {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+} */
+
+.pf-event-participants {
+    margin-top: var(--tec-spacer-3, 1rem) !important;
+    padding-top: var(--tec-spacer-3, 0.9rem) !important;
+    border-top: 1px solid var(--tec-color-border-default, var(--pf-border)) !important;
+    font-size: 0.9rem;
+    color: var(--pf-text);
+    line-height: 1.5;
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+}
+
+.pf-event-participants p {
+    margin: 0;
+}
+
+
+.pf-event-participants-auteur {
+    font-weight: 600;
+    color: inherit;
+    text-decoration: none;
+}
+
+.pf-event-participants-auteur:hover,
+.pf-event-participants-auteur:focus {
+    color: var(--pf-accent);
+    text-decoration: underline;
+}
+
+/* Titres des sections (Auteurs présents, Personnes présentes…) */
+.pf-event-section-titre {
+    color: var(--tec-color-text-primary);
+    font-size: var(--tec-font-size-2);
+    font-weight: var(--tec-font-weight-bold);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+}
+
+/* Scroll horizontal des tuiles auteurs (vue single event) — scrollbar via .pf-hscroll */
+.pf-event-auteurs-scroll {
+    display: flex;
+    gap: 1rem;
+    padding: 10px !important;
+}
+
+.pf-event-auteurs-scroll > .pf-auteur-card {
+    flex-shrink: 0;
+    scroll-snap-align: start;
+}
+
+/* Variante compacte de la tuile auteur */
+.pf-card--compact {
+    width: 200px;
+}
+
+.tribe-events-event-image img {
+    max-height: 500px;
+    width: auto;
+    left: 50%;
+    position: relative;
+    transform: translateX(-50%);
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   Vue liste — chaque événement = carte cliquable
+   Le wrapper porte `pf-card` (override list/event.php) → fond/rayon/ombre/
+   flex-column/survol hérités de style.css. Le date-tag reste à gauche, HORS
+   carte. L'<article> interne est une rangée (TEC la met en row-reverse →
+   image à droite) ; on bascule en colonne sur mobile (image en haut).
+   ════════════════════════════════════════════════════════════════════ */
+
+/* Carte : ancre le lien étiré + espace intérieur. Fond/ombre/survol via .pf-card. */
+.tribe-events-calendar-list__event-wrapper.pf-card {
+    position: relative;
+    padding: var(--pf-space-5);
+    margin-right: var(--global-content-edge-padding);
+}
+
+/* Lien étiré : un <a> vide couvre toute la carte → carte entièrement cliquable,
+   en HTML valide. (Le titre n'est plus un lien ; un <a> englobant imbriquerait
+   les liens auteurs-participants, ce qui est invalide.) Le titre, en .pf-card-title,
+   rougit au survol via la règle globale `.pf-card:hover .pf-card-title` (style.css). */
+.tribe-events-calendar-list__event-wrapper.pf-card .pf-card-link {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    outline: none;
+}
+
+/* Titre = look « titre de carte » (pf-card-title). Spécificité supérieure à la règle
+   TEC `.tribe-events …event-title` (qui impose couleur/taille/marge). On ne touche pas
+   à `order` (layout du header). Rougit au survol de la carte. Les participants ne sont
+   plus des liens (rendu texte) → pas de carve-out z-index nécessaire. */
+.tribe-events .tribe-events-calendar-list__event-wrapper.pf-card .tribe-events-calendar-list__event-title {
+    margin: 0;
+    /* `!important` : un reset global `h4 { font-size: var(--pf-text-sm) !important }`
+       écraserait sinon la taille (le titre est un <h4>, pas un <span> comme les autres
+       .pf-card-title). */
+    font-size: var(--pf-text-base) !important;
+    font-weight: var(--pf-weight-semibold);
+    line-height: var(--pf-leading-snug);
+    color: var(--pf-heading);
+}
+.tribe-events .tribe-events-calendar-list__event-wrapper.pf-card:hover .tribe-events-calendar-list__event-title,
+.tribe-events .tribe-events-calendar-list__event-wrapper.pf-card:focus-within .tribe-events-calendar-list__event-title {
+    color: var(--pf-accent);
+}
+
+/* Rangée interne. Base = mobile : colonne (image en haut). On annule les marges
+   négatives de gouttière de TEC ; l'écart image/détails vient de `gap`. */
+.tribe-events-calendar-list__event-wrapper.pf-card .tribe-events-calendar-list__event.tribe-common-g-row {
+    align-items: stretch;
+    flex-direction: column;
+    gap: var(--pf-space-4);
+    margin: 0;
+}
+/* On retire aussi le padding latéral de gouttière des deux colonnes (l'espacement
+   vient du padding de la carte + du `gap`). `!important` : la règle TEC
+   `…g-row--gutters > .tribe-common-g-col` monte à (0,4,0) en breakpoint-medium. */
+.tribe-events-calendar-list__event-wrapper.pf-card .tribe-events-calendar-list__event-featured-image-wrapper,
+.tribe-events-calendar-list__event-wrapper.pf-card .tribe-events-calendar-list__event-details {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+}
+
+/* Mobile + tablette (< 1024px) : écart entre le date-tag (gauche) et la carte dans la
+   rangée `<li>` (sinon collés). Desktop : pas de gap (place suffisante). */
+@media (max-width: 1023px) {
+    .tribe-common-g-row.tribe-events-calendar-list__event-row {
+        gap: var(--pf-space-4);
+    }
+}
+
+/* ── Mobile (base) : image en haut, format tuile (16/9, recadrée cover) ── */
+.tribe-events-calendar-list__event-wrapper.pf-card .tribe-events-calendar-list__event-featured-image-wrapper {
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    min-height: 0;
+    overflow: hidden;
+    border-radius: var(--pf-radius-card);
+}
+.tribe-events-calendar-list__event-wrapper.pf-card .tribe-events-calendar-list__event-featured-image {
+    position: static !important;
+    inset: auto !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    height: 100% !important;
+    object-fit: cover !important;
+    transform: none !important;       /* annule le zoom au survol hérité de .pf-card */
+    display: block;
+    border-radius: 0;
+}
+
+/* ── Ordinateur / tablette (≥ medium) : image à droite, affichée en entier
+      (contain), centrée, à hauteur des détails, avec marges. Pas de zoom. ── */
+.tribe-common--breakpoint-medium.tribe-events .tribe-events-calendar-list__event-wrapper.pf-card .tribe-events-calendar-list__event.tribe-common-g-row {
+    flex-direction: row-reverse;
+    gap: var(--pf-space-5);
+}
+/* Wrapper relatif + image en ABSOLU : la hauteur de l'image ne dicte pas celle
+   de la carte (sinon une image haute étire toute la rangée). L'image remplit la
+   hauteur des détails (align-items:stretch) en restant entière (contain), centrée. */
+.tribe-common--breakpoint-medium.tribe-events .tribe-events-calendar-list__event-wrapper.pf-card .tribe-events-calendar-list__event-featured-image-wrapper {
+    position: relative;
+    flex: 0 0 34%;
+    max-width: 360px;
+    width: auto;
+    aspect-ratio: auto;
+    min-height: 180px;
+    overflow: hidden;
+    border-radius: var(--pf-radius-card);
+}
+.tribe-common--breakpoint-medium.tribe-events .tribe-events-calendar-list__event-wrapper.pf-card .tribe-events-calendar-list__event-featured-image {
+    position: absolute !important;
+    inset: 0 !important;
+    left: 50% !important;
+    width: auto !important;
+    max-width: 100% !important;
+    height: 100% !important;
+    object-fit: contain !important;
+    transform: translateX(-50%) !important;   /* centré + annule le zoom au survol de .pf-card */
+    border-radius: var(--pf-radius-card);
+    display: block;
+}
+.tribe-common--breakpoint-medium.tribe-events .tribe-events-calendar-list__event-wrapper.pf-card .tribe-events-calendar-list__event-details {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.tribe-events-c-subscribe-dropdown {
+    width: fit-content;
+    left: 50%;
+    transform: translateX(-50%);
+}
+
+h3:has(> .tribe-events-calendar-list__month-separator-text) {
+    font-family: var(--tec-font-family-sans-serif);
+
+    .tribe-events-calendar-list__month-separator-text {
+        font-weight: var(--tec-font-weight-bold);
+        text-transform: uppercase;
+    }
+}
+
+/* Le séparateur colle sous le header sticky de la liste quand celui-ci est apparent,
+   et remonte sous le header Kadence quand le header événements est masqué (smart-hide).
+   --pf-ev-header-offset = hauteur du header événements visible (0 si masqué), tenu à
+   jour par events-month.js. */
+.tribe-events-calendar-list__month-separator {
+    position: sticky;
+    top: calc(var(--pf-sticky-offset, 0px) + var(--pf-ev-header-offset, 0px));
+    /* Full-bleed pleine largeur écran. `!important` car TEC pose des marges/paddings
+       sur le séparateur (spécificité supérieure) qui annulaient le décalage négatif
+       → la barre gardait `margin-left:0` et débordait à droite au lieu d'aller bord
+       à bord. Le `padding` recale le texte sur la gouttière du contenu. */
+    width: calc(100vw - var(--scrollbar-offset, 0px)) !important;
+    margin-left:  calc(50% - 50vw + var(--scrollbar-offset, 0px) / 2) !important;
+    margin-right: calc(50% - 50vw + var(--scrollbar-offset, 0px) / 2) !important;
+    padding-left:  calc(50vw - 50% - var(--scrollbar-offset, 0px) / 2) !important;
+    padding-right: calc(50vw - 50% - var(--scrollbar-offset, 0px) / 2) !important;
+    box-sizing: border-box;
+    z-index: 11;
+    background: var(--pf-surface-alt);
+    /* Pas de transition sur `top` : sinon la position « collée » s'anime et le calcul
+       JS de l'état stuck lit une valeur transitoire. Seule l'ombre est animée. */
+    transition: box-shadow 0.2s ease;
+}
+
+/* Ombre portée vers le bas quand le séparateur est collé (pinned) — classe `is-stuck`
+   posée par events-infinite.js selon la position réelle vs le haut sticky. */
+.tribe-events-calendar-list__month-separator.is-stuck {
+    box-shadow: var(--pf-shadow-stuck);
+}
+
+/* Séparateur sortant en cours de « push » par le mois suivant : il perd son z-index
+   de 11 (→ 10) pour que le séparateur entrant (resté à 11, plus bas dans le DOM) le
+   recouvre sans ambiguïté. Classe posée par events-infinite.js avec le translateY. */
+.tribe-events-calendar-list__month-separator.is-pushed {
+    z-index: 1;
+}
+
+/* Effet « aéro » au scroll — voir le bloc « Éléments sticky » de style.css. */
+@supports ((backdrop-filter: blur(2px)) or (-webkit-backdrop-filter: blur(2px))) {
+    .tribe-events-calendar-list__month-separator {
+        background: color-mix(in srgb, var(--pf-surface-alt) 90%, transparent);
+        -webkit-backdrop-filter: blur(var(--pf-aero-blur));
+        backdrop-filter: blur(var(--pf-aero-blur));
+    }
+}
+
+.tribe-events .tribe-events-calendar-list__event-date-tag-datetime {
+    height: auto;
+}
+
+.tribe-events-calendar-list__event-date-tag-time {
+    display: block;
+    font-size: 0.72rem;
+    font-weight: 500;
+    color: var(--tec-color-text-secondary, #888);
+    text-align: center;
+    margin-top: 3px;
+    white-space: nowrap;
+}
+
+.tribe-events-calendar-list__event-date-tag-separator {
+    display: flex;
+    justify-content: center;
+    color: var(--tec-color-text-secondary, #888);
+    margin: 3px 0;
+}
+
+.tribe-events-calendar-list__event-datetime-wrapper {
+    display: none;
+}
+
+.tribe-event-date-start, .tribe-events-c-top-bar__datepicker-desktop {
+    display: inline-block;
+}
+
+.tribe-event-date-start::first-letter, .tribe-events-c-top-bar__datepicker-desktop::first-letter {
+    text-transform: uppercase;
+}
+
+/* ─── Section "Présence de" — single event page ────────────── */
+
+.pf-event-presence-tiles {
+    margin-top: var(--tec-spacer-3);
+    padding-top: var(--tec-spacer-3);
+    border-top: 1px solid var(--tec-color-border-default);
+}
+
+.pf-event-presence-tiles .pf-event-section-titre {
+    margin-bottom: 0.75rem;
+}
+
+/* Conteneur + internes de la carte auteur (photo, titre, bio, zoom) : globaux (style.css).
+   Ici uniquement le comportement de scroll horizontal. */
+.pf-event-presence-tiles .pf-auteur-card {
+    flex-shrink: 0;
+    scroll-snap-align: start;
+}
+
+.pf-auteur-card--passiflore .pf-auteur-photo {
+    background: #fff5f5;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.pf-auteur-card--passiflore .pf-auteur-photo img {
+    width: 55%;
+    height: 55%;
+    object-fit: contain;
+    object-position: center;
+}
+
+/* Livres associés à un événement (single event page) */
+.pf-event-livres {
+    margin-top: var(--tec-spacer-3);
+    padding-top: var(--tec-spacer-3);
+    border-top: 1px solid var(--tec-color-border-default);
+}
+
+/* =============================================================================
+   Event tiles — composant partagé
+   ============================================================================= */
+
+.pf-event-tiles-wrap {
+    position: relative;
+}
+
+.pf-event-tiles-wrap::before,
+.pf-event-tiles-wrap::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 60px;
+    pointer-events: none;
+    z-index: 1;
+    opacity: 0;
+    transition: opacity 0.25s ease;
+}
+
+.pf-event-tiles-wrap::before {
+    left: 0;
+    background: linear-gradient(to right, var(--pf-cream), transparent, transparent)
+}
+
+.pf-event-tiles-wrap::after {
+    right: 0;
+    background: linear-gradient(to left, var(--pf-cream), transparent, transparent);
+}
+
+.pf-event-tiles-wrap.pf-scroll-left::before  { opacity: 1; }
+.pf-event-tiles-wrap.pf-scroll-right::after  { opacity: 1; }
+
+.pf-event-tiles-scroll {
+    display: flex;
+    align-items: stretch;
+    gap: var(--pf-space-6);
+    padding: var(--pf-space-3);
+}
+
+/* Scrollbar plus fine que la base .pf-hscroll (6px) : surcharge de hauteur conservée. */
+.pf-event-tiles-scroll::-webkit-scrollbar       { height: 4px; }
+
+/* Conteneur (fond, radius, ombre, survol, flex-column, text-decoration) hérité de .pf-card.
+   Plus de padding ici : il est porté par le wrapper interne .pf-card-content, donc
+   l'image reste plein-cadre sans marges négatives. */
+.pf-event-tile {
+    flex: 0 0 290px;
+}
+
+.pf-event-tile__image {
+    aspect-ratio: 16 / 9;
+    overflow: hidden;
+    background: var(--pf-border);
+    flex-shrink: 0;
+}
+
+.pf-event-tile__image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+/* (survol → rouge du titre + zoom image : gérés globalement par .pf-card:hover) */
+
+/* ── Éléments intérieurs ── */
+
+/* Filet de séparation date/info : géré par .pf-card-content--separated. */
+.pf-event-date {
+    display: flex;
+    flex-direction: column;
+}
+
+.pf-event-mois {
+    font-size: 0.62rem;
+    letter-spacing: 0.18em;
+    font-weight: 700;
+    color: var(--pf-accent);
+    line-height: 1;
+    margin-bottom: 0.15rem;
+}
+
+.pf-event-date-ligne {
+    display: flex;
+    align-items: baseline;
+    gap: 0.35rem;
+}
+
+.pf-event-jour {
+    font-size: 2.6rem;
+    font-weight: 700;
+    line-height: 1;
+    color: var(--pf-heading);
+}
+
+.pf-event-heure {
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    color: var(--pf-text);
+    margin-top: 0.3rem;
+}
+
+.pf-event-info {
+    flex: 1;
+}
+
+/* Titre de tuile : style global .pf-card-title (style.css). L'espacement vers
+   le lieu (ex-margin-bottom du titre) est porté par le margin-top du lieu. */
+
+.pf-event-lieu {
+    font-size: 0.8rem;
+    color: var(--pf-muted);
+    margin: 0.5rem 0 0;
+    line-height: 1.4;
+}
+
+.pf-event-tile .pf-card-text {
+    font-size: 0.82rem;
+    line-height: 1.6;
+    margin: 0.75rem 0 0;
+    display: -webkit-box;
+    -webkit-line-clamp: 4;
+    line-clamp: 4;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.pf-event-tile .pf-event-participants {
+    font-size: 0.82rem;
+    /* L'espacement/filet vient de .pf-card-content--separated (gap) ;
+       on annule le margin-top !important de la base pour ne pas doubler. */
+    margin-top: 0 !important;
+}
+
+@media ( max-width: 768px ) {
+    .pf-event-tile  { flex: 0 0 250px; }
+    .pf-event-tile .pf-card-text { -webkit-line-clamp: 3; line-clamp: 3; }
+}
+
+@media ( max-width: 480px ) {
+    .pf-event-tile { flex: 0 0 240px; }
+}
+
+/* Horaires par jour (fiche evenement) */
+.pf-event-horaires {
+    margin: 1.5rem 0;
+}
+
+.pf-event-horaires-liste {
+    list-style: none;
+    margin: 0.75rem 0 0;
+    padding: 0;
+    max-width: 420px;
+}
+
+.pf-event-horaire {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.45rem 0;
+    border-bottom: 1px solid var(--frame-color, var(--pf-border-light));
+}
+
+.pf-event-horaire:last-child {
+    border-bottom: none;
+}
+
+.pf-event-horaire .pf-eh-jour {
+    font-weight: 600;
+}
+
+.pf-event-horaire .pf-eh-creneau {
+    color: var(--tec-color-text-secondary, #5e524d);
+    white-space: nowrap;
+}
+
+.pf-event-horaire.is-closed .pf-eh-creneau {
+    font-style: italic;
+    opacity: 0.7;
+}
