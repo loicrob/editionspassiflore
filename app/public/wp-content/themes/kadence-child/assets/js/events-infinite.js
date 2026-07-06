@@ -87,6 +87,14 @@
 		// passés sont préfixés AU-DESSUS → cette row reste le 1er « à venir ».
 		var upcomingAnchor = list.querySelector(EVENT_ROW_SEL);
 
+		// IDs déjà rendus (page initiale + lots déjà ajoutés), pour dé-dupliquer les
+		// lots entrants : la pagination de TEC est un simple LIMIT/OFFSET sans tri
+		// secondaire déterministe (event_date, event_duration) — deux événements à
+		// égalité stricte peuvent, selon l'état de l'index/cache MySQL, se retrouver
+		// tous les deux en bord de page consécutives. On ne peut pas empêcher ça côté
+		// serveur sans changer le tri global du site, donc on filtre côté client.
+		var insertedIds = collectEventIds(list);
+
 		/* Curseurs initiaux depuis la nav native, puis on la masque. */
 		var nav   = list.parentNode ? list.parentNode.querySelector('.tribe-events-calendar-list-nav') : null;
 		if (!nav) nav = document.querySelector('.tribe-events-calendar-list-nav');
@@ -184,6 +192,7 @@
 		/* Insertion + dé-dup des séparateurs de mois. */
 		function appendBatch(html) {
 			var tmp = parse(html);
+			dedupeEvents(tmp);
 			var seps = tmp.querySelectorAll(SEP_SEL);
 			var liveLast = lastSeparator();
 			if (seps.length && liveLast && monthKey(seps[0]) === monthKey(liveLast)) {
@@ -194,6 +203,7 @@
 
 		function prependBatch(html) {
 			var tmp = parse(html);
+			dedupeEvents(tmp);
 			var seps = tmp.querySelectorAll(SEP_SEL);
 			var liveFirst = firstSeparator();
 			var dropLiveFirst = seps.length && liveFirst &&
@@ -325,6 +335,18 @@
 		function firstSeparator() { return list.querySelector(SEP_SEL); }
 		function lastSeparator() { var s = list.querySelectorAll(SEP_SEL); return s.length ? s[s.length - 1] : null; }
 
+		// Retire du lot entrant (tmp) tout événement déjà rendu (même ID), et
+		// enregistre les nouveaux. N'affecte jamais les rows déjà en direct dans `list`.
+		function dedupeEvents(tmp) {
+			var rows = tmp.querySelectorAll(EVENT_ROW_SEL);
+			for (var i = 0; i < rows.length; i++) {
+				var id = eventId(rows[i]);
+				if (!id) continue;
+				if (insertedIds[id]) { rows[i].parentNode.removeChild(rows[i]); }
+				else { insertedIds[id] = true; }
+			}
+		}
+
 		/* Démontage (avant ré-activation sur une nouvelle liste). */
 		function teardown() {
 			if (ioDown) ioDown.disconnect();
@@ -373,4 +395,22 @@
 	function el(tag, cls) { var n = document.createElement(tag); n.className = cls; return n; }
 	function parse(html) { var u = document.createElement('ul'); u.innerHTML = String(html).trim(); return u; }
 	function removeNode(n) { if (n && n.parentNode) n.parentNode.removeChild(n); }
+
+	// ID de l'événement porté par une row (classe `post-{ID}` posée par get_post_class()
+	// sur le date-tag et sur l'<article>, cf. tribe/events/v2/list/event.php).
+	function eventId(li) {
+		var marker = li.querySelector('[class*="post-"]');
+		if (!marker) return null;
+		var m = /(?:^|\s)post-(\d+)(?:\s|$)/.exec(marker.className);
+		return m ? m[1] : null;
+	}
+	function collectEventIds(container) {
+		var ids = {};
+		var rows = container.querySelectorAll(EVENT_ROW_SEL);
+		for (var i = 0; i < rows.length; i++) {
+			var id = eventId(rows[i]);
+			if (id) ids[id] = true;
+		}
+		return ids;
+	}
 })();
