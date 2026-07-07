@@ -20,3 +20,8 @@ function passiflore_redirect_dashboard_to_analytics() {
     exit;
 }
 add_action( 'admin_init', 'passiflore_redirect_dashboard_to_analytics' );
+
+// La « catégorie primaire » Rank Math (lien "Make Primary" dans la metabox
+// Catégories) n'est utilisée nulle part sur ce site (pas de %category% dans
+// les permaliens, breadcrumbs Rank Math désactivés) → on masque le contrôle.
+add_filter( 'rank_math/admin/disable_primary_term', '__return_true' );
