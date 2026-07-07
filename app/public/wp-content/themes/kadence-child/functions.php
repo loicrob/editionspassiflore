@@ -233,3 +233,4 @@ require_once get_stylesheet_directory() . '/inc/accueil.php';
 require_once get_stylesheet_directory() . '/inc/class-reading-list.php';
 require_once get_stylesheet_directory() . '/inc/class-mes-avis.php';
 require_once get_stylesheet_directory() . '/inc/recommendations.php';
+require_once get_stylesheet_directory() . '/inc/shipping.php';
