@@ -83,8 +83,14 @@ class Passiflore_Events_Map {
 
 		// Géocodage côté écriture (jamais pendant le rendu public) :
 		//  - à l'enregistrement d'un lieu dans l'admin ;
-		//  - backfill des lieux existants en tâche de fond (WP-Cron auto-drainant).
+		//  - backfill des lieux existants en tâche de fond (WP-Cron auto-drainant) ;
+		//  - à la création d'un lieu en ligne depuis la fiche événement : ce chemin
+		//    (Tribe__Events__Venue::create()) déclenche save_post_tribe_venue AVANT
+		//    d'écrire l'adresse en meta (save_meta() tourne après), donc geocode_on_save
+		//    y lirait une adresse vide ; on rebranche sur tribe_events_venue_created,
+		//    déclenchée juste après save_meta() — cf. inc/venue-admin.php.
 		add_action( 'save_post_tribe_venue', [ $this, 'geocode_on_save' ], 25 );
+		add_action( 'tribe_events_venue_created', [ $this, 'geocode_on_save' ], 25 );
 		add_action( 'admin_init',            [ $this, 'maybe_schedule_backfill' ] );
 		add_action( self::GEO_BACKFILL_HOOK, [ $this, 'run_backfill' ] );
 

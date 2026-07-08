@@ -792,10 +792,20 @@ Workaround: stack two pseudo-elements. ::before is the base gradient (always vis
    laisse le ratio piloter ; max-width évite tout débordement. NB : le polaroïd
    épouse le plus large entre cette image et la légende (limite de CSS pur :
    fit-content ne peut pas se caler sur la seule image quand le texte est plus
-   large). */
+   large).
+   min-height (≠ 0) : casse une dépendance circulaire — la légende
+   (.pf-actualite-contenu, largeur 0 + min-width:100% du polaroïd, cf. plus
+   bas) attend la largeur de l'image pour se dimensionner, alors que l'image
+   attend l'espace flex restant une fois la légende posée. Sur WebKit/Safari,
+   à largeur de carrousel réduite (mobile) avec un texte d'actualité un peu
+   long, ce cycle diverge vers image = 0×0 (slide visuellement "hyper
+   étroite") au lieu de se stabiliser comme sur desktop. Un plancher fixe le
+   point de départ du cycle et empêche l'image de disparaître ; la légende,
+   elle, reste contenue par l'overflow:hidden du polaroïd (ligne ~786) si
+   son contenu dépasse. */
 .pf-en-ce-moment-actualites .pf-actualite-image {
     flex: 1;
-    min-height: 0;
+    min-height: 45%;
     height: 100%;
     width: auto;
     max-width: 100%;

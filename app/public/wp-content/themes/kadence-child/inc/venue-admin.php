@@ -359,6 +359,21 @@ function pf_render_venue_name_is_address_checkbox( $post ) {
    Validation post-sauvegarde
    ═══════════════════════════════════════════════════════════════ */
 
+/**
+ * Réduit une valeur Département/Région à '' si elle ne fait pas partie de la
+ * liste officielle — factorisé car utilisé à la fois par la sauvegarde de la
+ * fiche lieu autonome (pf_validate_venue_departement_region) et par celle du
+ * lieu créé en ligne depuis la fiche événement (pf_sync_venue_fields_on_create).
+ */
+function pf_venue_clamp_departement( $value ) {
+	$valid = wp_list_pluck( PF_VENUE_DEPARTEMENTS, 'name' );
+	return in_array( $value, $valid, true ) ? $value : '';
+}
+
+function pf_venue_clamp_region( $value ) {
+	return in_array( $value, PF_VENUE_REGIONS, true ) ? $value : '';
+}
+
 add_action( 'save_post_tribe_venue', 'pf_validate_venue_departement_region', 20 );
 
 function pf_validate_venue_departement_region( $post_id ) {
@@ -366,13 +381,18 @@ function pf_validate_venue_departement_region( $post_id ) {
 	if ( empty( $_POST['venue'] ) || ! is_array( $_POST['venue'] ) ) return;
 	if ( ! current_user_can( 'edit_post', $post_id ) ) return;
 
-	$valid_departements = wp_list_pluck( PF_VENUE_DEPARTEMENTS, 'name' );
+	// Ne traite que la soumission du formulaire propre à CE lieu (mécanisme
+	// repris de Tribe__Events__Main::save_venue_data()) : quand un lieu est créé
+	// en ligne depuis la fiche événement, $_POST['venue'] existe aussi mais
+	// appartient au formulaire de l'ÉVÉNEMENT (post_ID = l'événement, valeurs en
+	// tableaux venue[Champ][]) — géré séparément par pf_sync_venue_fields_on_create().
+	if ( empty( $_POST['post_ID'] ) || (int) $_POST['post_ID'] !== (int) $post_id ) return;
 
 	$dept = isset( $_POST['venue']['Departement'] ) ? sanitize_text_field( wp_unslash( $_POST['venue']['Departement'] ) ) : '';
 	$reg  = isset( $_POST['venue']['Region'] )      ? sanitize_text_field( wp_unslash( $_POST['venue']['Region'] ) )      : '';
 
-	$dept = in_array( $dept, $valid_departements, true ) ? $dept : '';
-	$reg  = in_array( $reg,  PF_VENUE_REGIONS,     true ) ? $reg  : '';
+	$dept = pf_venue_clamp_departement( $dept );
+	$reg  = pf_venue_clamp_region( $reg );
 
 	update_post_meta( $post_id, '_VenueDepartement', $dept );
 	update_post_meta( $post_id, '_VenueRegion', $reg );
@@ -389,6 +409,87 @@ function pf_validate_venue_departement_region( $post_id ) {
 	// une checkbox décochée n'est pas soumise en POST, d'où le isset() plutôt
 	// qu'un simple ternaire — sans ça, la décocher ne l'effacerait jamais.
 	update_post_meta( $post_id, '_VenueNameIsAddress', isset( $_POST['venue']['NameIsAddress'] ) ? 1 : 0 );
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Création d'un lieu en ligne depuis la fiche événement (tribe_events)
+   ═══════════════════════════════════════════════════════════════
+
+   TEC propose, en plus du sélecteur de lieu existant, un mini-formulaire
+   « Créer un nouveau lieu » directement sur l'écran événement (template
+   create-venue-fields.php, distinct de venue-meta-box.php utilisé par la
+   fiche lieu autonome — nos champs Département/Région n'y apparaissaient
+   donc pas). Ce mini-formulaire est rendu une seule fois dans un
+   <script type="text/template"> puis cloné en JS ; le hook natif
+   tribe_events_linked_post_new_form (déjà utilisé par TEC pour y injecter
+   create-venue-fields.php) est le seul point d'extension disponible.
+
+   Sauvegarde : la création passe par Tribe__Events__Venue::create(), où le
+   save_meta() natif de TEC (qui écrit _Venue{Champ} bruts pour CHAQUE champ
+   soumis, sans validation) s'exécute APRÈS le hook save_post_tribe_venue
+   (déclenché plus tôt, pendant le wp_insert_post() interne à create()) —
+   contrairement à la fiche lieu autonome où save_post_tribe_venue arrive
+   après le save natif. Brancher la validation au même hook que la fiche
+   autonome serait donc écrasé juste après par save_meta(). On utilise à la
+   place l'action dédiée tribe_events_venue_created, déclenchée juste après
+   save_meta() — cf. pf_sync_venue_fields_on_create() plus bas.
+   ═══════════════════════════════════════════════════════════════ */
+
+add_action( 'tribe_events_linked_post_new_form', 'pf_render_venue_departement_region_fields_inline', 20 );
+
+function pf_render_venue_departement_region_fields_inline( $post_type ) {
+	if ( 'tribe_venue' !== $post_type ) return;
+	?>
+	<tr class="linked-post venue tribe-linked-type-venue-departement">
+		<td class="tribe-table-field-label">
+			<label><?php esc_html_e( 'Département :', 'kadence-child' ); ?></label>
+		</td>
+		<td>
+			<div class="pf-venue-combo" data-field="departements">
+				<input type="text" name="venue[Departement][]" size="25" autocomplete="off" value="" />
+				<ul class="pf-venue-combo-menu"></ul>
+			</div>
+		</td>
+	</tr>
+	<tr class="linked-post venue tribe-linked-type-venue-region">
+		<td class="tribe-table-field-label">
+			<label><?php esc_html_e( 'Région :', 'kadence-child' ); ?></label>
+		</td>
+		<td>
+			<div class="pf-venue-combo" data-field="regions">
+				<input type="text" name="venue[Region][]" size="25" autocomplete="off" value="" />
+				<ul class="pf-venue-combo-menu"></ul>
+			</div>
+		</td>
+	</tr>
+	<tr class="linked-post venue tribe-linked-type-venue-name-is-address">
+		<td class="tribe-table-field-label"></td>
+		<td>
+			<label>
+				<input type="checkbox" name="venue[NameIsAddress][]" value="1" id="pf-venue-name-is-address-inline" />
+				<?php esc_html_e( "Ce lieu n'a pas de nom, remplacer par l'adresse.", 'kadence-child' ); ?>
+			</label>
+		</td>
+	</tr>
+	<?php
+}
+
+add_action( 'tribe_events_venue_created', 'pf_sync_venue_fields_on_create', 10, 2 );
+
+function pf_sync_venue_fields_on_create( $venue_id, $data ) {
+	$dept = isset( $data['Departement'] ) ? pf_venue_clamp_departement( sanitize_text_field( $data['Departement'] ) ) : '';
+	$reg  = isset( $data['Region'] )      ? pf_venue_clamp_region( sanitize_text_field( $data['Region'] ) )          : '';
+
+	update_post_meta( $venue_id, '_VenueDepartement', $dept );
+	update_post_meta( $venue_id, '_VenueRegion', $reg );
+
+	// cf. pf_validate_venue_departement_region() : le champ natif « State or
+	// Province » reste alimenté par Département pour les usages natifs déjà
+	// branchés dessus (bloc adresse public, schema.org JSON-LD).
+	update_post_meta( $venue_id, '_VenueStateProvince', $dept );
+	update_post_meta( $venue_id, '_VenueProvince', $dept );
+
+	update_post_meta( $venue_id, '_VenueNameIsAddress', ! empty( $data['NameIsAddress'] ) ? 1 : 0 );
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -456,8 +557,11 @@ function pf_enqueue_venue_admin_assets( $hook ) {
 	] );
 
 	wp_add_inline_style( 'wp-admin', '
-		/* Champ natif TEC remplacé par Département (cf. pf_validate_venue_departement_region) */
-		tr.tribe-linked-type-venue-state-province { display:none; }
+		/* Champ natif TEC remplacé par Département (cf. pf_validate_venue_departement_region).
+		   !important nécessaire : sur la fiche événement, le JS natif TEC (events-admin.js)
+		   affiche ces lignes via jQuery .show() (style inline) quand le mini-formulaire de
+		   création de lieu est révélé, ce qui écraserait une simple règle sans !important. */
+		tr.tribe-linked-type-venue-state-province { display:none !important; }
 		.pf-venue-combo { position:relative; display:inline-block; }
 		.pf-venue-combo-menu { position:absolute; top:100%; left:0; z-index:100; margin:2px 0 0; padding:0; list-style:none; min-width:220px; max-height:220px; overflow-y:auto; background:#fff; border:1px solid #ddd; border-radius:3px; box-shadow:0 2px 6px rgba(0,0,0,.15); display:none; }
 		.pf-venue-combo-menu li { padding:5px 8px; cursor:pointer; border-bottom:1px solid #f5f5f5; }
