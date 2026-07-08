@@ -38,6 +38,8 @@
 	var BOTTOM_MARGIN  = '0px 0px ' + SCROLL_MARGIN_PX + 'px 0px';
 	var TOP_MARGIN     = SCROLL_MARGIN_PX + 'px 0px 0px 0px';
 	var EVENT_ROW_CLS  = 'tribe-events-calendar-list__event-row';
+	var RETRY_DELAY_MS   = 2000; // Panne serveur ponctuelle (ex. 502 le temps d'un redémarrage PHP-FPM).
+	var MAX_AUTO_RETRIES = 2;
 	var ARROW_UP   = 'M12 19V5M12 5L5 12M12 5l7 7';
 	var ARROW_DOWN = 'M12 5v14M12 19l-7-7M12 19l7-7';
 
@@ -82,8 +84,8 @@
 
 	/* ─── Contrôleur lié à une liste donnée ───────────────────────── */
 	function buildController(list) {
-		var down = { cursor: '', busy: false, done: false };
-		var up   = { cursor: '', busy: false, done: false };
+		var down = { cursor: '', busy: false, done: false, retries: 0 };
+		var up   = { cursor: '', busy: false, done: false, retries: 0 };
 		var ioDown = null, ioUp = null;
 		var topWrap = null, pastBtn = null, bottomWrap = null;
 		var futureWrap = null, futureBtn = null;
@@ -152,8 +154,13 @@
 			var st = direction === 'prev' ? up : down;
 			if (st.busy || st.done || !st.cursor) return;
 			st.busy = true;
+			st.retries = 0;
 			setLoading(direction, true);
+			attempt(direction);
+		}
 
+		function attempt(direction) {
+			var st = direction === 'prev' ? up : down;
 			var fd = new FormData();
 			fd.append('action', 'pf_events_feed');
 			fd.append('nonce', cfg.nonce);
@@ -163,22 +170,38 @@
 			fetch(cfg.ajax_url, { method: 'POST', body: fd, credentials: 'same-origin' })
 				.then(function (r) { return r.json(); })
 				.then(function (p) {
-					st.busy = false;
-					setLoading(direction, false);
-					if (!p || !p.success || !p.data || !p.data.html) { finish(direction); return; }
+					if (p && p.success && p.data && p.data.html) {
+						st.busy = false;
+						setLoading(direction, false);
 
-					if (direction === 'next') appendBatch(p.data.html);
-					else                      prependBatch(p.data.html);
+						if (direction === 'next') appendBatch(p.data.html);
+						else                      prependBatch(p.data.html);
 
-					st.cursor = p.data.has_more ? p.data.next_url : '';
+						st.cursor = p.data.has_more ? p.data.next_url : '';
 
-					if (!p.data.has_more) finish(direction);
-					else if (direction === 'prev') armTopObserver();
+						if (!p.data.has_more) finish(direction);
+						else if (direction === 'prev') armTopObserver();
+						return;
+					}
+					if (p && p.success) { st.busy = false; setLoading(direction, false); finish(direction); return; }
+					fail(direction);
 				})
-				.catch(function () {
-					st.busy = false;
-					setLoading(direction, false);
-				});
+				.catch(function () { fail(direction); });
+		}
+
+		// Panne serveur ponctuelle (502/erreur réseau) : quelques tentatives automatiques
+		// espacées avant d'abandonner silencieusement. Sans ça, un aléa transitoire devient
+		// définitif une fois l'utilisateur déjà arrivé en bout de liste (plus rien à scroller
+		// pour redéclencher un essai).
+		function fail(direction) {
+			var st = direction === 'prev' ? up : down;
+			if (st.retries < MAX_AUTO_RETRIES) {
+				st.retries++;
+				setTimeout(function () { attempt(direction); }, RETRY_DELAY_MS);
+				return;
+			}
+			st.busy = false;
+			setLoading(direction, false);
 		}
 
 		function finish(direction) {
