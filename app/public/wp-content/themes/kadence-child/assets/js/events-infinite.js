@@ -13,6 +13,12 @@
  * Les curseurs sont les URLs « préc. » / « suiv. » que TEC rend dans sa nav native :
  * on les lit, on masque la nav, et on demande à l'endpoint pf_events_feed le lot suivant.
  *
+ * Filet anti-saut (checkScrollSkip, sur onScroll) : un scroll rapide peut franchir la
+ * marge de déclenchement d'un IntersectionObserver en un seul frame sans jamais le
+ * traverser en position « intersecting » (repro : navigation par saut, ex. touche Fin,
+ * plutôt qu'un scroll continu) — sans ce filet, le dernier lot (bas ou haut) ne se
+ * charge alors jamais, même une fois arrivé en bout de liste.
+ *
  * Ré-initialisation AJAX : la bascule de vue (Liste/Mois) de TEC remplace tout le
  * conteneur. Un MutationObserver sur le parent stable ré-active le contrôleur dès
  * qu'une nouvelle liste apparaît (et le démonte sinon).
@@ -28,8 +34,9 @@
 	var SEP_SEL        = '.tribe-events-calendar-list__month-separator';
 	var SEP_TEXT_SEL   = '.tribe-events-calendar-list__month-separator-text';
 	var EVENT_ROW_SEL  = '.tribe-events-calendar-list__event-row';
-	var BOTTOM_MARGIN  = '0px 0px 600px 0px';
-	var TOP_MARGIN     = '600px 0px 0px 0px';
+	var SCROLL_MARGIN_PX = 600; // Doit rester égal à la marge utilisée par les rootMargin ci-dessous.
+	var BOTTOM_MARGIN  = '0px 0px ' + SCROLL_MARGIN_PX + 'px 0px';
+	var TOP_MARGIN     = SCROLL_MARGIN_PX + 'px 0px 0px 0px';
 	var EVENT_ROW_CLS  = 'tribe-events-calendar-list__event-row';
 	var ARROW_UP   = 'M12 19V5M12 5L5 12M12 5l7 7';
 	var ARROW_DOWN = 'M12 5v14M12 19l-7-7M12 19l7-7';
@@ -318,12 +325,28 @@
 		function onScroll() {
 			if (!scrollTick) {
 				scrollTick = true;
-				window.requestAnimationFrame(function () { updateFutureBtn(); updateStuck(); scrollTick = false; });
+				window.requestAnimationFrame(function () { updateFutureBtn(); updateStuck(); checkScrollSkip(); scrollTick = false; });
 			}
 			// Re-calcul après stabilisation : un reflow tardif (transition du header,
 			// images) peut décaler la position des séparateurs après le rAF du scroll.
 			clearTimeout(settleTimer);
 			settleTimer = setTimeout(function () { updateStuck(); updateFutureBtn(); }, 220);
+		}
+
+		// Filet de sécurité : un scroll rapide (molette véloce, ascenseur glissé, touche Fin)
+		// peut franchir la marge de déclenchement d'un IntersectionObserver en un seul frame
+		// sans jamais passer par un état « intersecting » — le lot suivant ne se charge alors
+		// jamais tout seul, même si l'utilisateur est bien arrivé au bas/haut de la liste. On
+		// revérifie ici, à chaque scroll, la position réelle des sentinelles pour rattraper ce cas.
+		function checkScrollSkip() {
+			if (down.cursor && !down.busy && !down.done) {
+				if (bottomSentinel.getBoundingClientRect().top <= window.innerHeight + SCROLL_MARGIN_PX) load('next');
+			}
+			// Uniquement une fois le 1er lot passé chargé (ioUp armé) — avant ça, le
+			// déclenchement reste volontairement réservé au clic (cf. armTopObserver).
+			if (ioUp && topWrap && up.cursor && !up.busy && !up.done) {
+				if (topWrap.getBoundingClientRect().bottom >= -SCROLL_MARGIN_PX) load('prev');
+			}
 		}
 
 		/* Helpers liés à la liste. */
