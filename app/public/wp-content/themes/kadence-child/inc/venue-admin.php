@@ -435,6 +435,28 @@ function pf_validate_venue_departement_region( $post_id ) {
    save_meta() — cf. pf_sync_venue_fields_on_create() plus bas.
    ═══════════════════════════════════════════════════════════════ */
 
+/**
+ * Les dropdowns natifs TEC de sélection de lieu ET d'organisateur font aussi
+ * office de « créer en tapant » (mode Select2 « freeform », option
+ * « Create: <texte tapé> »), source de confusion avec le mini-formulaire
+ * dédié à chacun. On désactive ce mode via le filtre officiel prévu à cet
+ * effet (contrôle uniquement les attributs data-freeform/data-create-choice-
+ * template posés sur le <select> — Tribe__Events__Linked_Posts::
+ * saved_linked_post_dropdown()) : chaque dropdown redevient recherche seule,
+ * et son placeholder passe automatiquement de « Créer ou trouver un X » à
+ * « Trouver un X » (même mécanisme natif, get_create_or_find_labels()). La
+ * création passe désormais uniquement par le bouton « Créer un X » dédié
+ * (assets/js/venue-admin.js, wireCreateButton()) — même mécanisme pour les
+ * deux types de contenu lié, malgré le nom du fichier resté « venue-admin »
+ * (premier point d'entrée historique de ce fichier).
+ */
+add_filter( 'tribe_events_linked_posts_dropdown_enable_creation', 'pf_disable_linked_post_dropdown_creation', 10, 2 );
+
+function pf_disable_linked_post_dropdown_creation( $creation_enabled, $post_type ) {
+	if ( in_array( $post_type, [ 'tribe_venue', 'tribe_organizer' ], true ) ) return false;
+	return $creation_enabled;
+}
+
 add_action( 'tribe_events_linked_post_new_form', 'pf_render_venue_departement_region_fields_inline', 20 );
 
 function pf_render_venue_departement_region_fields_inline( $post_type ) {
@@ -570,6 +592,21 @@ function pf_enqueue_venue_admin_assets( $hook ) {
 		.pf-venue-combo-menu li.pf-venue-combo-empty { color:#999; cursor:default; }
 		.pf-venue-combo-menu li.pf-venue-combo-empty:hover { background:none; }
 		#title.pf-venue-title-readonly { background:#f0f0f0; color:#666; }
+		.pf-linked-post-create-btn { margin-left:10px; vertical-align:middle; }
+		.pf-linked-post-create-cancel { margin-left:10px; vertical-align:middle; }
+		/* Case « Show map » natif TEC (Google Maps) : sans objet, ce site a sa
+		   propre vue Carte OpenStreetMap/Leaflet (Passiflore_Events_Map) — pas
+		   de JS TEC ne touchant l\'affichage de cette ligne (class
+		   remain-visible, jamais .hide()/.show() par events-admin.js), donc
+		   pas besoin de !important ici contrairement au reste de ce bloc.
+		   Même id sur les deux templates (fiche lieu autonome et fiche
+		   événement) — une seule règle couvre les deux. */
+		#google_map_toggle { display:none; }
+		/* Bloc « Cost » natif TEC (symbole monetaire, devise) sur la fiche
+		   evenement : sans objet, la tarification passe par les produits
+		   WooCommerce, pas par un cout d entree a l evenement lui-meme.
+		   Jamais touche par events-admin.js (aucune reference a cet id). */
+		#event_cost { display:none; }
 	' );
 }
 

@@ -221,12 +221,116 @@
 		}
 	}
 
+	// Fiche événement uniquement : le dropdown natif de sélection de lieu ne
+	// fait plus que chercher (mode « tape pour créer » désactivé côté PHP,
+	// cf. pf_disable_venue_dropdown_creation) — un bouton dédié révèle le
+	// mini-formulaire de création. On reproduit à la main la mécanique
+	// interne de TEC (events-admin.js, fonction liée au `change` du
+	// dropdown : classe `.tribe-is-creating-linked-post`, affichage des
+	// lignes `.linked-post`, valeur sentinelle `-1`) faute de hook officiel
+	// pour ça — donc plus fragile qu'un simple filtre PHP, à surveiller aux
+	// mises à jour de TEC.
+	//
+	// Décision volontaire : déclencher un `change` natif sur le dropdown
+	// (au clic comme à l'annulation) plutôt que d'essayer de l'éviter —
+	// tenter de contourner le handler natif de TEC pour ne pas le
+	// déclencher casserait la synchronisation visuelle de Select2 (qui
+	// écoute ce même événement). On laisse donc le handler natif de TEC
+	// s'exécuter (il vide/masque les champs), puis on réaffiche par-dessus
+	// au clic sur « Créer un lieu » — la remise à zéro des champs est de
+	// toute façon le comportement voulu pour démarrer une création.
+	// Étiquettes du bouton par type de contenu lié — un lieu (allow_multiple:
+	// false, une seule ligne dropdown possible) ou un organisateur
+	// (allow_multiple: true par défaut TEC, donc plusieurs lignes dropdown —
+	// une par organisateur déjà lié — et de nouvelles lignes peuvent être
+	// ajoutées dynamiquement via « + Ajouter un autre organisateur »).
+	var CREATE_BUTTON_LABELS = {
+		tribe_venue: 'Créer un lieu',
+		tribe_organizer: 'Créer un organisateur'
+	};
+
+	// Câble un bouton « Créer » + lien « Annuler » sur UN dropdown donné.
+	// Appelée pour chaque ligne existante au chargement, et pour chaque
+	// nouvelle ligne ajoutée dynamiquement (organisateurs, cf. plus bas) —
+	// idempotente par élément ($select.data('pfInited')), donc rien ne se
+	// double si les deux passes (dropdown existant + hook d'ajout) se
+	// recoupaient jamais.
+	function wireCreateButton( $select, label ) {
+		if ( ! $select.length || $select.data( 'pfInited' ) ) return;
+		$select.data( 'pfInited', true );
+
+		var $row     = $select.closest( 'tr.saved-linked-post' );
+		var $cell    = $row.find( 'td' ).last();
+		var $tbody   = $row.closest( 'tbody' );
+		var $section = $tbody.parents( '.tribe-section' );
+
+		var $createBtn = $( '<button type="button" class="button pf-linked-post-create-btn"></button>' )
+			.text( label )
+			.appendTo( $cell );
+
+		var $cancelLink = $( '<a href="#" class="pf-linked-post-create-cancel"></a>' )
+			.text( 'Annuler, revenir à la recherche' )
+			.hide()
+			.appendTo( $cell );
+
+		var previousValue = null;
+
+		$createBtn.on( 'click', function ( e ) {
+			e.preventDefault();
+			previousValue = $select.val();
+			$select.val( '-1' ).trigger( 'change' );
+			$tbody.find( '.linked-post' ).removeAttr( 'data-hidden' ).show();
+			$section.addClass( 'tribe-is-creating-linked-post' );
+			$createBtn.hide();
+			$cancelLink.show();
+		} );
+
+		$cancelLink.on( 'click', function ( e ) {
+			e.preventDefault();
+			$select.val( previousValue || '-1' ).trigger( 'change' );
+			$section.removeClass( 'tribe-is-creating-linked-post' );
+			$cancelLink.hide();
+			$createBtn.show();
+		} );
+	}
+
+	// Câble tous les dropdowns déjà présents dans le DOM pour un type donné
+	// (lieu : au plus un ; organisateur : un par organisateur déjà lié).
+	function wireCreateButtonsFor( postType ) {
+		var label = CREATE_BUTTON_LABELS[ postType ];
+		$( 'select.linked-post-dropdown[data-post-type="' + postType + '"]' ).each( function () {
+			wireCreateButton( $( this ), label );
+		} );
+	}
+
+	// Organisateurs uniquement en pratique (lieu : pas de bouton « + Ajouter »,
+	// cf. allow_multiple ci-dessus) : chaque clic sur « + Ajouter un autre
+	// organisateur » clone une NOUVELLE ligne dropdown, en dehors de tout
+	// document.ready — wireCreateButtonsFor() au chargement ne peut pas la
+	// voir. TEC expose un hook JS natif dédié (wp.hooks, contrairement à la
+	// mécanique interne du dropdown lui-même) pour ce cas précis.
+	function hookDynamicRows() {
+		if ( ! window.wp || ! window.wp.hooks || window.pfLinkedPostsHooked ) return;
+		window.pfLinkedPostsHooked = true;
+
+		window.wp.hooks.addAction( 'tec.events.admin.linked_posts.add_post', 'pf-venue-admin', function ( postType, outerTable, newTbody ) {
+			var label = CREATE_BUTTON_LABELS[ postType ];
+			if ( ! label ) return;
+			$( newTbody ).find( 'select.linked-post-dropdown[data-post-type="' + postType + '"]' ).each( function () {
+				wireCreateButton( $( this ), label );
+			} );
+		} );
+	}
+
 	function pfVenueAdminRun() {
 		if ( ! window.pfVenueAdmin ) return;
 
 		reposition();
 		initCombos();
 		fillDefaultCountry();
+		wireCreateButtonsFor( 'tribe_venue' );
+		wireCreateButtonsFor( 'tribe_organizer' );
+		hookDynamicRows();
 
 		// Fiche lieu autonome.
 		wireNameIsAddress( $( '#pf-venue-name-is-address' ), $( '#title' ), $( '#venueAddress' ) );
