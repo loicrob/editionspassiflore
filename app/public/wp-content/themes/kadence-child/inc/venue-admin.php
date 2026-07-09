@@ -567,6 +567,56 @@ function pf_enqueue_venue_admin_assets( $hook ) {
 		true
 	);
 
+	/**
+	 * pf_disable_linked_post_dropdown_creation() retire côté PHP les attributs
+	 * data-freeform/data-force-search/etc. du <select> (tous posés dans le
+	 * même bloc conditionnel par Tribe__Events__Linked_Posts::
+	 * saved_linked_post_dropdown()), en désactivant proprement le mode
+	 * « créer en tapant ». Effet de bord non désiré : Select2 (dropdowns.js,
+	 * commun/build) fixe minimumResultsForSearch=10 par défaut et ne le
+	 * retire QUE si data-force-search est présent — sans lui, la barre de
+	 * recherche interne au dropdown n'apparaît plus qu'à partir de 10
+	 * options. Comme les deux attributs sont posés ensemble dans le même
+	 * bloc « if ($creation_enabled) », impossible de garder l'un sans
+	 * l'autre côté PHP (pas de filtre par attribut individuel) — réinjecté
+	 * en JS à la place, en deux temps :
+	 *
+	 *  1) Au chargement initial : data-force-search posé directement en JS,
+	 *     avant l'exécution du script natif TEC (tribe-events-admin est en
+	 *     pied de page — $in_footer=true par défaut de la lib Assets — donc
+	 *     le <select> existe déjà dans le DOM à ce stade, et le script natif,
+	 *     qui lit cet attribut à l'initialisation de Select2, n'a pas encore
+	 *     tourné).
+	 *
+	 *  2) Pour les organisateurs (allow_multiple=true, contrairement aux
+	 *     lieux) : chaque clic sur « + Ajouter un autre organisateur » clone
+	 *     un NOUVEAU <select>, en dehors de tout chargement de page — le
+	 *     correctif du point 1 ne peut pas l'atteindre. Le clic TEC appelle
+	 *     .tribe_dropdowns() de façon synchrone sur ce nouveau <select> AVANT
+	 *     même de déclencher le hook JS natif tec.events.admin.linked_posts.
+	 *     add_post (vérifié dans build/js/events-admin.js) — impossible donc
+	 *     de patcher l'attribut a posteriori via ce hook, Select2 aurait déjà
+	 *     lu l'ancien minimumResultsForSearch. On enveloppe donc directement
+	 *     $.fn.tribe_dropdowns (tribe-dropdowns est une dépendance de
+	 *     tribe-events-admin, chargée avant lui, donc déjà définie ici) pour
+	 *     poser l'attribut juste avant CHAQUE appel, initial ou futur.
+	 */
+	if ( wp_script_is( 'tribe-events-admin', 'registered' ) ) {
+		$pf_force_search_js = <<<'JS'
+document.querySelectorAll('select.linked-post-dropdown[data-post-type="tribe_venue"], select.linked-post-dropdown[data-post-type="tribe_organizer"]').forEach(function (el) {
+	el.setAttribute('data-force-search', '');
+});
+if (window.jQuery && window.jQuery.fn && window.jQuery.fn.tribe_dropdowns) {
+	var pfOriginalTribeDropdowns = window.jQuery.fn.tribe_dropdowns;
+	window.jQuery.fn.tribe_dropdowns = function () {
+		this.filter('select.linked-post-dropdown[data-post-type="tribe_venue"], select.linked-post-dropdown[data-post-type="tribe_organizer"]').attr('data-force-search', '');
+		return pfOriginalTribeDropdowns.apply(this, arguments);
+	};
+}
+JS;
+		wp_add_inline_script( 'tribe-events-admin', $pf_force_search_js, 'before' );
+	}
+
 	wp_localize_script( 'pf-venue-admin', 'pfVenueAdmin', [
 		'departements' => pf_venue_options_pinned_first( array_map( function ( $d ) {
 			return [ 'value' => $d['name'], 'label' => $d['name'] . ' (' . $d['code'] . ')' ];
