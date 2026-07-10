@@ -37,6 +37,17 @@ function passiflore_enqueue_auteurs_styles() {
         'nonce'    => wp_create_nonce( 'pf_newsletter' ),
     ] );
 
+    // Composant partagé « section-nav » (fiche livre + fiche événement).
+    if ( is_product() || is_singular( 'tribe_events' ) ) {
+        wp_enqueue_script(
+            'pf-section-nav',
+            get_stylesheet_directory_uri() . '/assets/js/section-nav.js',
+            [],
+            filemtime( get_stylesheet_directory() . '/assets/js/section-nav.js' ),
+            true
+        );
+    }
+
     if ( is_product() ) {
         wp_enqueue_style(
             'pf-book-single',
@@ -57,10 +68,10 @@ function passiflore_enqueue_auteurs_styles() {
             filemtime( get_stylesheet_directory() . '/assets/css/events.css' )
         );
         wp_enqueue_script(
-            'pf-event-tiles',
-            get_stylesheet_directory_uri() . '/assets/js/event-tiles.js',
+            'pf-scroll-fade',
+            get_stylesheet_directory_uri() . '/assets/js/scroll-fade.js',
             [],
-            filemtime( get_stylesheet_directory() . '/assets/js/event-tiles.js' ),
+            filemtime( get_stylesheet_directory() . '/assets/js/scroll-fade.js' ),
             true
         );
     }
@@ -86,10 +97,10 @@ function passiflore_enqueue_auteurs_styles() {
             filemtime( get_stylesheet_directory() . '/assets/css/events.css' )
         );
         wp_enqueue_script(
-            'pf-event-tiles',
-            get_stylesheet_directory_uri() . '/assets/js/event-tiles.js',
+            'pf-scroll-fade',
+            get_stylesheet_directory_uri() . '/assets/js/scroll-fade.js',
             [],
-            filemtime( get_stylesheet_directory() . '/assets/js/event-tiles.js' ),
+            filemtime( get_stylesheet_directory() . '/assets/js/scroll-fade.js' ),
             true
         );
     }
@@ -113,6 +124,29 @@ function passiflore_enqueue_auteurs_styles() {
             get_stylesheet_directory_uri() . '/assets/css/events.css',
             [ 'pf-auteurs' ],
             '1.0.0'
+        );
+    }
+    if ( is_singular( 'tribe_events' ) ) {
+        wp_enqueue_style(
+            'pf-event-single',
+            get_stylesheet_directory_uri() . '/assets/css/event-single.css',
+            [ 'pf-events' ],
+            filemtime( get_stylesheet_directory() . '/assets/css/event-single.css' )
+        );
+        wp_enqueue_script(
+            'pf-scroll-fade',
+            get_stylesheet_directory_uri() . '/assets/js/scroll-fade.js',
+            [],
+            filemtime( get_stylesheet_directory() . '/assets/js/scroll-fade.js' ),
+            true
+        );
+        // Desktop : largeur de la colonne de l'image collée (calculée depuis le ratio).
+        wp_enqueue_script(
+            'pf-event-single-media',
+            get_stylesheet_directory_uri() . '/assets/js/event-single-media.js',
+            [],
+            filemtime( get_stylesheet_directory() . '/assets/js/event-single-media.js' ),
+            true
         );
     }
     if ( function_exists( 'is_account_page' ) && is_account_page() ) {
@@ -216,6 +250,7 @@ require_once get_stylesheet_directory() . '/inc/admin.php';
 require_once get_stylesheet_directory() . '/inc/book-sheet.php';
 require_once get_stylesheet_directory() . '/inc/auteurs.php';
 require_once get_stylesheet_directory() . '/inc/events.php';
+require_once get_stylesheet_directory() . '/inc/event-single.php';
 require_once get_stylesheet_directory() . '/inc/class-events-feed.php';
 require_once get_stylesheet_directory() . '/inc/class-events-search.php';
 require_once get_stylesheet_directory() . '/inc/class-events-map.php';
@@ -224,6 +259,7 @@ require_once get_stylesheet_directory() . '/inc/venue-admin.php';
 require_once get_stylesheet_directory() . '/inc/book-groups-admin.php';
 require_once get_stylesheet_directory() . '/inc/event-hours.php';
 require_once get_stylesheet_directory() . '/inc/pageflip.php';
+require_once get_stylesheet_directory() . '/inc/section-nav.php';
 require_once get_stylesheet_directory() . '/inc/book-single-tabs.php';
 require_once get_stylesheet_directory() . '/inc/class-bookshelf.php';
 require_once get_stylesheet_directory() . '/inc/class-catalogue.php';

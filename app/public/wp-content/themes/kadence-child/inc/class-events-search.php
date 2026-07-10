@@ -218,51 +218,24 @@ class Passiflore_Events_Search {
 					<div class="tribe-events-calendar-list__event-details tribe-common-g-col">
 						<header class="tribe-events-calendar-list__event-header">
 							<h4 class="tribe-events-calendar-list__event-title pf-card-title"><?php echo $event->title; // phpcs:ignore WordPress.Security.EscapeOutput ?></h4>
-							<?php echo self::render_venue( $event ); ?>
 						</header>
 
-						<?php if ( ! empty( $event->excerpt ) ) : ?>
-						<div class="tribe-events-calendar-list__event-description tribe-common-b2 tribe-common-a11y-hidden">
-							<?php echo $event->excerpt; // phpcs:ignore WordPress.Security.EscapeOutput ?>
+						<?php // Lieu (nom+ville)/organisateur/participants : pf-event-card-meta, pas l'adresse complète native TEC. ?>
+						<?php $description = function_exists( 'passiflore_render_event_description_text' ) ? passiflore_render_event_description_text( $event ) : ''; ?>
+						<?php if ( '' !== $description ) : ?>
+						<div class="tribe-events-calendar-list__event-description pf-card-text pf-card-text--clamp-2">
+							<?php echo $description; // phpcs:ignore WordPress.Security.EscapeOutput ?>
 						</div>
 						<?php endif; ?>
 						<?php
-						if ( function_exists( 'passiflore_render_event_participants' ) ) {
-							echo passiflore_render_event_participants( $event->ID, 'text' );
+						if ( function_exists( 'passiflore_render_event_card_meta' ) ) {
+							echo passiflore_render_event_card_meta( $event ); // phpcs:ignore WordPress.Security.EscapeOutput
 						}
 						?>
 					</div>
 				</article>
 			</div>
 		</li>
-		<?php
-		return ob_get_clean();
-	}
-
-	private static function render_venue( $event ) {
-		if ( ! $event->venues->count() ) return '';
-
-		$separator            = esc_html_x( ', ', 'Address separator', 'the-events-calendar' );
-		$venue                = $event->venues[0];
-		$append_after_address = array_filter( array_map( 'trim', [ $venue->state_province, $venue->state, $venue->province ] ) );
-		$address              = $venue->address . ( $venue->address && ( $append_after_address || $venue->city ) ? $separator : '' );
-
-		ob_start();
-		?>
-		<address class="tribe-events-calendar-list__event-venue tribe-common-b2">
-			<span class="tribe-events-calendar-list__event-venue-title tribe-common-b2--bold"><?php echo wp_kses_post( $venue->post_title ); ?></span>
-			<span class="tribe-events-calendar-list__event-venue-address">
-				<?php if ( ! post_password_required( $venue->ID ) ) :
-					echo esc_html( $address );
-					if ( ! empty( $venue->city ) ) {
-						echo esc_html( $venue->city );
-						if ( $append_after_address ) echo $separator;
-					}
-					if ( $append_after_address ) echo esc_html( reset( $append_after_address ) );
-					if ( ! empty( $venue->country ) ) echo $separator . esc_html( $venue->country );
-				endif; ?>
-			</span>
-		</address>
 		<?php
 		return ob_get_clean();
 	}
@@ -284,47 +257,55 @@ class Passiflore_Events_Search {
 		$event_week_day  = $display_date->format_i18n( 'l' );
 		$event_day_num   = $display_date->format_i18n( 'j' );
 		$event_date_attr = $display_date->format( Dates::DBDATEFORMAT );
-		$start_time      = $show_time ? $display_date->format_i18n( 'G\hi' ) : '';
+		$start_time      = $show_time ? pf_event_format_hm( (int) $display_date->format( 'G' ), (int) $display_date->format( 'i' ) ) : '';
 
 		$end_week_day  = $end_date->format_i18n( 'l' );
 		$end_day_num   = $end_date->format_i18n( 'j' );
 		$end_date_attr = $end_date->format( Dates::DBDATEFORMAT );
-		$end_time      = $show_time ? $end_date->format_i18n( 'G\hi' ) : '';
+		$end_time      = $show_time ? pf_event_format_hm( (int) $end_date->format( 'G' ), (int) $end_date->format( 'i' ) ) : '';
 
 		if ( $end_time !== '' && function_exists( 'pf_event_is_sentinel_time' ) && pf_event_is_sentinel_time( $end_date->format( 'H:i:s' ) ) ) {
 			$end_time = '';
 		}
 
+		$pf_daily_hours_used = false;
+		$pf_first_end        = '';
+		$pf_last_start       = '';
 		if ( function_exists( 'pf_event_get_daily_hours' ) ) {
 			$pf_hours = pf_event_get_daily_hours( (int) $event->ID );
 			if ( count( $pf_hours ) >= 2 ) {
 				[ $pf_first, $pf_last ] = pf_event_first_last_open_day( $pf_hours );
-				$pf_compact = static function ( $h ) {
-					if ( ! empty( $h['allday'] ) ) return '';
+				// Retourne [debut, fin] separement (jamais combines en une seule chaine) pour que
+				// le gabarit reconstruise la structure texte/span-sep/texte identique au natif.
+				$pf_day_time_parts = static function ( $h ) {
+					if ( ! empty( $h['allday'] ) ) return [ '', '' ];
 					$fmt = static function ( $t ) {
 						[ $hh, $mm ] = array_map( 'intval', explode( ':', $t ) );
-						return $mm ? sprintf( '%dh%02d', $hh, $mm ) : sprintf( '%dh', $hh );
+						return pf_event_format_hm( $hh, $mm );
 					};
-					if ( ! empty( $h['start'] ) && ! empty( $h['end'] ) ) return $fmt( $h['start'] ) . '–' . $fmt( $h['end'] );
-					if ( ! empty( $h['start'] ) ) return $fmt( $h['start'] );
-					return '';
+					return [
+						! empty( $h['start'] ) ? $fmt( $h['start'] ) : '',
+						! empty( $h['end'] ) ? $fmt( $h['end'] ) : '',
+					];
 				};
 				if ( $pf_first && $pf_last ) {
 					$is_multi_day    = $pf_first !== $pf_last;
 					$show_time       = true;
+					$pf_daily_hours_used = true;
 					$event_week_day  = ucfirst( date_i18n( 'l', (int) strtotime( $pf_first ) ) );
 					$event_day_num   = date_i18n( 'j', (int) strtotime( $pf_first ) );
 					$event_date_attr = date( 'Y-m-d', (int) strtotime( $pf_first ) );
-					$start_time      = $pf_compact( $pf_hours[ $pf_first ] );
+					[ $start_time, $pf_first_end ] = $pf_day_time_parts( $pf_hours[ $pf_first ] );
 					$end_week_day    = ucfirst( date_i18n( 'l', (int) strtotime( $pf_last ) ) );
 					$end_day_num     = date_i18n( 'j', (int) strtotime( $pf_last ) );
 					$end_date_attr   = date( 'Y-m-d', (int) strtotime( $pf_last ) );
-					$end_time        = $pf_compact( $pf_hours[ $pf_last ] );
+					[ $pf_last_start, $end_time ] = $pf_day_time_parts( $pf_hours[ $pf_last ] );
 				}
 			}
 		}
 
 		ob_start();
+		$pf_tag1_secondary = $pf_daily_hours_used ? $pf_first_end : ( ! $is_multi_day ? $end_time : '' );
 		?>
 		<div <?php tec_classes( tribe_get_post_class( [ 'tribe-events-calendar-list__event-date-tag', 'tribe-common-g-col' ], $event->ID ) ); ?>>
 			<time class="tribe-events-calendar-list__event-date-tag-datetime" datetime="<?php echo esc_attr( $event_date_attr ); ?>" aria-hidden="true">
@@ -333,9 +314,8 @@ class Passiflore_Events_Search {
 				<?php if ( $show_time && $start_time !== '' ) : ?>
 				<span class="tribe-events-calendar-list__event-date-tag-time">
 					<?php echo esc_html( $start_time ); ?>
-					<?php if ( ! $is_multi_day && $end_time !== '' ) : ?>
-					<span class="tribe-events-calendar-list__event-date-tag-time-sep">–</span>
-					<?php echo esc_html( $end_time ); ?>
+					<?php if ( $pf_tag1_secondary !== '' ) : ?>
+					<span class="tribe-events-calendar-list__event-date-tag-time-end"><span class="tribe-events-calendar-list__event-date-tag-time-sep">–</span> <?php echo esc_html( $pf_tag1_secondary ); ?></span>
 					<?php endif; ?>
 				</span>
 				<?php endif; ?>
@@ -350,7 +330,14 @@ class Passiflore_Events_Search {
 				<span class="tribe-events-calendar-list__event-date-tag-weekday"><?php echo esc_html( $end_week_day ); ?></span>
 				<span class="tribe-events-calendar-list__event-date-tag-daynum tribe-common-h5 tribe-common-h4--min-medium"><?php echo esc_html( $end_day_num ); ?></span>
 				<?php if ( $show_time && $end_time !== '' ) : ?>
-				<span class="tribe-events-calendar-list__event-date-tag-time"><?php echo esc_html( $end_time ); ?></span>
+				<span class="tribe-events-calendar-list__event-date-tag-time">
+					<?php if ( $pf_daily_hours_used && $pf_last_start !== '' ) : ?>
+					<?php echo esc_html( $pf_last_start ); ?>
+					<span class="tribe-events-calendar-list__event-date-tag-time-end"><span class="tribe-events-calendar-list__event-date-tag-time-sep">–</span> <?php echo esc_html( $end_time ); ?></span>
+					<?php else : ?>
+					<?php echo esc_html( $end_time ); ?>
+					<?php endif; ?>
+				</span>
 				<?php endif; ?>
 			</time>
 			<?php endif; ?>

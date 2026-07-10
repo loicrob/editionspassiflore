@@ -20,12 +20,12 @@ $show_time       = empty( $event->all_day );
 $event_week_day  = $display_date->format_i18n( 'l' );
 $event_day_num   = $display_date->format_i18n( 'j' );
 $event_date_attr = $display_date->format( Dates::DBDATEFORMAT );
-$start_time      = $show_time ? $display_date->format_i18n( 'G\hi' ) : '';
+$start_time      = $show_time ? pf_event_format_hm( (int) $display_date->format( 'G' ), (int) $display_date->format( 'i' ) ) : '';
 
 $end_week_day    = $end_date->format_i18n( 'l' );
 $end_day_num     = $end_date->format_i18n( 'j' );
 $end_date_attr   = $end_date->format( Dates::DBDATEFORMAT );
-$end_time        = $show_time ? $end_date->format_i18n( 'G\hi' ) : '';
+$end_time        = $show_time ? pf_event_format_hm( (int) $end_date->format( 'G' ), (int) $end_date->format( 'i' ) ) : '';
 
 // L'heure de fin sentinelle (23h59 = "pas d'heure de fin", convention import) ne s'affiche pas.
 if ( $end_time !== '' && function_exists( 'pf_event_is_sentinel_time' ) && pf_event_is_sentinel_time( $end_date->format( 'H:i:s' ) ) ) {
@@ -33,31 +33,38 @@ if ( $end_time !== '' && function_exists( 'pf_event_is_sentinel_time' ) && pf_ev
 }
 
 // Planning par jour reel : afficher le creneau complet du 1er et du dernier jour ouvert.
+$pf_daily_hours_used = false;
+$pf_first_end        = '';
+$pf_last_start       = '';
 if ( function_exists( 'pf_event_get_daily_hours' ) ) {
 	$pf_hours = pf_event_get_daily_hours( (int) $event->ID );
 	if ( count( $pf_hours ) >= 2 ) {
 		[ $pf_first, $pf_last ] = pf_event_first_last_open_day( $pf_hours );
-		$pf_compact = static function ( $h ) {
-			if ( ! empty( $h['allday'] ) ) return '';
+		// Retourne [debut, fin] separement (jamais combines en une seule chaine) pour que
+		// le gabarit reconstruise la structure texte/span-sep/texte identique au natif.
+		$pf_day_time_parts = static function ( $h ) {
+			if ( ! empty( $h['allday'] ) ) return [ '', '' ];
 			$fmt = static function ( $t ) {
 				[ $hh, $mm ] = array_map( 'intval', explode( ':', $t ) );
-				return $mm ? sprintf( '%dh%02d', $hh, $mm ) : sprintf( '%dh', $hh );
+				return pf_event_format_hm( $hh, $mm );
 			};
-			if ( ! empty( $h['start'] ) && ! empty( $h['end'] ) ) return $fmt( $h['start'] ) . '–' . $fmt( $h['end'] );
-			if ( ! empty( $h['start'] ) ) return $fmt( $h['start'] );
-			return '';
+			return [
+				! empty( $h['start'] ) ? $fmt( $h['start'] ) : '',
+				! empty( $h['end'] ) ? $fmt( $h['end'] ) : '',
+			];
 		};
 		if ( $pf_first && $pf_last ) {
 			$is_multi_day    = $pf_first !== $pf_last;
 			$show_time       = true;
+			$pf_daily_hours_used = true;
 			$event_week_day  = ucfirst( date_i18n( 'l', (int) strtotime( $pf_first ) ) );
 			$event_day_num   = date_i18n( 'j', (int) strtotime( $pf_first ) );
 			$event_date_attr = date( 'Y-m-d', (int) strtotime( $pf_first ) );
-			$start_time      = $pf_compact( $pf_hours[ $pf_first ] );
+			[ $start_time, $pf_first_end ] = $pf_day_time_parts( $pf_hours[ $pf_first ] );
 			$end_week_day    = ucfirst( date_i18n( 'l', (int) strtotime( $pf_last ) ) );
 			$end_day_num     = date_i18n( 'j', (int) strtotime( $pf_last ) );
 			$end_date_attr   = date( 'Y-m-d', (int) strtotime( $pf_last ) );
-			$end_time        = $pf_compact( $pf_hours[ $pf_last ] );
+			[ $pf_last_start, $end_time ] = $pf_day_time_parts( $pf_hours[ $pf_last ] );
 		}
 	}
 }
@@ -73,12 +80,12 @@ $event_classes   = tribe_get_post_class( [ 'tribe-events-calendar-list__event-da
 		<span class="tribe-events-calendar-list__event-date-tag-daynum tribe-common-h5 tribe-common-h4--min-medium">
 			<?php echo esc_html( $event_day_num ); ?>
 		</span>
+		<?php $pf_tag1_secondary = $pf_daily_hours_used ? $pf_first_end : ( ! $is_multi_day ? $end_time : '' ); ?>
 		<?php if ( $show_time && $start_time !== '' ) : ?>
 		<span class="tribe-events-calendar-list__event-date-tag-time">
 			<?php echo esc_html( $start_time ); ?>
-			<?php if ( ! $is_multi_day && $end_time !== '' ) : ?>
-			<span class="tribe-events-calendar-list__event-date-tag-time-sep">–</span>
-			<?php echo esc_html( $end_time ); ?>
+			<?php if ( $pf_tag1_secondary !== '' ) : ?>
+			<span class="tribe-events-calendar-list__event-date-tag-time-end"><span class="tribe-events-calendar-list__event-date-tag-time-sep">–</span> <?php echo esc_html( $pf_tag1_secondary ); ?></span>
 			<?php endif; ?>
 		</span>
 		<?php endif; ?>
@@ -98,7 +105,12 @@ $event_classes   = tribe_get_post_class( [ 'tribe-events-calendar-list__event-da
 		</span>
 		<?php if ( $show_time && $end_time !== '' ) : ?>
 		<span class="tribe-events-calendar-list__event-date-tag-time">
+			<?php if ( $pf_daily_hours_used && $pf_last_start !== '' ) : ?>
+			<?php echo esc_html( $pf_last_start ); ?>
+			<span class="tribe-events-calendar-list__event-date-tag-time-end"><span class="tribe-events-calendar-list__event-date-tag-time-sep">–</span> <?php echo esc_html( $end_time ); ?></span>
+			<?php else : ?>
 			<?php echo esc_html( $end_time ); ?>
+			<?php endif; ?>
 		</span>
 		<?php endif; ?>
 	</time>

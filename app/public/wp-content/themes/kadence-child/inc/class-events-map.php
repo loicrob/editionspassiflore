@@ -80,6 +80,8 @@ class Passiflore_Events_Map {
 		add_action( 'init', [ $this, 'register_view' ], 5 );
 		add_action( 'init', [ $this, 'maybe_flush_rewrites' ], 20 );
 		add_action( 'wp_enqueue_scripts', [ $this, 'enqueue' ], 20 );
+		// Mini-carte mono-lieu de la fiche événement (section « Lieu »).
+		add_action( 'wp_enqueue_scripts', [ $this, 'enqueue_single' ], 20 );
 
 		// Géocodage côté écriture (jamais pendant le rendu public) :
 		//  - à l'enregistrement d'un lieu dans l'admin ;
@@ -188,6 +190,122 @@ class Passiflore_Events_Map {
 			'placeholderMobile' => __( 'Événement', 'kadence-child' ), // même placeholder mobile que la recherche liste.
 			'markers'           => $this->build_markers(),
 		] );
+	}
+
+	/* ─── Fiche événement : mini-carte mono-lieu ───────────────────── */
+
+	/**
+	 * Enqueue Leaflet + la mini-carte mono-lieu sur la fiche événement, si le
+	 * lieu a des coordonnées en cache (géocodage côté écriture). Aucun appel
+	 * réseau au rendu : lecture du cache post meta seule (cf. RGPD, CLAUDE.md).
+	 */
+	public function enqueue_single() {
+		if ( ! is_singular( 'tribe_events' ) || ! function_exists( 'tribe_get_venue_id' ) ) {
+			return;
+		}
+		$venue_id = tribe_get_venue_id( get_queried_object_id() );
+		if ( ! $venue_id
+			|| '' === get_post_meta( $venue_id, self::GEO_META_LAT, true )
+			|| '' === get_post_meta( $venue_id, self::GEO_META_LNG, true ) ) {
+			return; // pas de coordonnées → pas de carte (repli adresse seule)
+		}
+
+		$uri = get_stylesheet_directory_uri();
+		$dir = get_stylesheet_directory();
+
+		wp_enqueue_style( 'leaflet', $uri . '/assets/vendor/leaflet/leaflet.css', [], '1.9.4' );
+		wp_enqueue_style(
+			'pf-events-map',
+			$uri . '/assets/css/events-map.css',
+			[ 'leaflet', 'pf-events' ],
+			filemtime( $dir . '/assets/css/events-map.css' )
+		);
+		wp_enqueue_script( 'leaflet', $uri . '/assets/vendor/leaflet/leaflet.js', [], '1.9.4', true );
+		wp_enqueue_script(
+			'pf-event-venue-map',
+			$uri . '/assets/js/event-venue-map.js',
+			[ 'leaflet' ],
+			filemtime( $dir . '/assets/js/event-venue-map.js' ),
+			true
+		);
+		wp_localize_script( 'pf-event-venue-map', 'PassifloreVenueMap', [
+			'tileUrl'     => 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+			'attribution' => '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+		] );
+	}
+
+	/**
+	 * Section « Lieu » de la fiche événement : bloc adresse + mini-carte OSM
+	 * mono-marqueur (si coordonnées en cache) + lien « Y aller ». Le nom du lieu
+	 * est omis quand il duplique l'adresse (flag _VenueNameIsAddress).
+	 *
+	 * @param int $event_id
+	 * @return string HTML, ou '' si aucun lieu.
+	 */
+	public static function render_single_venue_map( $event_id ) {
+		if ( ! function_exists( 'tribe_get_venue_id' ) ) {
+			return '';
+		}
+		$venue_id = tribe_get_venue_id( $event_id );
+		if ( ! $venue_id ) {
+			return '';
+		}
+
+		$name            = tribe_get_venue( $event_id );
+		$name_is_address = get_post_meta( $venue_id, '_VenueNameIsAddress', true );
+		$address         = tribe_get_address( $event_id );
+		$zip             = tribe_get_zip( $event_id );
+		$city            = tribe_get_city( $event_id );
+		$dept            = get_post_meta( $venue_id, '_VenueDepartement', true );
+		$region          = get_post_meta( $venue_id, '_VenueRegion', true );
+
+		$lat        = get_post_meta( $venue_id, self::GEO_META_LAT, true );
+		$lng        = get_post_meta( $venue_id, self::GEO_META_LNG, true );
+		$has_coords = ( '' !== $lat && '' !== $lng );
+
+		$lines = [];
+		if ( $name && ! $name_is_address ) {
+			$lines[] = '<span class="pf-event-venue__name">' . esc_html( $name ) . '</span>';
+		}
+		if ( $address ) {
+			$lines[] = esc_html( $address );
+		}
+		$zip_city = trim( $zip . ' ' . $city );
+		if ( '' !== $zip_city ) {
+			$lines[] = esc_html( $zip_city );
+		}
+		$area = array_filter( [ $dept, $region ] );
+		if ( $area ) {
+			$lines[] = '<span class="pf-event-venue__area">' . esc_html( implode( ' · ', $area ) ) . '</span>';
+		}
+
+		if ( empty( $lines ) && ! $has_coords ) {
+			return '';
+		}
+
+		$label = $name ?: $city;
+
+		ob_start();
+		echo '<div class="pf-event-venue">';
+
+		if ( $lines ) {
+			echo '<address class="pf-event-venue__address">' . implode( '<br>', $lines ) . '</address>';
+		}
+
+		if ( $has_coords ) {
+			echo '<div id="pf-event-venue-map" class="pf-event-venue__map"'
+				. ' data-lat="' . esc_attr( $lat ) . '" data-lng="' . esc_attr( $lng ) . '"'
+				. ' data-label="' . esc_attr( $label ) . '"'
+				. ' aria-label="' . esc_attr( sprintf( 'Carte du lieu : %s', $label ) ) . '"></div>';
+
+			// « Y aller » : itinéraire Google Maps par coordonnées (lien sortant, au clic).
+			$dir_url = 'https://www.google.com/maps/dir/?api=1&destination=' . rawurlencode( $lat . ',' . $lng );
+			echo '<a class="pf-btn pf-btn--outline pf-btn--sm pf-event-venue__go" href="' . esc_url( $dir_url )
+				. '" target="_blank" rel="noopener noreferrer">' . esc_html__( 'Y aller', 'kadence-child' ) . '</a>';
+		}
+
+		echo '</div>';
+		return ob_get_clean();
 	}
 
 	/* ─── Recherche sur la carte ───────────────────────────────────── */

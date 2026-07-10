@@ -1,0 +1,219 @@
+/* ============================================================
+   Fiche événement individuelle — override tribe-events/single-event.php
+   Hero (info + image) puis sections via le composant partagé .pf-sectionnav
+   (style.css). Ici : layout propre du hero + habillage des sections maison
+   (Lieu + carte OSM, Organisateur). Les composants (.pf-btn, .pf-card, nav de
+   section) vivent dans style.css.
+   ============================================================ */
+
+/* Prix natif TEC (plus rendu par l'override, garde-fou si un chemin le ré-émet). */
+.tribe-events-single .tribe-events-cost { display: none; }
+
+/* TEC (tribe-events-single-skeleton.css) pose `overflow:hidden` sur le wrapper du
+   post (`.tribe-events-single > .tribe_events`) → casse la nav sticky : `position:sticky`
+   se cale sur ce conteneur (qui défile avec la page) au lieu du viewport. On rétablit
+   `overflow:visible` (même sélecteur + !important, shim anti-plugin autorisé) ; le clip
+   horizontal global reste assuré par `#wrapper` (overflow:clip, thème Kadence). */
+.tribe-events-single > .tribe_events { overflow: visible !important; }
+
+.tribe-events-back {
+	margin: 0 0 var(--pf-space-4);
+	font-size: var(--pf-text-sm);
+}
+
+/* ── Layout événement — DEUX zones (desktop ≥1024px) ──────────
+   ZONE HAUTE = grille `.pf-event-hero` à 3 colonnes [nav | contenu | image] :
+     • head (titre+planning) et body (description+actions) en pleine largeur nav+contenu ;
+     • nav (points) à gauche + topsec (Horaires/Lieu/Organisateur) dans la colonne contenu ;
+     • image (media) COLLÉE pleine hauteur à droite, span head → topsec UNIQUEMENT.
+   ZONE BASSE = `.pf-event-botsec` PLEINE LARGEUR juste après (Présence + Livres associés) :
+     image et nav ont leur containing block sticky dans `.pf-event-hero` → elles reprennent
+     leur scroll dès que la zone basse commence.
+   Colonne image = --pf-event-media-col (JS = largeur réelle plafonnée à 40% ; event-single-media.js).
+   Mobile+tablette ≤1023px : tout empilé (cf. bloc responsive plus bas). */
+.pf-event-hero {
+	display: grid;
+	grid-template-columns: [nav] auto [content] minmax(0, 1fr) [media] var(--pf-event-media-col, auto);
+	grid-template-areas:
+		"head head   media"
+		"body body   media"
+		"nav  topsec media"
+		"nav  botsec botsec";
+	column-gap: var(--pf-space-8);
+	row-gap: var(--pf-space-4);
+	align-items: start;
+	padding: var(--pf-space-4) 0 var(--pf-space-10);
+}
+
+.pf-event-hero__head            { grid-area: head;   min-width: 0; }
+/* Filet de délimitation au-dessus de la zone sections (nav + topsec). Porté par le BAS
+   de body, qui couvre les colonnes nav+contenu (cols 1-2) mais PAS l'image (col3, qui
+   continue). padding-bottom : écart entre les boutons du hero et le filet. */
+.pf-event-hero__body            { grid-area: body;   min-width: 0; padding-bottom: var(--pf-space-6); border-bottom: 1px solid var(--pf-border); }
+.pf-event-hero__topsec          { grid-area: topsec; min-width: 0; }
+.pf-event-hero__botsec          { grid-area: botsec; min-width: 0; }
+.pf-event-hero > .pf-sectionnav { grid-area: nav; align-self: start; }
+
+/* Colonne image (zone haute, rangées head/body/topsec). __media remplit ces rangées
+   (align-self:stretch) pour servir de containing block au sticky de __media-inner :
+   un sticky en grille colle sinon dans TOUT le conteneur → l'image ne sortirait
+   jamais. Ainsi bornée, l'image reste collée dans la zone haute puis reprend son
+   scroll dès la zone basse (botsec = Présence/Livres). */
+.pf-event-hero__media {
+	grid-area: media;
+	align-self: stretch;
+	min-width: 0;
+	max-width: 40vw; /* garde-fou avant que le JS ne pose --pf-event-media-col */
+}
+
+.pf-event-hero__media-inner {
+	position: sticky;
+	top: var(--pf-sticky-offset, 0px);
+	height: calc(100vh - var(--pf-sticky-offset, 0px));
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.pf-event-hero__img {
+	display: block;
+	max-width: 100%;  /* de la colonne (= largeur réelle de l'image, posée en JS) */
+	max-height: 100%; /* de la hauteur visible collée */
+	width: auto;
+	height: auto;
+	border-radius: var(--pf-radius-lg);
+}
+
+.pf-event-hero__title {
+	margin: 0 0 var(--pf-space-2);
+	color: var(--pf-heading);
+}
+
+.pf-event-hero__schedule {
+	margin: 0; /* dernier élément du bloc head : l'écart vers l'image/body vient du gap de grille */
+	color: var(--pf-accent);
+	font-weight: var(--pf-weight-semibold);
+}
+
+.pf-event-hero__desc {
+	color: var(--pf-text);
+	line-height: 1.7;
+}
+
+.pf-event-hero__desc > :first-child { margin-top: 0; }
+.pf-event-hero__desc > :last-child  { margin-bottom: 0; }
+
+.pf-event-hero__actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--pf-space-2);
+	margin-top: var(--pf-space-5);
+}
+
+/* ── Section « Lieu » : adresse + carte OSM + « Y aller » ────── */
+.pf-event-venue {
+	display: grid;
+	gap: var(--pf-space-4);
+	justify-items: start;
+}
+
+.pf-event-venue__address {
+	margin: 0;
+	font-style: normal;
+	line-height: 1.7;
+	color: var(--pf-text);
+}
+
+.pf-event-venue__name {
+	font-weight: 600;
+	color: var(--pf-heading);
+}
+
+.pf-event-venue__area {
+	color: var(--pf-muted);
+	font-size: var(--pf-text-sm);
+}
+
+/* Conteneur Leaflet : hauteur explicite obligatoire (sinon rendu 0px). isolation
+   isolate → nouveau contexte d'empilement, les z-index internes de Leaflet
+   (contrôles ~1000) ne débordent pas au-dessus du header/nav sticky de la page. */
+.pf-event-venue__map {
+	width: 100%;
+	height: 360px;
+	border-radius: var(--pf-radius);
+	border: 1px solid var(--pf-border);
+	overflow: hidden;
+	isolation: isolate;
+	z-index: 0;
+	background: var(--pf-cream-dark); /* fond en attendant le chargement des tuiles */
+}
+
+/* ── Section « Organisateur » ─────────────────────────────────── */
+.pf-event-organizers {
+	display: grid;
+	gap: var(--pf-space-5);
+}
+
+.pf-event-organizer__name {
+	margin: 0 0 var(--pf-space-1);
+	font-weight: 600;
+	color: var(--pf-heading);
+}
+
+.pf-event-organizer__contact {
+	margin: 0;
+	color: var(--pf-muted);
+	font-size: var(--pf-text-sm);
+}
+
+/* Zone basse : filet de séparation PLEINE LARGEUR au-dessus de Présence. Le border-top
+   de .pf-section est retiré sur :first-child (style.css) → on le restaure pour la 1re
+   section de la zone basse (délimite le passage zone haute → pleine largeur). Padding-top
+   restauré en desktop : la règle d'alignement :first-child padding-top:0 ne vaut que pour
+   la 1re section de la PAGE (Horaires), pas pour Présence. */
+.pf-event-hero__botsec .pf-section:first-child {
+	border-top: 1px solid var(--pf-border);
+}
+
+@media (min-width: 1024px) {
+	.pf-event-hero__botsec .pf-section:first-child {
+		padding-top: var(--pf-space-6);
+	}
+}
+
+/* ── Mobile + tablette (≤1023px) : tout empilé — titre+planning, image, description+
+   actions, nav (horizontale), puis les sections (topsec + botsec). L'image redevient
+   un bloc pleine largeur dans le flux (plus de colonne collée). ── */
+@media (max-width: 1023px) {
+	.pf-event-hero {
+		grid-template-columns: 1fr;
+		grid-template-areas:
+			"head"
+			"media"
+			"body"
+			"nav"
+			"topsec"
+			"botsec";
+		gap: var(--pf-space-5);
+		padding-bottom: var(--pf-space-6);
+	}
+
+	.pf-event-hero__media { max-width: none; }
+
+	.pf-event-hero__media-inner {
+		position: static;
+		height: auto;
+		display: block;
+	}
+
+	.pf-event-hero__img {
+		width: 100%;
+		max-width: 100%;
+		max-height: none;
+	}
+}
+
+/* Mobile seul : carte du lieu réduite. */
+@media (max-width: 767px) {
+	.pf-event-venue__map { height: 260px; }
+}

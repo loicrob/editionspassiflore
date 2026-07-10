@@ -751,161 +751,15 @@
 }
 
 
-/* ─── Layout sections ────────────────────────────────────────── */
-
-.bs-body {
-	display: grid;
-	grid-template-columns: 160px minmax(0, 1fr);
-	gap: var(--pf-space-12);
-	align-items: start;
-	padding: var(--pf-space-12) 0 var(--pf-space-16);
-}
-
-/* ─── Nav latérale sticky — ligne de progression + points ─────── */
-
-.bs-sectionnav {
-	position: sticky;
-	top: calc(var(--pf-sticky-offset, 0px) + 2rem);
-	display: flex;
-	flex-direction: column;
-	padding-left: var(--pf-space-5);
-}
-
-.bs-sectionnav::before {
-	content: '';
-	position: absolute;
-	left: 0.38rem;
-	top: 0.7rem;
-	bottom: 0.7rem;
-	width: 1px;
-	background: var(--pf-border);
-}
-
-/* Liens de nav : reprennent la voix « étiquette » (petites capitales espacées),
-   décrochée de .pf-label pour ne pas hériter de son ton atténué ; couleur + layout + états. */
-.bs-sectionnav a {
-	position: relative;
-	display: block;
-	padding: 0.45em 0;
-	font-family: var(--pf-font-body);
-	font-size: var(--pf-text-xs);
-	font-weight: var(--pf-weight-normal);
-	text-transform: uppercase;
-	letter-spacing: 0.1em;
-	line-height: 1.2;
-	color: var(--pf-text);
-	text-decoration: none;
-	transition: color 0.15s;
-}
-
-.bs-sectionnav a::before {
-	content: '';
-	position: absolute;
-	left: -1.0625rem;
-	top: 50%;
-	transform: translateY(-50%);
-	width: 7px;
-	height: 7px;
-	border-radius: 50%;
-	border: 1.5px solid var(--pf-border);
-	background: var(--pf-cream-dark);
-	transition: border-color 0.2s, background 0.2s;
-}
-
-.bs-sectionnav a:hover {
-	color: var(--pf-accent);
-}
-
-.bs-sectionnav a.is-active {
-	color: var(--pf-accent);
-	font-weight: 600;
-}
-
-.bs-sectionnav a.is-active::before,
-.bs-sectionnav a:hover::before {
-	border-color: var(--pf-accent);
-	background: var(--pf-accent);
-}
-
-/* Mobile : nav horizontale sticky en haut */
-@media (max-width: 599px) {
-	.bs-body {
-		display: block;
-	}
-
-	.bs-sectionnav {
-		position: sticky;
-		top: var(--pf-sticky-offset, 0px);
-		flex-direction: row;
-		overflow-x: auto;
-		white-space: nowrap;
-		scrollbar-width: none;
-		background: var(--pf-cream-dark);
-		border-bottom: 1px solid var(--pf-border);
-		padding-left: 0;
-		z-index: 100;
-	}
-
-	/* Effet « aéro » au scroll — voir le bloc « Éléments sticky » de style.css. */
-	@supports ((backdrop-filter: blur(2px)) or (-webkit-backdrop-filter: blur(2px))) {
-		.bs-sectionnav {
-			background: rgba(245, 240, 232, 0.9); /* --pf-cream-dark translucide */
-			-webkit-backdrop-filter: blur(var(--pf-aero-blur));
-			backdrop-filter: blur(var(--pf-aero-blur));
-		}
-	}
-
-	.bs-sectionnav::-webkit-scrollbar { display: none; }
-
-	.bs-sectionnav::before { display: none; }
-
-	.bs-sectionnav a {
-		padding: 0.6em 1em;
-		border-bottom: 2px solid transparent;
-	}
-
-	.bs-sectionnav a::before { display: none; }
-
-	.bs-sectionnav a.is-active,
-	.bs-sectionnav a:hover {
-		border-bottom-color: var(--pf-accent);
-	}
-}
-
-
-/* ─── Sections ───────────────────────────────────────────────── */
-
-.bs-section {
-	padding-top: var(--pf-space-6);
-	padding-bottom: var(--pf-space-10);
-	border-bottom: 1px solid var(--pf-border);
-	scroll-margin-top: calc(var(--pf-sticky-offset, 0px) + 1rem);
-}
-
-.bs-section:last-child {
-	border-bottom: none;
-}
-
-/* Titre de section : la voix typo vient de la règle h2 globale (style.css) ;
-   ici on ne garde que la couleur et la marge contextuelles. */
-.bs-section__title {
-	color: var(--pf-text);
-	margin: 0 0 var(--pf-space-5);
-}
+/* Layout à sections : composant partagé « Section-nav » dans style.css
+   (.pf-body / .pf-sectionnav / .pf-section). Ne restent ici que les styles
+   de contenu propres à la fiche livre. */
 
 .bs-section__body {
 	font-size: 0.95rem;
 	line-height: 1.7;
 	color: var(--pf-heading);
 }
-
-/* scroll-margin-top mobile : header + nav horizontale */
-@media (max-width: 599px) {
-	.bs-section {
-		scroll-margin-top: calc(var(--pf-sticky-offset, 0px) + 3rem);
-	}
-}
-
 
 /* ─── Auteurs : wrapper carte + rôle ─────────────────────────── */
 
@@ -947,12 +801,12 @@
 	padding: var(--pf-space-3) 0.85rem var(--pf-space-4);
 }
 
-/* Dégradés scroll (override couleur events.css) */
-.bs-tab-auteurs .pf-event-tiles-wrap::before {
+/* Dégradés scroll (override couleur — .pf-scroll-fade est global, style.css) */
+.bs-tab-auteurs .pf-scroll-fade::before {
 	background: linear-gradient(to right, var(--pf-surface-alt), transparent);
 }
 
-.bs-tab-auteurs .pf-event-tiles-wrap::after {
+.bs-tab-auteurs .pf-scroll-fade::after {
 	background: linear-gradient(to left, var(--pf-surface-alt), transparent);
 }
 

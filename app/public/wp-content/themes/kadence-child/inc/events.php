@@ -60,7 +60,17 @@ function passiflore_get_auteurs_present_label( $term_ids ) {
     return $all_feminin ? 'Autrices présentes' : 'Auteurs présents';
 }
 
-function passiflore_render_event_participants( $event_id, $mode = 'link' ) {
+// Jointure "X, Y et Z" partagée par la phrase pf-event-participants (day view, single event)
+// et la valeur "Personnes présentes" des tiles liste/recherche (voir passiflore_render_event_card_meta).
+function passiflore_join_with_et( array $parts ) {
+    if ( empty( $parts ) ) return '';
+    if ( count( $parts ) === 1 ) return $parts[0];
+    if ( count( $parts ) === 2 ) return $parts[0] . ' et ' . $parts[1];
+    $last = array_pop( $parts );
+    return implode( ', ', $parts ) . ' et ' . $last;
+}
+
+function passiflore_get_event_participant_parts( $event_id, $mode = 'link' ) {
     $passiflore_participe = (bool) get_field( 'passiflore_participe', $event_id );
     $rows                 = get_field( 'personnes_participant_a_l’evenement', $event_id );
     if ( ! is_array( $rows ) ) $rows = [];
@@ -95,23 +105,90 @@ function passiflore_render_event_participants( $event_id, $mode = 'link' ) {
         }
     }
 
-    $lines = [];
+    return $parts;
+}
 
-    if ( ! empty( $parts ) ) {
-        if ( count( $parts ) === 1 ) {
-            $joined = $parts[0];
-        } elseif ( count( $parts ) === 2 ) {
-            $joined = $parts[0] . ' et ' . $parts[1];
-        } else {
-            $last   = array_pop( $parts );
-            $joined = implode( ', ', $parts ) . ' et ' . $last;
-        }
-        $lines[] = '<p>Présence de ' . $joined . '.</p>';
+function passiflore_render_event_participants( $event_id, $mode = 'link' ) {
+    $parts = passiflore_get_event_participant_parts( $event_id, $mode );
+    if ( empty( $parts ) ) return '';
+
+    return '<div class="pf-event-participants"><p>Présence de ' . passiflore_join_with_et( $parts ) . '.</p></div>';
+}
+
+/**
+ * Contenu principal d'un événement pour les tiles (liste + recherche) : texte aplati
+ * (balises de bloc retirées) avec gras/italique conservés. Pas de découpe en PHP —
+ * la troncature à 2 lignes est purement visuelle (.pf-card-text--clamp-2 en CSS).
+ *
+ * @param WP_Post $event Objet event décoré par tribe_get_event() (post_content natif conservé).
+ */
+function passiflore_render_event_description_text( $event ) {
+    $content = (string) $event->post_content;
+    if ( '' === trim( $content ) ) return '';
+
+    if ( function_exists( 'excerpt_remove_blocks' ) ) {
+        $content = excerpt_remove_blocks( $content );
     }
 
-    if ( empty( $lines ) ) return '';
+    // Shortcodes retirés bruts (pas exécutés) — même logique que tribe_events_get_the_excerpt().
+    $content = preg_replace( '#\[.+\]#U', '', $content );
 
-    return '<div class="pf-event-participants">' . implode( '', $lines ) . '</div>';
+    $content = wp_kses( $content, [
+        'strong' => [],
+        'b'      => [],
+        'em'     => [],
+        'i'      => [],
+    ] );
+
+    return trim( preg_replace( '/\s+/', ' ', $content ) );
+}
+
+/**
+ * Bloc Lieu / Organisateur / Personnes présentes des tiles (liste + recherche), en
+ * remplacement de l'adresse complète rendue nativement par TEC (list/event/venue.php).
+ * Pattern lieu = nom + ville, identique à Passiflore_Event_Tiles::render_tile() (tuiles
+ * auteurs/accueil) — pas l'adresse complète.
+ *
+ * @param WP_Post $event Objet event décoré par tribe_get_event() (->venues, ->organizer_names).
+ */
+function passiflore_render_event_card_meta( $event ) {
+    $icons = [
+        'lieu'         => '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960" fill="currentColor" aria-hidden="true"><path d="M480-186q122-112 181-203.5T720-552q0-109-69.5-178.5T480-800q-101 0-170.5 69.5T240-552q0 71 59 162.5T480-186Zm-28 74q-14-5-25-15-65-60-115-117t-83.5-110.5q-33.5-53.5-51-103T160-552q0-150 96.5-239T480-880q127 0 223.5 89T800-552q0 45-17.5 94.5t-51 103Q698-301 648-244T533-127q-11 10-25 15t-28 5q-14 0-28-5Zm28-448Zm56.5 56.5Q560-527 560-560t-23.5-56.5Q513-640 480-640t-56.5 23.5Q400-593 400-560t23.5 56.5Q447-480 480-480t56.5-23.5Z"/></svg>',
+        'organisateur' => '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960" fill="currentColor" aria-hidden="true"><path d="M287-527q-47-47-47-113t47-113q47-47 113-47t113 47q47 47 47 113t-47 113q-47 47-113 47t-113-47ZM80-240v-32q0-33 17-62t47-44q58-29 120-45.5T391-440q17 0 28.5 12t11.5 29q0 17-11.5 28.5T391-359q-56 0-108.5 14T180-306q-10 5-15 14t-5 20v32h231q17 0 28.5 11.5T431-200q0 17-11.5 28.5T391-160H160q-33 0-56.5-23.5T80-240Zm554 88-6-28q-12-5-22.5-10.5T584-204l-29 9q-13 4-25.5-1T510-212l-8-14q-7-12-5-26t13-23l22-19q-2-14-2-26t2-26l-22-19q-11-9-13-22.5t5-25.5l9-15q7-11 19-16t25-1l29 9q11-8 21.5-13.5T628-460l6-29q3-14 13.5-22.5T672-520h16q14 0 24.5 9t13.5 23l6 28q12 5 22.5 11t21.5 15l27-9q14-5 27 0t20 17l8 14q7 12 5 26t-13 23l-22 19q2 12 2 25t-2 25l22 19q11 9 13 22.5t-5 25.5l-9 15q-7 11-19 16t-25 1l-29-9q-11 8-21.5 13.5T732-180l-6 29q-3 14-13.5 22.5T688-120h-16q-14 0-24.5-9T634-152Zm102.5-111.5Q760-287 760-320t-23.5-56.5Q713-400 680-400t-56.5 23.5Q600-353 600-320t23.5 56.5Q647-240 680-240t56.5-23.5Zm-280-320Q480-607 480-640t-23.5-56.5Q433-720 400-720t-56.5 23.5Q320-673 320-640t23.5 56.5Q367-560 400-560t56.5-23.5ZM400-640Zm12 400Z"/></svg>',
+        'presence'     => '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960" fill="currentColor" aria-hidden="true"><path d="M360-120v-489q-83-22-135.5-88T162-847q-2-14 10-23.5t28-9.5q16 0 28 8.5t14 23.5q11 72 62 120t126 48h100q30 0 56 11t47 32l153 153q11 11 11 28t-11 28q-11 11-28 11t-28-11L600-558v438q0 17-11.5 28.5T560-80q-17 0-28.5-11.5T520-120v-200h-80v200q0 17-11.5 28.5T400-80q-17 0-28.5-11.5T360-120Zm63.5-623.5Q400-767 400-800t23.5-56.5Q447-880 480-880t56.5 23.5Q560-833 560-800t-23.5 56.5Q513-720 480-720t-56.5-23.5Z"/></svg>',
+    ];
+
+    $rows = [];
+
+    if ( $event->venues->count() ) {
+        $venue = $event->venues[0];
+        $lieu  = array_filter( [ (string) $venue->post_title, (string) $venue->city ] );
+        if ( $lieu ) $rows[] = [ 'icon' => 'lieu', 'label' => 'Lieu', 'value' => implode( ', ', $lieu ) ];
+    }
+
+    $organisateurs = array_filter( $event->organizer_names->all() );
+    if ( $organisateurs ) $rows[] = [ 'icon' => 'organisateur', 'label' => 'Organisateur', 'value' => implode( ', ', $organisateurs ) ];
+
+    if ( function_exists( 'passiflore_get_event_participant_parts' ) ) {
+        $parts = passiflore_get_event_participant_parts( $event->ID, 'text' );
+        if ( $parts ) $rows[] = [ 'icon' => 'presence', 'label' => 'Participants', 'value' => passiflore_join_with_et( $parts ) ];
+    }
+
+    if ( empty( $rows ) ) return '';
+
+    ob_start();
+    ?>
+    <div class="pf-event-card-meta">
+        <?php foreach ( $rows as $row ) : ?>
+        <p class="pf-event-card-meta-row">
+            <span class="pf-event-card-meta-icon"><?php echo $icons[ $row['icon'] ]; ?></span>
+            <span class="pf-label"><?php echo esc_html( $row['label'] ); ?></span>
+            <span class="pf-card-text"><?php echo esc_html( $row['value'] ); ?></span>
+        </p>
+        <?php endforeach; ?>
+    </div>
+    <?php
+    return ob_get_clean();
 }
 
 function passiflore_render_event_participants_tiles( int $event_id ): string {
@@ -126,13 +203,12 @@ function passiflore_render_event_participants_tiles( int $event_id ): string {
     ob_start();
 
     echo '<div class="pf-event-presence-tiles">';
-    echo '<h5 class="pf-event-section-titre">Présence de</h5>';
-    echo '<div class="pf-event-tiles-wrap"><div class="pf-event-auteurs-scroll pf-event-tiles-scroll pf-hscroll">';
+    echo '<div class="pf-scroll-fade"><div class="pf-event-auteurs-scroll pf-event-tiles-scroll pf-hscroll">';
 
     if ( $passiflore_participe ) {
         echo '<div class="pf-card pf-card--static pf-auteur-card pf-card--compact pf-auteur-card--passiflore">';
         echo '<div class="pf-auteur-photo"><img src="' . esc_url( content_url( 'uploads/2026/04/cropped-icone.png' ) ) . '" alt="" aria-hidden="true" /></div>';
-        echo '<div class="pf-card-content"><span class="pf-card-title"><span class="pf-auteur-nom-de-famille">Passiflore</span></span><p class="pf-card-text">Un ou plusieurs membres de l’équipe seront présents.</p></div>';
+        echo '<div class="pf-card-content"><span class="pf-card-title"><span class="pf-auteur-nom-de-famille">Passiflore</span></span><p class="pf-card-text">Une ou plusieurs personnes de l’équipe seront présentes.</p></div>';
         echo '</div>';
     }
 
@@ -159,11 +235,8 @@ function passiflore_render_event_participants_tiles( int $event_id ): string {
     return ob_get_clean();
 }
 
-function passiflore_inject_participants_after_content() {
-    if ( ! is_singular( 'tribe_events' ) ) return;
-    echo passiflore_render_event_participants_tiles( get_the_ID() );
-}
-add_action( 'tribe_events_single_event_after_the_content', 'passiflore_inject_participants_after_content', 5 );
+// Rendu en section « Présence » via l'override tribe-events/single-event.php
+// (passiflore_render_event_sections, inc/event-single.php) — plus d'injection après le contenu.
 
 /**
  * Tableau "Jour -> horaire" sous le hero, uniquement si l'evenement a un planning
@@ -176,7 +249,6 @@ function passiflore_render_event_hours( $event_id ) {
 
 	ob_start();
 	echo '<div class="pf-event-horaires">';
-	echo '<h5 class="pf-event-section-titre">Horaires</h5>';
 	echo '<ul class="pf-event-horaires-liste">';
 	foreach ( $hours as $ymd => $h ) {
 		$label = ucfirst( date_i18n( 'l j F', (int) strtotime( (string) $ymd ) ) );
@@ -190,11 +262,7 @@ function passiflore_render_event_hours( $event_id ) {
 	return ob_get_clean();
 }
 
-function passiflore_inject_hours_after_content() {
-	if ( ! is_singular( 'tribe_events' ) ) return;
-	echo passiflore_render_event_hours( get_the_ID() );
-}
-add_action( 'tribe_events_single_event_after_the_content', 'passiflore_inject_hours_after_content', 3 );
+// Rendu en section « Horaires » via l'override tribe-events/single-event.php.
 
 /**
  * Reecrit la chaine de schedule (titre / H2) pour :
@@ -220,6 +288,8 @@ add_filter( 'tribe_events_event_schedule_details', function ( $schedule, $event_
 
 	if ( $sd->format( 'Ymd' ) === $ed->format( 'Ymd' ) ) {
 		$str = ucfirst( date_i18n( 'l j F Y', $start_ts ) );
+	} elseif ( $sd->format( 'Ym' ) === $ed->format( 'Ym' ) ) {
+		$str = 'Du ' . date_i18n( 'j', $start_ts ) . ' au ' . date_i18n( 'j F Y', $end_ts );
 	} elseif ( $sd->format( 'Y' ) === $ed->format( 'Y' ) ) {
 		$str = 'Du ' . date_i18n( 'j F', $start_ts ) . ' au ' . date_i18n( 'j F Y', $end_ts );
 	} else {
@@ -282,17 +352,12 @@ function passiflore_render_event_books( $event_id ) {
 
     ob_start();
     echo '<div class="pf-event-livres">';
-    echo '<h5 class="pf-event-section-titre">Livres associés</h5>';
     echo do_shortcode( '[passiflore_etagere ids="' . implode( ',', $all_ids ) . '" mode="scroll" display="covers" nb_books_first_displayed="20"]' );
     echo '</div>';
     return ob_get_clean();
 }
 
-function passiflore_inject_books_after_content() {
-    if ( ! is_singular( 'tribe_events' ) ) return;
-    echo passiflore_render_event_books( get_the_ID() );
-}
-add_action( 'tribe_events_single_event_after_the_content', 'passiflore_inject_books_after_content', 10 );
+// Rendu en section « Livres associés » via l'override tribe-events/single-event.php.
 
 function passiflore_get_upcoming_events_for_auteur( $term_id ) {
     global $wpdb;
@@ -564,7 +629,7 @@ class Passiflore_Event_Tiles {
     public static function render_row( array $events ): string {
         if ( empty( $events ) ) return '';
         ob_start();
-        echo '<div class="pf-event-tiles-wrap">';
+        echo '<div class="pf-scroll-fade">';
         echo '<div class="pf-event-tiles-scroll pf-hscroll">';
         foreach ( $events as $event ) {
             echo self::render_tile( $event );

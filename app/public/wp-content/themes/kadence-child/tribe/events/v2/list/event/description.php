@@ -7,16 +7,17 @@
  * @var WP_Post $event The event post object with properties added by the `tribe_get_event` function.
  */
 
-$excerpt = (string) $event->excerpt;
+$description = function_exists( 'passiflore_render_event_description_text' )
+	? passiflore_render_event_description_text( $event )
+	: '';
 ?>
-<?php if ( ! empty( $excerpt ) ) : ?>
-	<div class="tribe-events-calendar-list__event-description tribe-common-b2 tribe-common-a11y-hidden">
-		<?php echo $excerpt; ?>
+<?php if ( '' !== $description ) : ?>
+	<div class="tribe-events-calendar-list__event-description pf-card-text pf-card-text--clamp-2">
+		<?php echo $description; ?>
 	</div>
 <?php endif; ?>
 
 <?php
-if ( function_exists( 'passiflore_render_event_participants' ) ) {
-	// 'text' : participants en texte simple (non cliquables) — la carte entière est le lien.
-	echo passiflore_render_event_participants( $event->ID, 'text' );
+if ( function_exists( 'passiflore_render_event_card_meta' ) ) {
+	echo passiflore_render_event_card_meta( $event );
 }

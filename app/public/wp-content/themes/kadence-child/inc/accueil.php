@@ -83,16 +83,16 @@ add_action( 'wp_enqueue_scripts', function () {
         true
     );
     wp_enqueue_script(
-        'pf-event-tiles',
-        get_stylesheet_directory_uri() . '/assets/js/event-tiles.js',
+        'pf-scroll-fade',
+        get_stylesheet_directory_uri() . '/assets/js/scroll-fade.js',
         [],
-        filemtime( get_stylesheet_directory() . '/assets/js/event-tiles.js' ),
+        filemtime( get_stylesheet_directory() . '/assets/js/scroll-fade.js' ),
         true
     );
     wp_enqueue_script(
         'pf-accueil',
         get_stylesheet_directory_uri() . '/assets/js/accueil.js',
-        [ 'splide', 'pf-event-tiles' ],
+        [ 'splide', 'pf-scroll-fade' ],
         filemtime( get_stylesheet_directory() . '/assets/js/accueil.js' ),
         true
     );

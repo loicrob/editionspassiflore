@@ -359,27 +359,8 @@ function passiflore_render_sections_layout() {
 
 	if ( empty( $sections ) ) return;
 
-	// ── Rendu ────────────────────────────────────────────────────
-	echo '<div class="bs-body">';
-
-	echo '<nav class="bs-sectionnav" aria-label="Navigation dans la fiche">';
-	foreach ( $sections as $s ) {
-		$slug = sanitize_title( $s['label'] );
-		echo '<a href="#' . esc_attr( $slug ) . '">' . esc_html( $s['label'] ) . '</a>';
-	}
-	echo '</nav>';
-
-	echo '<div class="bs-sections">';
-	foreach ( $sections as $s ) {
-		$slug = sanitize_title( $s['label'] );
-		echo '<section id="' . esc_attr( $slug ) . '" class="bs-section">';
-		echo '<h2 class="bs-section__title">' . esc_html( $s['label'] ) . '</h2>';
-		echo $s['html'];
-		echo '</section>';
-	}
-	echo '</div>';
-
-	echo '</div>';
+	// ── Rendu (composant partagé) ────────────────────────────────
+	echo pf_render_sectionnav( $sections );
 }
 
 
@@ -441,7 +422,7 @@ function passiflore_render_auteurs_section( int $id ): bool {
 	echo '<div class="bs-tab-auteurs">';
 
 	if ( $all_rows ) {
-		echo '<div class="pf-event-tiles-wrap">';
+		echo '<div class="pf-scroll-fade">';
 		echo '<div class="pf-event-auteurs-scroll pf-hscroll">';
 		foreach ( $all_rows as $r ) {
 			echo '<div class="bs-auteur-wrapper">';
@@ -1106,7 +1087,10 @@ function passiflore_avis_error_data(): array {
 }
 
 
-/* ─── JS inline ──────────────────────────────────────────────── */
+/* ─── JS inline : toggle « Voir tout » des sous-listes ────────── */
+/* Nav sticky + scrollspy + neutralisation du scroll d'ancre Kadence : désormais
+ * dans le composant partagé (assets/js/section-nav.js + inc/section-nav.php, qui
+ * pose aussi body.no-anchor-scroll). Ne reste ici que le toggle « Voir tout ». */
 
 add_action( 'wp_footer', 'passiflore_book_tabs_inline_js' );
 
@@ -1115,30 +1099,9 @@ function passiflore_book_tabs_inline_js() {
 	?>
 	<script>
 	(function () {
-		// Nav sections : surlignage du lien actif via IntersectionObserver
-		var navLinks = Array.from(document.querySelectorAll('.bs-sectionnav a[href^="#"]'));
-		var bsSections = Array.from(document.querySelectorAll('.bs-section[id]'));
-		if (navLinks.length && bsSections.length) {
-			var current = '';
-			function setActive(id) {
-				if (id === current) return;
-				current = id;
-				navLinks.forEach(function (l) {
-					l.classList.toggle('is-active', l.getAttribute('href') === '#' + id);
-				});
-			}
-			var observer = new IntersectionObserver(function (entries) {
-				entries.forEach(function (entry) {
-					if (entry.isIntersecting) setActive(entry.target.id);
-				});
-			}, { rootMargin: '-20% 0px -70% 0px', threshold: 0 });
-			bsSections.forEach(function (s) { observer.observe(s); });
-			if (bsSections[0]) setActive(bsSections[0].id);
-		}
-
 		// "Voir tout" / "Voir les n premiers" — toggle des items supplémentaires
 		document.querySelectorAll('.bs-voir-tout').forEach(function (btn) {
-			var section = btn.closest('.bs-avis-section, .bs-section');
+			var section = btn.closest('.bs-avis-section, .pf-section');
 			if (!section) return;
 
 			var extraItems = Array.from(section.querySelectorAll('.bs-item--hidden'));

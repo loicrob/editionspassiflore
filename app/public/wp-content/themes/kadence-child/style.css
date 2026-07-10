@@ -285,7 +285,7 @@ a.pf-value:hover, .pf-value-container a:hover, a.pf-value-highlight:hover, .pf-v
 h1,h2,h3,h4,h5,h6 {
     line-height: var(--pf-leading-tight);
 }
-h1 { font-family: var(--pf-font-heading); font-weight: var(--pf-weight-semibold); color: var(--pf-heading);     font-size: var(--pf-text-2xl)  !important; text-transform: none; }
+h1 { font-family: var(--pf-font-heading) !important; font-weight: var(--pf-weight-semibold) !important; color: var(--pf-heading) !important;     font-size: var(--pf-text-2xl) !important; text-transform: none !important; }
 h2 { font-family: var(--pf-font-body);    font-weight: var(--pf-weight-normal);   color: var(--pf-text-dim);    font-size: var(--pf-text-base) !important; text-transform: uppercase; letter-spacing: 0.1em; }
 h3 { font-family: var(--pf-font-body);    font-weight: var(--pf-weight-normal);   color: var(--pf-text-dim);    font-size: var(--pf-text-base) !important; }
 h4 { font-family: var(--pf-font-body);    font-weight: var(--pf-weight-normal);   color: var(--pf-text-dim);    font-size: var(--pf-text-sm)   !important; }
@@ -377,6 +377,15 @@ h6 { font-family: var(--pf-font-body);    font-weight: var(--pf-weight-normal); 
     font-size: var(--pf-text-sm);
     color: var(--pf-muted);
     margin: 0;
+}
+/* Troncature visuelle multi-lignes (points de suspension) — le texte n'est jamais
+   coupé en PHP, seule la présentation est limitée. */
+.pf-card-text--clamp-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
 }
 
 /* Carte auteur — composant. Mêmes specs quel que soit le contexte (/auteurs, présence
@@ -1017,6 +1026,298 @@ h2.pf-section-titre a::after {
 .pf-hscroll::-webkit-scrollbar { height: 6px; }
 .pf-hscroll::-webkit-scrollbar-track { background: transparent; }
 .pf-hscroll::-webkit-scrollbar-thumb { background: var(--pf-border); border-radius: 3px; }
+
+/* =========================================================
+   Ombres de bord (« scroll shadows ») — signalent qu'un scroll horizontal
+   masque du contenu de part et d'autre du conteneur. Partagé par les tuiles
+   d'événements/auteurs (accueil, fiche auteur, fiche livre) et la nav de
+   section mobile (fiche livre). JS (assets/js/scroll-fade.js) bascule
+   .is-scroll-left/.is-scroll-right sur .pf-scroll-fade selon scrollLeft/
+   scrollWidth de son enfant .pf-hscroll (ou de lui-même s'il n'y a pas
+   d'enfant .pf-hscroll — cas d'un conteneur qui scrolle lui-même).
+   Couleur du dégradé via --pf-scroll-fade-color (défaut : --pf-cream) ;
+   surcharger avec une seule déclaration selon le fond réel du contexte. ====== */
+.pf-scroll-fade {
+    position: relative;
+    --pf-scroll-fade-color: var(--pf-cream);
+}
+
+.pf-scroll-fade::before,
+.pf-scroll-fade::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 60px;
+    pointer-events: none;
+    z-index: 1;
+    opacity: 0;
+    transition: opacity 0.25s ease;
+}
+
+.pf-scroll-fade::before {
+    left: 0;
+    background: linear-gradient(to right, var(--pf-scroll-fade-color), transparent, transparent);
+}
+
+.pf-scroll-fade::after {
+    right: 0;
+    background: linear-gradient(to left, var(--pf-scroll-fade-color), transparent, transparent);
+}
+
+.pf-scroll-fade.is-scroll-left::before  { opacity: 1; }
+.pf-scroll-fade.is-scroll-right::after  { opacity: 1; }
+
+/* =========================================================
+   Section-nav — nav sticky (verticale desktop ≥1024px / horizontale sticky mobile+tablette
+   ≤1023px) + scrollspy, pour les pages à sections (fiche livre, fiche événement). Rendu PHP
+   par pf_render_sectionnav() (inc/section-nav.php) ; contrôleur assets/js/section-nav.js.
+   --pf-sectionnav-h = hauteur réelle de la barre (mesurée en JS), consommée par le
+   scroll-margin-top mobile+tablette des sections. ========================================================= */
+
+/* ─── Layout : colonne nav + colonne sections ─── */
+.pf-body {
+	display: grid;
+	grid-template-columns: 160px minmax(0, 1fr);
+	gap: var(--pf-space-12);
+	align-items: start;
+	/* padding-top réduit (space-6) : rapproche le filet de délimitation ci-dessous des
+	   sections (sinon il flotte loin sous le hero). */
+	padding: var(--pf-space-6) 0 var(--pf-space-16);
+	/* Filet de délimitation au-dessus de la zone nav + sections (passage hero → sections),
+	   pleine largeur (nav + colonne sections). */
+	border-top: 1px solid var(--pf-border);
+}
+
+/* ─── Nav latérale sticky — ligne de progression + points ─── */
+.pf-sectionnav {
+	position: sticky;
+	top: calc(var(--pf-sticky-offset, 0px) + 2rem);
+	display: flex;
+	flex-direction: column;
+	padding-left: var(--pf-space-5);
+}
+
+/* offsetParent stable pour le calcul JS de scroll flush-left (setActive) —
+   sans lien avec la mise en page (position:relative n'a pas d'effet visuel ici). */
+.pf-sectionnav__track {
+	position: relative;
+}
+
+/* Ombre de bord (.pf-scroll-fade) : wrap statique distinct de l'élément qui scrolle
+   (.pf-sectionnav__track, son enfant) — jamais le même élément, sinon le dégradé
+   (position:absolute relatif à sa propre boîte) ferait partie de la zone de scroll
+   et se déplacerait avec le contenu au lieu de rester épinglé au bord. Couleur
+   alignée sur le fond de la nav (--pf-cream-dark). */
+.pf-sectionnav .pf-scroll-fade {
+	--pf-scroll-fade-color: var(--pf-cream-dark);
+}
+
+.pf-sectionnav::before {
+	content: '';
+	position: absolute;
+	left: 0.38rem;
+	/* Demi-hauteur d'un lien (padding 0.6em + moitié de line-height 1.2) : aligne les extrémités sur le centre du 1er/dernier point plutôt que sur leur bord. */
+	top: calc(var(--pf-text-sm) * 1.2);
+	bottom: calc(var(--pf-text-sm) * 1.2);
+	width: 1px;
+	background: var(--pf-border);
+}
+
+/* Liens de nav : reprennent la voix « étiquette » (petites capitales espacées),
+   décrochée de .pf-label pour ne pas hériter de son ton atténué ; couleur + layout + états. */
+.pf-sectionnav a {
+	position: relative;
+	display: block;
+	padding: 0.6em 0;
+	font-family: var(--pf-font-body);
+	font-size: var(--pf-text-sm);
+	font-weight: var(--pf-weight-normal);
+	line-height: 1.2;
+	color: var(--pf-text);
+	text-decoration: none;
+	transition: color 0.15s;
+}
+
+.pf-sectionnav a::before {
+	content: '';
+	position: absolute;
+	left: -1.0625rem;
+	top: 50%;
+	transform: translateY(-50%);
+	width: 7px;
+	height: 7px;
+	border-radius: 50%;
+	border: 1.5px solid var(--pf-border);
+	background: var(--pf-cream-dark);
+	transition: border-color 0.2s, background 0.2s;
+}
+
+.pf-sectionnav a.is-active {
+	color: var(--pf-accent);
+	font-weight: 600;
+}
+
+.pf-sectionnav a.is-active::before {
+	border-color: var(--pf-accent);
+	background: var(--pf-accent);
+}
+
+/* :hover réservé aux pointeurs capables de survol : sur tactile, l'état hover
+   reste « collé » après un tap — le lien tapé resterait rouge indéfiniment au
+   lieu de suivre le scrollspy JS (.is-active). */
+@media (hover: hover) {
+	.pf-sectionnav a:hover {
+		color: var(--pf-accent);
+	}
+
+	.pf-sectionnav a:hover::before {
+		border-color: var(--pf-accent);
+		background: var(--pf-accent);
+	}
+}
+
+/* Mobile + tablette (≤1023px) : nav horizontale sticky en haut */
+@media (max-width: 1023px) {
+	.pf-body {
+		display: block;
+	}
+
+	.pf-sectionnav {
+		position: sticky;
+		top: var(--pf-sticky-offset, 0px);
+		background: var(--pf-cream-dark);
+		box-shadow: var(--pf-shadow-stuck);
+		z-index: 100;
+		/* Full-bleed : le fond couvre la largeur du viewport (même technique que
+		   .pf-sticky-bar), le 1er lien reste aligné sur le contenu. */
+		width: calc(100vw - var(--scrollbar-offset, 0px));
+		margin-left:  calc(50% - 50vw + var(--scrollbar-offset, 0px) / 2);
+		margin-right: calc(50% - 50vw + var(--scrollbar-offset, 0px) / 2);
+		padding-left:  calc(50vw - 50% - var(--scrollbar-offset, 0px) / 2);
+		padding-right: calc(50vw - 50% - var(--scrollbar-offset, 0px) / 2);
+		box-sizing: border-box;
+		/* Masquée tant que le haut de la 1ère section n'a pas atteint le haut de
+		   l'écran (JS : section-nav.js, classe .is-visible) — évite qu'elle
+		   apparaisse dès la sortie du hero, avant le contenu qu'elle indexe. */
+		transform: translateY(-100%);
+		opacity: 0;
+		pointer-events: none;
+		transition: transform 0.25s ease, opacity 0.25s ease;
+	}
+
+	.pf-sectionnav.is-visible {
+		transform: translateY(0);
+		opacity: 1;
+		pointer-events: auto;
+	}
+
+	/* Effet « aéro » au scroll — voir le bloc « Éléments sticky ». */
+	@supports ((backdrop-filter: blur(2px)) or (-webkit-backdrop-filter: blur(2px))) {
+		.pf-sectionnav {
+			background: color-mix(in srgb, var(--pf-surface-alt) 90%, transparent);
+			-webkit-backdrop-filter: blur(var(--pf-aero-blur));
+			backdrop-filter: blur(var(--pf-aero-blur));
+		}
+	}
+
+	/* Le défilement horizontal vit sur .pf-sectionnav__track (pas sur .pf-sectionnav
+	   lui-même) : ce dernier est full-bleed (100vw), donc si LUI portait l'overflow,
+	   le clip du scroll se ferait à la largeur de l'écran plutôt qu'à celle du
+	   conteneur visuel — les liens voisins dépasseraient dans la zone de bleed. */
+	.pf-sectionnav__track {
+		display: flex;
+		flex-direction: row;
+		overflow-x: auto;
+		white-space: nowrap;
+		scrollbar-width: none;
+	}
+
+	.pf-sectionnav__track::-webkit-scrollbar { display: none; }
+
+	.pf-sectionnav::before { display: none; }
+
+	.pf-sectionnav a {
+		padding: 0.6em 1em;
+		border-bottom: 2px solid transparent;
+	}
+
+	.pf-sectionnav a::before { display: none; }
+
+	.pf-sectionnav a.is-active {
+		border-bottom-color: var(--pf-accent);
+	}
+}
+
+/* :hover tactile — voir le commentaire de la règle desktop équivalente plus haut. */
+@media (max-width: 1023px) and (hover: hover) {
+	.pf-sectionnav a:hover {
+		border-bottom-color: var(--pf-accent);
+	}
+}
+
+/* ─── Sections ─── */
+.pf-section {
+	padding-top: var(--pf-space-6);
+	padding-bottom: var(--pf-space-10);
+	/* Filet de séparation porté par le HAUT de la section (pas le bas) : ainsi il
+	   appartient à la section qu'il précède → sur la fiche événement, le filet au-dessus
+	   de Présence (section pleine largeur) court sur toute la largeur, alors qu'un
+	   border-bottom sur la dernière section (étroite) du topsec ne le ferait pas. */
+	border-top: 1px solid var(--pf-border);
+	/* -var(--pf-adminbar) : voir la note du bloc mobile plus bas (double comptage de
+	   la barre d'admin WP). No-op déconnecté (--pf-adminbar:0px). */
+	scroll-margin-top: calc(var(--pf-sticky-offset, 0px) + 1rem - var(--pf-adminbar, 0px));
+}
+
+.pf-section:first-child {
+	border-top: none;
+}
+
+/* Desktop (≥1024px, nav verticale à gauche) : la 1re section ET le 1er lien de nav
+   collent au haut de leur colonne (padding-top retiré) → le 1er item de nav s'aligne
+   sur le titre de la 1re section. Conservé en mobile+tablette (nav horizontale sticky
+   au-dessus). */
+@media (min-width: 1024px) {
+	.pf-section:first-child {
+		padding-top: 0;
+	}
+	.pf-sectionnav a:first-child {
+		padding-top: 0;
+	}
+	/* Le 1er lien perd son padding-top → sa boîte devient asymétrique et le point,
+	   centré sur la boîte (top:50% = 0.9×sm), tomberait trop bas par rapport au TEXTE
+	   (centré à 0.6×sm = mi-hauteur de ligne). On recentre le point sur le texte, et on
+	   aligne le haut de la ligne dessus (espacement des points redevenu uniforme). Le
+	   bas de la ligne ne bouge pas (dernier lien symétrique). */
+	.pf-sectionnav a:first-child::before {
+		top: calc(var(--pf-text-sm) * 0.6);
+	}
+	.pf-sectionnav::before {
+		top: calc(var(--pf-text-sm) * 0.6);
+	}
+}
+
+/* Titre de section : la voix typo vient de la règle h2 globale ; ici on ne garde
+   que la couleur et la marge contextuelles. */
+.pf-section__title {
+	color: var(--pf-text);
+	margin: 0 0 var(--pf-space-5);
+}
+
+/* scroll-margin-top mobile : header + nav horizontale sticky. On cale le SÉPARATEUR
+   (border-top de la section cible = haut de sa boîte) pile sous la nav → somme
+   header + hauteur nav ; le titre suit avec son padding-top (space-6).
+   --pf-sectionnav-h = hauteur réelle de la barre, mesurée en JS.
+   -var(--pf-adminbar) : quand la barre d'admin WP est présente (édition connectée),
+   sa hauteur est déjà comptée dans --pf-sticky-offset ET le navigateur la rajoute via
+   html{margin-top} en résolvant l'ancre → double comptage. On la retire une fois.
+   Déconnecté (--pf-adminbar:0px = les visiteurs), no-op. */
+@media (max-width: 1023px) {
+	.pf-section {
+		scroll-margin-top: calc(var(--pf-sticky-offset, 0px) + var(--pf-sectionnav-h, 36px) - var(--pf-adminbar, 0px));
+	}
+}
 
 /* =========================================================
    Switch segmenté — conteneur bordé + segments ; actif = rouge translucide.

@@ -36,12 +36,11 @@ $event_classes = tribe_get_post_class( [ 'tribe-events-calendar-list__event', 't
 				<header class="tribe-events-calendar-list__event-header">
 					<?php $this->template( 'list/event/title', [ 'event' => $event ] ); ?>
 					<?php $this->template( 'list/event/date', [ 'event' => $event ] ); ?>
-					<?php $this->template( 'list/event/venue', [ 'event' => $event ] ); ?>
-					<?php $this->template( 'list/event/category', [ 'event' => $event ] ); ?>
 				</header>
 
+				<?php // Lieu (nom+ville)/organisateur/participants : rendus par description.php (pf-event-card-meta),
+				// pas par TEC — adresse complète, catégories et coût natifs volontairement supprimés. ?>
 				<?php $this->template( 'list/event/description', [ 'event' => $event ] ); ?>
-				<?php $this->template( 'list/event/cost', [ 'event' => $event ] ); ?>
 
 			</div>
 		</article>

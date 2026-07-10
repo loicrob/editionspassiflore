@@ -109,6 +109,15 @@ function pf_event_is_sentinel_time( string $his ): bool {
 }
 
 /**
+ * Format compact d'une heure ("18h", "18h30") : les minutes ne s'affichent que si non nulles.
+ * Utilise pour l'affichage des heures dans la liste des evenements (natives TEC et
+ * horaires par jour custom), afin que les deux sources rendent le meme format.
+ */
+function pf_event_format_hm( int $hour, int $minute ): string {
+	return $minute ? sprintf( '%dh%02d', $hour, $minute ) : sprintf( '%dh', $hour );
+}
+
+/**
  * Lit les bornes natives + applique la convention sentinelle.
  *
  * @return array{allday:bool,start:?string,end:?string}

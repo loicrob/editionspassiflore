@@ -417,6 +417,58 @@
     text-decoration: underline;
 }
 
+/* TEC ne pose `margin-top` sur la description (tiles liste + recherche) qu'à partir du
+   breakpoint medium (`.tribe-common--breakpoint-medium .tribe-events-calendar-list__event-description`) ;
+   en dessous, le reset `.tribe-common div{margin:0}` (0,1,1) s'applique seul → pas d'écart
+   sous le titre en mobile. Réimposé ici sans condition de largeur, même valeur que
+   .pf-event-card-meta pour un rythme vertical cohérent dans la carte.
+   Ce même sélecteur TEC (medium+) impose aussi `display:block !important`, qui écrase
+   `display:-webkit-box` de .pf-card-text--clamp-2 (style.css, une classe, sans !important) —
+   même en y ajoutant !important, sa spécificité (0,1,0) perd contre celle de TEC (0,3,0)
+   quand les deux sont !important (la spécificité tranche avant l'ordre des règles). Ancestor
+   qualifié pour dépasser confortablement TEC sur les deux propriétés. */
+.tribe-events-calendar-list__event-wrapper.pf-card .tribe-events-calendar-list__event-description.pf-card-text.pf-card-text--clamp-2 {
+    margin-top: var(--tec-spacer-2, 0.8rem) !important;
+    display: -webkit-box !important;
+}
+
+/* Bloc Lieu/Organisateur/Personnes présentes des tiles liste + recherche (rendu par
+   passiflore_render_event_card_meta) — porte le filet qui séparait auparavant
+   .pf-event-participants seul, puisque celui-ci n'est plus qu'une ligne parmi d'autres ici. */
+.pf-event-card-meta {
+    margin-top: var(--tec-spacer-3, 1rem) !important;
+    padding-top: var(--tec-spacer-3, 0.9rem) !important;
+    border-top: 1px solid var(--pf-border) !important;
+    display: flex;
+    flex-direction: column;
+    gap: var(--tec-spacer-1, 0.5rem);
+}
+.pf-event-card-meta-row {
+    margin: 0 !important;
+    display: grid;
+    grid-template-columns: auto 1fr;
+    align-items: center;
+    column-gap: 0.5rem;
+}
+.pf-event-card-meta-icon {
+    grid-row: 1 / 3;
+    width: 1.4rem;
+    height: 1.4rem;
+    color: var(--pf-muted);
+}
+.pf-event-card-meta-icon svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+.pf-event-card-meta-row .pf-label,
+.pf-event-card-meta-row .pf-card-text {
+    grid-column: 2;
+}
+.pf-event-card-meta-row .pf-label {
+    font-size: var(--pf-text-xs);
+}
+
 /* Titres des sections (Auteurs présents, Personnes présentes…) */
 .pf-event-section-titre {
     color: var(--tec-color-text-primary);
@@ -521,13 +573,17 @@
     }
 }
 
-/* ── Mobile (base) : image en haut, format tuile (16/9, recadrée cover) ── */
+/* ── Mobile (base) : image en haut, format tuile (16/9, recadrée cover) ──
+   Plein-cadre (bleed) : marges négatives = padding de .pf-card sur les 3 côtés qui
+   touchent le bord (haut/gauche/droite), largeur compensée d'autant. Pas de rayon propre :
+   .pf-card (overflow:hidden + border-radius, style.css) clippe déjà l'image à sa forme. */
 .tribe-events-calendar-list__event-wrapper.pf-card .tribe-events-calendar-list__event-featured-image-wrapper {
-    width: 100%;
+    width: calc(100% + var(--pf-space-5) * 2);
+    margin: calc(var(--pf-space-5) * -1) calc(var(--pf-space-5) * -1) 0;
     aspect-ratio: 16 / 9;
     min-height: 0;
     overflow: hidden;
-    border-radius: var(--pf-radius-card);
+    border-radius: 0;
 }
 .tribe-events-calendar-list__event-wrapper.pf-card .tribe-events-calendar-list__event-featured-image {
     position: static !important;
@@ -555,6 +611,7 @@
     flex: 0 0 34%;
     max-width: 360px;
     width: auto;
+    margin: 0; /* annule le bleed négatif du mobile (règle de base, non redéclarée sinon) */
     aspect-ratio: auto;
     min-height: 180px;
     overflow: hidden;
@@ -638,6 +695,12 @@ h3:has(> .tribe-events-calendar-list__month-separator-text) {
     }
 }
 
+.tribe-events-calendar-list__event-date-tag {
+    display: flex;
+    flex-direction: column;
+    gap: var(--pf-space-2);
+}
+
 .tribe-events .tribe-events-calendar-list__event-date-tag-datetime {
     height: auto;
 }
@@ -649,7 +712,33 @@ h3:has(> .tribe-events-calendar-list__month-separator-text) {
     color: var(--tec-color-text-secondary, #888);
     text-align: center;
     margin-top: 3px;
+}
+
+/* Ordinateur : le séparateur et l'heure de fin restent solidaires (une seule
+   ligne « hh – hh », ou tous les deux ensemble sur une 2e ligne si ça ne tient pas). */
+.tribe-events-calendar-list__event-date-tag-time-end {
     white-space: nowrap;
+}
+
+.tribe-events-calendar-list__event-date-tag-time-sep {
+    line-height: 0.4;
+}
+
+/* Mobile + tablette : la colonne date-tag est trop étroite pour « hh – hh » — dès qu'un
+   retour à la ligne est nécessaire, heure de début / séparateur / heure de fin se
+   répartissent chacun sur leur propre ligne plutôt que de partager une 2e ligne à deux. */
+@media (max-width: 1023px) {
+    .tribe-events-calendar-list__event-date-tag-time {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+
+    .tribe-events-calendar-list__event-date-tag-time-end {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
 }
 
 .tribe-events-calendar-list__event-date-tag-separator {
@@ -676,7 +765,6 @@ h3:has(> .tribe-events-calendar-list__month-separator-text) {
 .pf-event-presence-tiles {
     margin-top: var(--tec-spacer-3);
     padding-top: var(--tec-spacer-3);
-    border-top: 1px solid var(--tec-color-border-default);
 }
 
 .pf-event-presence-tiles .pf-event-section-titre {
@@ -708,42 +796,13 @@ h3:has(> .tribe-events-calendar-list__month-separator-text) {
 .pf-event-livres {
     margin-top: var(--tec-spacer-3);
     padding-top: var(--tec-spacer-3);
-    border-top: 1px solid var(--tec-color-border-default);
 }
 
 /* =============================================================================
    Event tiles — composant partagé
    ============================================================================= */
 
-.pf-event-tiles-wrap {
-    position: relative;
-}
-
-.pf-event-tiles-wrap::before,
-.pf-event-tiles-wrap::after {
-    content: '';
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    width: 60px;
-    pointer-events: none;
-    z-index: 1;
-    opacity: 0;
-    transition: opacity 0.25s ease;
-}
-
-.pf-event-tiles-wrap::before {
-    left: 0;
-    background: linear-gradient(to right, var(--pf-cream), transparent, transparent)
-}
-
-.pf-event-tiles-wrap::after {
-    right: 0;
-    background: linear-gradient(to left, var(--pf-cream), transparent, transparent);
-}
-
-.pf-event-tiles-wrap.pf-scroll-left::before  { opacity: 1; }
-.pf-event-tiles-wrap.pf-scroll-right::after  { opacity: 1; }
+/* Ombres de bord (scroll shadows) : composant global .pf-scroll-fade (style.css). */
 
 .pf-event-tiles-scroll {
     display: flex;
@@ -867,6 +926,7 @@ h3:has(> .tribe-events-calendar-list__month-separator-text) {
     margin: 0.75rem 0 0;
     padding: 0;
     max-width: 420px;
+    padding-left: 0 !important;
 }
 
 .pf-event-horaire {

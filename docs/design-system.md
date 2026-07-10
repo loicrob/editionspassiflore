@@ -233,6 +233,24 @@ Hors échelle assumés : `999px` (pilules `.pf-badge`, chips), `50%` (boutons ro
 
 **Gotcha TEC** : le reset `.tribe-common *` (0,1,0, chargé après style.css) écrase les composants globaux (0,1,0) sur les pages événements → shims (0,2,0) dans events.css, mêmes tokens (cf. switch Liste/Mois).
 
+### B.9 `.pf-scroll-fade` — ombres de bord (2026-07-09, globalisation)
+
+Le composant existait déjà (tuiles événements/auteurs sur accueil, fiche auteur, fiche livre) mais vivait dans `events.css` sous le nom `.pf-event-tiles-wrap`, couplé aux classes JS `pf-scroll-left`/`pf-scroll-right`. Remonté dans `style.css` sous un nom générique car réutilisé sur un 4ᵉ contexte sans rapport avec les événements (nav de section mobile, fiche livre).
+
+- **Composant** : `.pf-scroll-fade` (`position:relative` + `::before`/`::after` en dégradé, 60px, épinglés aux bords) — voir `style.css`. Couleur via la variable locale `--pf-scroll-fade-color` (défaut `--pf-cream`), surchargeable en une ligne selon le fond du contexte (ex. `.bs-tab-auteurs .pf-scroll-fade`, `.pf-sectionnav .pf-scroll-fade`).
+- **États** : `.is-scroll-left` / `.is-scroll-right`, bascules par `assets/js/scroll-fade.js` (ex-`event-tiles.js`, renommé) selon `scrollLeft`/`scrollWidth`/`clientWidth` de `wrap.firstElementChild`.
+- ⚠️ **`.pf-scroll-fade` (le wrap) ne doit JAMAIS être aussi l'élément qui scrolle** — piège rencontré en l'appliquant directement sur `.pf-sectionnav__track` (nav de section mobile, structure à un seul élément à l'origine) : un pseudo-élément `position:absolute` dont le *containing block* est l'élément `overflow:auto` lui-même fait partie de sa propre zone de scroll (le dégradé se déplaçait avec le contenu au lieu de rester épinglé). Le wrap doit rester `overflow:visible` (jamais scrollable), l'élément qui scrolle est toujours son **enfant direct unique** (`firstElementChild`) — structure à deux éléments dans les 4 usages actuels. Vérifié : `getComputedStyle(wrap).overflowX === 'visible'` + `getBoundingClientRect()` du wrap identique avant/après scroll du enfant (la valeur *déclarée* `left:0` ne suffit pas à le prouver, elle ne bouge jamais qu'on soit épinglé ou non — seule la position réellement rendue le montre).
+- Script handle renommé `pf-event-tiles` → `pf-scroll-fade` (enqueue : `functions.php` ×2, `inc/accueil.php`).
+
+### B.10 `.pf-sectionnav` — nav à sections partagée (2026-07-09, extraction)
+
+Le layout « nav sticky + scrollspy » de la fiche livre (préfixe legacy `bs-*`) a été **extrait en composant partagé** `style.css` quand la fiche événement en a eu besoin (motif désormais sur ≥ 2 pages → règle #2 du design-system). La fiche livre a été migrée `bs-*` → `pf-*` dans la foulée (rendu identique, vérifié par captures).
+
+- **Composant** : `.pf-body` (grille `160px | 1fr` sur desktop ≥1024px, empilée sur mobile+tablette) contenant `nav.pf-sectionnav` (verticale sticky à points + ligne de progression sur desktop ≥1024px ; barre horizontale sticky full-bleed « aéro » sur mobile+tablette ≤1023px, masquée jusqu'au scroll via `.is-visible`) + `.pf-sections` (`section.pf-section` à `scroll-margin-top` = header + nav). Point de bascule = breakpoint 1024 du design-system (relevé de 599 le 2026-07-10 pour inclure la tablette). Voir `style.css` (« Section-nav »).
+- **Rendu PHP** (`inc/section-nav.php`, **découplé**) : `pf_sectionnav_bar($sections)` (la barre `<nav>` + primer inline `--pf-sticky-offset`/`--pf-sectionnav-h`, `''` si < 3 sections) et `pf_sectionnav_sections($sections)` (les blocs `<section class="pf-section">`), avec ancre/id = `sanitize_title($label)`. `pf_render_sectionnav($sections)` (fiche livre) les combine dans `.pf-body` (nav + sections) si ≥ 3, sinon les sections seules pleine largeur. La fiche événement les compose en **2 zones** (nav commune, sections top/bot) via `passiflore_get_event_sections_parts()` — cf. CLAUDE.md. Le découplage sert justement à ré-utiliser UNE barre qui liste toutes les sections tout en rendant celles-ci dans plusieurs conteneurs. Pose aussi `body.no-anchor-scroll` (neutralise le scroll d'ancre de Kadence).
+- **Contrôleur JS** : `assets/js/section-nav.js` (anchor-pin au chargement + scrollspy `IntersectionObserver` `.is-active` + visibilité/hauteur de la nav mobile), keyé `.pf-sectionnav`/`.pf-section`, inerte si absentes. Enqueué sur fiche livre + fiche événement.
+- Variable renommée `--pf-bs-sectionnav-h` → `--pf-sectionnav-h`. Le toggle « Voir tout » des sous-listes reste propre à la fiche livre (inline dans `book-single-tabs.php`, sélecteur `.bs-avis-section, .pf-section`). Classes de **contenu** livre `bs-*` (ex. `.bs-section__body`) conservées.
+
 ---
 
 ## C. Plan d'exécution
