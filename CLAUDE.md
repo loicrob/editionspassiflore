@@ -285,7 +285,7 @@ kadence-child/
 │   ├── book-single-tabs.php         — Fiche livre : sections sous le hero (nav sticky = composant partagé .pf-sectionnav via pf_render_sectionnav) ; avis lecteurs (SCF curés + avis WooCommerce + formulaire) avec anti-spam honeypot/timing ; toggle « Voir tout » inline (propre au livre)
 │   ├── catalogues.php               — Catalogues PDF (repeater SCF `catalogues` sur la page Catalogue) : page d'admin (WooCommerce → Catalogues PDF, formulaire natif SCF `acf_form()`) + lecture front `passiflore_get_pdf_catalogues()`
 │   ├── class-bookshelf.php          — Passiflore_Bookshelf — [passiflore_etagere] shortcode
-│   ├── class-catalogue.php          — Passiflore_Catalogue — [passiflore_catalogue] shortcode (filtering, AJAX)
+│   ├── class-catalogue.php          — Passiflore_Catalogue — [passiflore_catalogue] shortcode (filtering, AJAX) ; panneau de filtres mobile/tablette (render_filter_panel : bottom-sheet)
 │   ├── class-recherche-auteurs.php  — Passiflore_Recherche_Auteurs — [passiflore_recherche_auteurs] shortcode (AJAX search)
 │   ├── book-groups-admin.php        — Produits → Groupes de livres : taxonomies pf_serie/pf_traduction + _pf_vous_aimerez ; page à 3 onglets, AJAX, sauvegardes
 │   ├── event-admin.php              — Custom meta box for event books (_pf_event_books): replaces SCF field, AJAX search + add-by-author, drag reorder
@@ -308,7 +308,7 @@ kadence-child/
 │   │   ├── book-single.css          — Single book page sections (nav sticky, avis, formulaire d'avis)
 │   │   ├── bookshelf.css            — 3D bookshelf
 │   │   ├── cart.css                 — Page panier (table, totaux, actions secondaires)
-│   │   ├── catalogue.css            — Catalogue page + filters
+│   │   ├── catalogue.css            — Catalogue page + filters (dont panneau de filtres mobile/tablette <1024px : bar réduite à 2 rangées + bottom-sheet)
 │   │   ├── checkout.css             — Page commande (récap, paiement, confirmation)
 │   │   ├── events.css               — Events Calendar pages
 │   │   ├── events-infinite.css      — Vue liste : scroll infini (bouton rond passés au clic, loaders, top-bar masqué)
@@ -323,7 +323,7 @@ kadence-child/
 │       ├── bookshelf.js             — Wheel-to-horizontal scroll (scroll mode)
 │       ├── book-picker.js           — Composant admin réutilisable (window.pfBookPicker) : recherche AJAX + ajout par auteur + drag reorder, partagé par event-admin.js et book-groups-admin.js
 │       ├── book-groups-admin.js     — Admin JS « Groupes de livres » (instancie pfBookPicker + sélecteur de livre source)
-│       ├── catalogue.js             — Catalogue filter + AJAX
+│       ├── catalogue.js             — Catalogue filter + AJAX ; mobile/tablette : relogement des contrôles tri/filtres dans le bottom-sheet « Filtres » (gate .pf-cat-js, panneau rendu hors du sticky mais dans .pf-catalogue → root.querySelector inchangé), badge de filtres actifs
 │       ├── scroll-fade.js           — Composant global .pf-scroll-fade (style.css) : bascule .is-scroll-left/-right sur tout conteneur à scroll horizontal (tuiles événements/auteurs, nav de section mobile fiche livre)
 │       ├── event-admin.js           — Admin JS for event books meta box (thin caller de pfBookPicker)
 │       ├── venue-admin.js           — Combobox à choix contraint (Département/Région, fiche lieu) : liste préchargée, filtrée au focus/à la frappe, réutilise la normalisation de book-picker.js

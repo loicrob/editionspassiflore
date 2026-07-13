@@ -124,6 +124,33 @@ class Passiflore_Catalogue {
 				<?php echo $this->render_chips( $atts ); ?>
 			</div>
 			<div class="pf-catalogue-grid"><?php echo $grid; ?></div>
+			<?php echo $this->render_filter_panel(); ?>
+		</div>
+		<?php
+		return ob_get_clean();
+	}
+
+	/**
+	 * Panneau de filtres mobile/tablette (bottom-sheet). Rendu HORS du conteneur
+	 * sticky (transformé/flouté quand collé → casserait un position:fixed enfant)
+	 * mais À L'INTÉRIEUR de .pf-catalogue, pour que les root.querySelector du JS
+	 * voient toujours les contrôles qu'il y reloge. Le JS y déplace tri, format,
+	 * public, type, langue, découvrir, affichage et PDF en mobile. Masqué ≥1024px.
+	 */
+	private function render_filter_panel() {
+		ob_start();
+		?>
+		<div class="pf-cat-filter-backdrop"></div>
+		<div class="pf-cat-filter-panel" role="dialog" aria-modal="true" aria-label="Tri et filtres">
+			<div class="pf-cat-filter-panel__head">
+				<span class="pf-cat-filter-panel__title">Tri et filtres</span>
+				<button type="button" class="pf-cat-filter-close" aria-label="Fermer les filtres">&times;</button>
+			</div>
+			<div class="pf-cat-filter-panel__body"></div>
+			<div class="pf-cat-filter-panel__foot">
+				<button type="button" class="pf-cat-panel-reset">Tout réinitialiser</button>
+				<button type="button" class="pf-cat-panel-apply pf-btn pf-btn--primary pf-btn--sm">Voir les résultats</button>
+			</div>
 		</div>
 		<?php
 		return ob_get_clean();
@@ -416,7 +443,7 @@ class Passiflore_Catalogue {
 
 		ob_start();
 		?>
-		<div class="pf-catalogue-bar pf-sub-header <?php echo $is_searching ? 'is-searching' : ''; ?>" role="toolbar" aria-label="Filtres et tri du catalogue">
+		<div class="pf-catalogue-bar pf-sub-header <?php echo $is_searching ? 'is-searching' : ''; ?>" role="toolbar" aria-label="Tri et filtres du catalogue">
 
 			<?php /* Single row that flexes: [search + sort wrapper] [scroll container] */ ?>
 			<div class="pf-cat-bar-row pf-cat-bar-row-primary">
@@ -458,6 +485,14 @@ class Passiflore_Catalogue {
 
 				</div><?php /* end .pf-cat-search-sort */ ?>
 
+				<?php /* Mobile/tablette : ouvre le panneau de filtres (rangé à droite
+				       de la recherche). Masqué ≥1024px et sans JS (classe .pf-cat-js). */ ?>
+				<button type="button" class="pf-cat-filter-trigger" aria-haspopup="dialog" aria-expanded="false">
+					<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="6" x2="20" y2="6"/><line x1="7" y1="12" x2="17" y2="12"/><line x1="10" y1="18" x2="14" y2="18"/></svg>
+					<span class="pf-cat-filter-trigger-label">Filtres</span>
+					<span class="pf-cat-filter-count" hidden>0</span>
+				</button>
+
 				<?php /* Scroll container — holds the filter row.
 				       On mobile it drops to a row below search. */ ?>
 				<div class="pf-cat-row-scroll">
@@ -485,7 +520,7 @@ class Passiflore_Catalogue {
 				       (cf. normalize_display). */ ?>
 				<?php $spines_blocked = in_array( $atts['format'], [ 'tous', 'numerique' ], true ); ?>
 				<div class="pf-cat-display pf-switch" role="group" aria-label="Mode d'affichage">
-					<button type="button" data-value="covers" aria-label="Couvertures"
+					<button type="button" data-value="covers" aria-label="Vue couvertures"
 					        class="pf-switch__btn <?php echo $atts['display'] === 'covers' ? 'is-active' : ''; ?>">
 						<svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
 							<rect x="1"  y="1"  width="8" height="8" rx="1.5"/>
@@ -493,8 +528,9 @@ class Passiflore_Catalogue {
 							<rect x="1"  y="11" width="8" height="8" rx="1.5"/>
 							<rect x="11" y="11" width="8" height="8" rx="1.5"/>
 						</svg>
+						<span class="pf-cat-display-label">Vue couvertures</span>
 					</button>
-					<button type="button" data-value="spines" aria-label="Tranches"
+					<button type="button" data-value="spines" aria-label="Vue tranches"
 					        <?php echo $spines_blocked ? 'disabled ' : ''; ?>class="pf-switch__btn <?php echo $atts['display'] === 'spines' ? 'is-active' : ''; ?>">
 						<svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
 							<rect x="1"  y="1" width="4" height="18" rx="1.5"/>
@@ -502,6 +538,7 @@ class Passiflore_Catalogue {
 							<rect x="11" y="1" width="4" height="18" rx="1.5"/>
 							<rect x="16" y="1" width="4" height="18" rx="1.5"/>
 						</svg>
+						<span class="pf-cat-display-label">Vue tranches</span>
 					</button>
 				</div>
 

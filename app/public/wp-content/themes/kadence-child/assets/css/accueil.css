@@ -904,7 +904,7 @@ Workaround: stack two pseudo-elements. ::before is the base gradient (always vis
     min-height: 0;
 }
 
-/* Trait ornemental + titre-lien flèche : composant global .pf-section-titre (style.css). */
+/* Titre-lien flèche : composant global .pf-section-titre (style.css). */
 
 .pf-bookshelf {
     margin: 0 var(--global-content-edge-padding);
@@ -996,12 +996,16 @@ Workaround: stack two pseudo-elements. ::before is the base gradient (always vis
         gap: 0;
     }
 
-    /* Même plafond que desktop (slot hero = max-width 460px) : sans lui le
-       carousel grandit jusqu'à son max-width:760px de base et les cartes font
-       quasi toute la largeur du slide (effet « 100% »). align-self:center pour
-       centrer dans .pf-en-ce-moment-cols (flex-column, align-items:stretch). */
     .pf-en-ce-moment-actualites {
         margin-bottom: 1rem;
+    }
+
+    /* Même plafond que desktop (slot hero = max-width 460px) : sans lui le
+       carousel grandit jusqu'à son max-width:760px de base et les cartes font
+       quasi toute la largeur du slide (effet « 100% »). Le plafond porte sur le
+       carousel seul (pas .pf-en-ce-moment-actualites) pour que le titre « Actualités »,
+       lui, reste pleine largeur et aligné à gauche comme les autres titres de section. */
+    .pf-en-ce-moment-actualites .pf-actualites-carousel {
         align-self: center;
         width: 100%;
         max-width: 460px;

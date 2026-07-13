@@ -123,38 +123,63 @@
 }
 
 /* ── Section « Lieu » : adresse + carte OSM + « Y aller » ────── */
-/* Mobile (≤767px) : empilé (nom+adresse, carte, « Y aller »). */
+/* Mobile (≤767px) : empilé (adresse, carte, bouton), dans cet ordre visuel précis.
+   .pf-event-venue__info (adresse+bouton, cf. class-events-map.php) est neutralisé en
+   display:contents : ses enfants redeviennent des grid items directs de .pf-event-venue,
+   réordonnables via `order` indépendamment l'un de l'autre (le bouton doit apparaître
+   APRÈS la carte, alors qu'il la précède dans le DOM). */
 .pf-event-venue {
 	display: grid;
 	gap: var(--pf-space-4);
 	justify-items: start;
 }
+.pf-event-venue__info { display: contents; }
+.pf-event-venue__address { order: 1; }
+.pf-event-venue__map     { order: 2; }
+.pf-event-venue__go      { order: 3; }
 
-/* Desktop + tablette (≥768px) : carte À DROITE du bloc {nom + adresse + bouton Google Maps}
-   (elle-même spanne les 2 rangées, à hauteur du bloc gauche complet). align-items:center :
-   la carte étant carrée (donc souvent plus haute que le texte de l'adresse), les deux
-   colonnes sont centrées l'une par rapport à l'autre plutôt que calées en haut. Scopé à
+/* Desktop + tablette (≥768px) : carte À DROITE du bloc {adresse + bouton Google Maps}.
+   .pf-event-venue__info redevient un vrai conteneur (flex colonne) : adresse et bouton
+   sont ainsi COLLÉS l'un à l'autre (gap propre au wrapper) et traités comme un seul bloc
+   pour le centrage vertical face à la carte — sinon (grille 2 rangées, chacune contenant
+   indépendamment l'adresse ou le bouton) chaque rangée s'étire à la hauteur de la carte et
+   les deux se retrouvent centrées chacune de son côté, écartées par un grand vide. Scopé à
    `:has(.pf-event-venue__map)` : un lieu sans coordonnées (pas de carte) garde son adresse
    en pleine largeur au lieu d'être coincée dans une colonne étroite. */
 @media (min-width: 768px) {
 	.pf-event-venue:has(.pf-event-venue__map) {
 		/* Colonne adresse dimensionnée à son contenu (pas 1fr) : la carte étant
-		   désormais plafonnée à 350px, un 1fr aurait étiré la colonne adresse pour
-		   absorber tout l'espace restant, repoussant la carte loin à droite. */
+		   plafonnée à 350px, un 1fr aurait étiré la colonne adresse pour absorber
+		   tout l'espace restant, repoussant la carte loin à droite. */
 		grid-template-columns: minmax(0, max-content) minmax(0, 350px);
-		grid-template-areas:
-			"info map"
-			"go   map";
+		grid-template-areas: "info map";
 		column-gap: var(--pf-space-6);
-		row-gap: var(--pf-space-3);
 		align-items: center;
 	}
-	.pf-event-venue:has(.pf-event-venue__map) .pf-event-venue__address { grid-area: info; }
-	.pf-event-venue:has(.pf-event-venue__map) .pf-event-venue__map     { grid-area: map; }
-	.pf-event-venue:has(.pf-event-venue__map) .pf-event-venue__go      { grid-area: go; justify-self: start; }
+	.pf-event-venue:has(.pf-event-venue__map) .pf-event-venue__info {
+		grid-area: info;
+		display: flex;
+		flex-direction: column;
+		align-items: flex-start;
+		gap: var(--pf-space-3);
+	}
+	.pf-event-venue:has(.pf-event-venue__map) .pf-event-venue__map { grid-area: map; }
+	/* `order` (ci-dessus) ne vaut que pour le réordonnancement mobile de .pf-event-venue —
+	   à l'intérieur du wrapper flex .pf-event-venue__info, on veut l'ordre naturel du DOM
+	   (adresse puis bouton), donc on le neutralise ici. */
+	.pf-event-venue:has(.pf-event-venue__map) .pf-event-venue__address,
+	.pf-event-venue:has(.pf-event-venue__map) .pf-event-venue__go {
+		order: initial;
+	}
 }
 
-.pf-event-venue__address {
+/* .pf-event-venue__address.pf-event-venue__address (classe doublée, (0,2,0)) : Kadence pose
+   `.single-content address { margin-bottom: var(--global-md-spacing) }` à (0,1,1), qui bat un
+   simple `.pf-event-venue__address` (0,1,0) — même gotcha de spécificité que le reset
+   `.tribe-common *` documenté plus haut dans ce fichier. Sans ce blindage, 32px de marge
+   Kadence s'ajoutaient sous l'adresse (visible notamment dans le gap avec le bouton
+   « Google Maps » juste en dessous). */
+.pf-event-venue__address.pf-event-venue__address {
 	margin: 0;
 	font-style: normal;
 	line-height: 1.7;
@@ -194,16 +219,17 @@
 	gap: var(--pf-space-5);
 }
 
-.pf-event-organizer__name {
-	margin: 0 0 var(--pf-space-1);
-	font-weight: 600;
-	color: var(--pf-heading);
+/* Pas de sous-conteneurs (nom / contact) : tout est directement dans .pf-event-organizer
+   (nom en <strong>, une ligne par info via <br>). Même gabarit que .pf-event-venue__address
+   (pas .pf-event-venue__area, plus petit/muted) : taille de texte normale. */
+.pf-event-organizer {
+	line-height: 1.7;
+	color: var(--pf-text);
 }
 
-.pf-event-organizer__contact {
-	margin: 0;
-	color: var(--pf-muted);
-	font-size: var(--pf-text-sm);
+.pf-event-organizer strong {
+	font-weight: 600;
+	color: var(--pf-heading);
 }
 
 /* Zone basse : filet de séparation PLEINE LARGEUR au-dessus de Présence. Le border-top

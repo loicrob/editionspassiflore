@@ -468,6 +468,25 @@ function pf_disable_linked_post_dropdown_creation( $creation_enabled, $post_type
 	return $creation_enabled;
 }
 
+/**
+ * Masque la note native TEC « L'e-mail sera masqué sur le site pour éviter d'être aspiré
+ * par les spammeurs. » (écrans d'édition organisateur : organizer-meta-box.php + création
+ * inline sur la fiche événement, create-organizer-fields.php). Devenue trompeuse depuis
+ * qu'on affiche réellement l'email (obfusqué en sortie, mais visible/cliquable pour le
+ * visiteur) — un·e éditeur·rice pourrait lire « masqué » comme « jamais montré ». Filtre
+ * gettext scopé au texte + domaine exacts (pas d'édition du plugin, survit aux MAJ TEC).
+ */
+add_filter( 'gettext', 'pf_hide_organizer_email_obfuscation_notice', 10, 3 );
+
+function pf_hide_organizer_email_obfuscation_notice( $translated, $text, $domain ) {
+	if ( 'the-events-calendar' === $domain
+		&& 'The e-mail address will be obfuscated on this site to avoid it getting harvested by spammers.' === $text
+	) {
+		return '';
+	}
+	return $translated;
+}
+
 add_action( 'tribe_events_linked_post_new_form', 'pf_render_venue_departement_region_fields_inline', 20 );
 
 function pf_render_venue_departement_region_fields_inline( $post_type ) {

@@ -92,13 +92,16 @@ function passiflore_render_event_organizer( $event_id ) {
 		}
 		$phone = function_exists( 'tribe_get_organizer_phone' ) ? tribe_get_organizer_phone( $oid ) : '';
 		if ( $phone ) {
-			$rows[] = esc_html( $phone );
+			$tel_href = 'tel:' . preg_replace( '/[^0-9+]/', '', $phone );
+			$rows[] = '<a href="' . esc_attr( $tel_href ) . '">' . esc_html( $phone ) . '</a>';
 		}
 
+		// Pas de sous-conteneurs dédiés (nom / contact) : tout directement dans
+		// .pf-event-organizer, une ligne par info (site / mail / tél) via <br>.
 		$block  = '<div class="pf-event-organizer">';
-		$block .= '<p class="pf-event-organizer__name">' . esc_html( $name ) . '</p>';
+		$block .= '<strong>' . esc_html( $name ) . '</strong>';
 		if ( $rows ) {
-			$block .= '<p class="pf-event-organizer__contact">' . implode( ' · ', $rows ) . '</p>';
+			$block .= '<br>' . implode( '<br>', $rows );
 		}
 		$block .= '</div>';
 		$blocks[] = $block;

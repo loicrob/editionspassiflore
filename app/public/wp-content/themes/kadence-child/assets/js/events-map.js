@@ -55,9 +55,15 @@
 		return '<div class="pf-map-pop__group">' + venue + cards + '</div>';
 	}
 
-	// Infobulle d'un lieu unique.
+	// Infobulle d'un lieu unique : titre (nom + ville) hors zone de scroll,
+	// seule la liste d'événements défile (cf. .pf-map-pop__header / __scroll).
 	function singlePopup( m ) {
-		return '<div class="pf-map-pop">' + venueBlock( m, null ) + '</div>';
+		var header = '<div class="pf-map-pop__header">' +
+			'<span class="pf-map-pop__venue-name">' + esc( m.venue || '' ) + '</span>' +
+			( m.city ? '<span class="pf-map-pop__venue-city">' + esc( m.city ) + '</span>' : '' ) +
+		'</div>';
+		var cards = ( m.events || [] ).map( eventCard ).join( '' );
+		return '<div class="pf-map-pop">' + header + '<div class="pf-map-pop__scroll">' + cards + '</div></div>';
 	}
 
 	// Dénominateur commun d'un ensemble de lieux : ville si toutes identiques,
@@ -84,14 +90,14 @@
 		var label = commonLabel( ms ) || 'Plusieurs lieux';
 		var noun  = total > 1 ? 'événements' : 'événement';
 
-		var area = '<div class="pf-map-pop__area">' +
+		var header = '<div class="pf-map-pop__header">' +
 			'<span class="pf-map-pop__area-label">' + esc( label ) + '</span>' +
 			'<span class="pf-map-pop__area-count">' + total + ' ' + noun + '</span>' +
 		'</div>';
 
 		var groups = ms.map( function ( m ) { return venueBlock( m, label ); } ).join( '' );
 
-		return '<div class="pf-map-pop pf-map-pop--cluster">' + area + groups + '</div>';
+		return '<div class="pf-map-pop pf-map-pop--cluster">' + header + '<div class="pf-map-pop__scroll">' + groups + '</div></div>';
 	}
 
 	// Pin d'un cluster : cercle rouge portant le nombre d'ÉVÉNEMENTS agrégés.
@@ -160,26 +166,21 @@
 		// pas toujours (position du marqueur trop haute pour le dégagement requis).
 		// On mesure le dépassement RÉEL une fois l'infobulle positionnée (source de
 		// vérité unique, valable quels que soient le zoom/pan courants) et on réduit
-		// sa hauteur de contenu d'autant, avec défilement interne (mécanisme natif
-		// Leaflet via la classe leaflet-popup-scrolled).
+		// la hauteur de la seule zone de scroll (.pf-map-pop__scroll) d'autant — le
+		// titre (.pf-map-pop__header) reste hors de cet ajustement, donc toujours visible.
 		map.on( 'popupopen', function ( e ) {
 			var popupEl = e.popup._container;
-			var content = popupEl && popupEl.querySelector( '.leaflet-popup-content' );
+			var content = popupEl && popupEl.querySelector( '.pf-map-pop__scroll' );
 			if ( ! content ) { return; }
 
 			var margin = 20;
 			var overflow = el.getBoundingClientRect().top - popupEl.getBoundingClientRect().top + margin;
 			if ( overflow <= 0 ) { return; }
 
-			// height (et non maxHeight) + overflow-y explicites, SANS rappeler
-			// _updateLayout() : cette méthode recompare la hauteur à l'option
-			// maxHeight D'ORIGINE (ex. 320) — comme notre valeur réduite lui est
-			// inférieure, elle retire leaflet-popup-scrolled (donc l'overflow:auto),
-			// laissant le contenu déborder visuellement de sa boîte sans y être
-			// contenu. On pose donc nous-mêmes le confinement, puis on ne repositionne
-			// (_updatePosition) qu'à partir de cette nouvelle taille.
+			// height (et non max-height) + overflow-y explicites, SANS rappeler
+			// _updateLayout() de Leaflet : cette méthode s'applique à .leaflet-popup-content
+			// (pas à notre zone de scroll interne) et n'a donc plus lieu d'être invoquée ici.
 			content.style.height = Math.max( 120, content.offsetHeight - overflow ) + 'px';
-			content.style.overflowY = 'auto';
 			e.popup._updatePosition();
 
 			// _updatePosition() déplace le popup en fonction de sa nouvelle taille,
@@ -235,7 +236,7 @@
 					pfEventCount: ( m.events || [] ).length || 1
 				} );
 				mk.bindPopup( singlePopup( m ), {
-					minWidth: 220, maxWidth: 300, maxHeight: 300, closeButton: true,
+					minWidth: 220, maxWidth: 300, closeButton: true,
 					autoPan: false // l'auto-pan natif de Leaflet, exécuté après coup, entre en
 					// conflit avec l'ajustement de hauteur du handler popupopen ci-dessous.
 				} );
@@ -247,7 +248,7 @@
 				layer.on( 'clusterclick', function ( a ) {
 					var cluster = a.layer;
 					cluster.bindPopup( clusterPopup( cluster.getAllChildMarkers() ), {
-						minWidth: 240, maxWidth: 320, maxHeight: 320, closeButton: true,
+						minWidth: 240, maxWidth: 320, closeButton: true,
 						autoPan: false
 					} ).openPopup();
 				} );

@@ -120,7 +120,7 @@
 .leaflet-popup-content-wrapper.leaflet-popup-content-wrapper {
 	border-radius: var(--pf-radius-card);
 	box-shadow: var(--pf-shadow-hover);
-	background: var(--pf-surface, #fff);
+	background: var(--pf-surface-alt);
 	/* Padding (et non margin) : le padding par défaut de Leaflet (1px) sert de
 	   barrière empêchant le collapse des marges verticales de .leaflet-popup-content
 	   avec ce wrapper. Le mettre à 0 supprimait cette barrière et laissait les
@@ -145,12 +145,37 @@
 	width: 100%;
 }
 
-/* En-tête d'un cluster : dénominateur commun + total.
+/* Titre de l'infobulle (nom du lieu, ou dénominateur commun d'un cluster) :
+   toujours hors de la zone de scroll, donc toujours visible.
    Classe répétée (0,2,0) : idem .leaflet-popup-content-wrapper ci-dessus. */
-.pf-map-pop__area.pf-map-pop__area {
+.pf-map-pop__header.pf-map-pop__header {
+	flex: 0 0 auto;
 	padding-right: var(--pf-space-5); /* place pour le bouton × de Leaflet */
 	padding-bottom: var(--pf-space-2);
 	border-bottom: 1px solid var(--pf-border);
+}
+
+/* Zone de scroll : liste des cartes d'événement (lieu unique) ou des blocs
+   par lieu (cluster). Hauteur bornée en dur ; le handler JS popupopen la
+   réduit encore si nécessaire (débordement haut du conteneur sur mobile).
+   display:flex + gap (comme tous les autres conteneurs de .pf-card du site —
+   tuiles, étagère, catalogue… — l'écart entre cartes est toujours porté par
+   le conteneur, jamais par .pf-card lui-même) : sépare les cartes (popup d'un
+   lieu unique) ou les blocs par lieu (popup de cluster).
+   Classe répétée (0,2,0) : idem .leaflet-popup-content-wrapper plus haut
+   (nécessaire ici pour le padding-right). box-sizing:border-box (reset
+   .tribe-common *) garde la largeur de boîte inchangée : le padding-right
+   ne fait que dégager le contenu de la barre de scroll, qui reste elle-même
+   collée au bord droit — pas de compensation de marge nécessaire. */
+.pf-map-pop__scroll.pf-map-pop__scroll {
+	display: flex;
+	flex-direction: column;
+	gap: var(--pf-space-3);
+	flex: 1 1 auto;
+	min-height: 0;
+	max-height: 240px;
+	overflow-y: auto;
+	padding-right: var(--pf-space-2);
 }
 
 .pf-map-pop__area-label {
@@ -167,16 +192,15 @@
 	font-size: var(--pf-text-xs);
 }
 
-/* Bloc d'un lieu (en-tête + ses cartes). */
+/* Bloc d'un lieu (en-tête + ses cartes). flex-shrink:0 : enfant de la zone de
+   scroll (.pf-map-pop__scroll, flex column) — sans ça, un flex item se
+   comprime par défaut pour tenir dans le max-height du parent au lieu de le
+   dépasser et déclencher le scroll. */
 .pf-map-pop__group {
 	display: flex;
 	flex-direction: column;
+	flex-shrink: 0;
 	gap: var(--pf-space-2);
-}
-
-/* Classe répétée (0,2,0) : idem .leaflet-popup-content-wrapper plus haut. */
-.pf-map-pop__venue.pf-map-pop__venue {
-	padding-right: var(--pf-space-5); /* × dans l'infobulle d'un lieu unique */
 }
 
 .pf-map-pop__venue-name {
@@ -194,29 +218,32 @@
 }
 
 /* Dans un cluster, l'en-tête donne déjà la zone → le nom de lieu passe en
-   sous-titre et n'a plus besoin de dégager le ×. */
-.pf-map-pop--cluster .pf-map-pop__venue {
-	padding-right: 0;
-}
-
+   sous-titre. */
 .pf-map-pop--cluster .pf-map-pop__venue-name {
 	font-size: var(--pf-text-sm);
 }
 
-/* Séparateur entre lieux d'un même cluster. */
+/* Séparateur entre lieux d'un même cluster. L'espace au-dessus du filet vient
+   désormais du gap de .pf-map-pop__scroll ; padding-top ajoute l'espace
+   symétrique en dessous, entre le filet et le nom du lieu suivant. */
 .pf-map-pop--cluster .pf-map-pop__group + .pf-map-pop__group {
 	border-top: 1px solid var(--pf-border-light);
 	padding-top: var(--pf-space-3);
 }
 
 /* Mini-carte : réutilise .pf-card (--static --compact), passée en disposition
-   horizontale (vignette à gauche) et resserrée pour l'infobulle. Bordure/rayon
-   ré-imposés ici (0,2,0) pour survivre au reset .tribe-common * des pages TEC. */
+   horizontale (vignette à gauche) et resserrée pour l'infobulle. Fond/bordure/
+   rayon ré-imposés ici (0,2,0) pour survivre au reset .tribe-common * des
+   pages TEC — le fond est déjà celui de .pf-card (--pf-surface, blanc) mais
+   redéclaré explicitement pour que la carte tranche sur le fond crème de
+   l'infobulle sans dépendre implicitement de la règle globale. */
 .pf-map-pop-card.pf-card {
 	flex-direction: row;
+	flex-shrink: 0; /* idem .pf-map-pop__group : ne pas se comprimer dans .pf-map-pop__scroll */
 	align-items: stretch;
 	width: 100%;
 	box-sizing: border-box;
+	background: var(--pf-surface);
 	border: 1px solid var(--pf-border-light);
 	border-radius: var(--pf-radius);
 }

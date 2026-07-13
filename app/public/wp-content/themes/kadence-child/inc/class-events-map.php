@@ -288,16 +288,20 @@ class Passiflore_Events_Map {
 		ob_start();
 		echo '<div class="pf-event-venue">';
 
+		// .pf-event-venue__info regroupe adresse + bouton : sur ordinateur/tablette, la carte
+		// (colonne droite) doit se centrer verticalement par rapport à CE BLOC dans son
+		// ensemble — pas à l'adresse et au bouton indépendamment (ce que ferait une grille
+		// CSS à 2 rangées, en gonflant chaque rangée à la hauteur de la carte et en écartant
+		// les deux au lieu de les garder collés). Sur mobile, ce wrapper redevient inerte
+		// (display:contents, event-single.css) : adresse/carte/bouton restent 3 éléments
+		// indépendants réordonnables (ordre visuel adresse → carte → bouton, via `order`).
+		echo '<div class="pf-event-venue__info">';
+
 		if ( $lines ) {
 			echo '<address class="pf-event-venue__address">' . implode( '<br>', $lines ) . '</address>';
 		}
 
 		if ( $has_coords ) {
-			echo '<div id="pf-event-venue-map" class="pf-event-venue__map"'
-				. ' data-lat="' . esc_attr( $lat ) . '" data-lng="' . esc_attr( $lng ) . '"'
-				. ' data-label="' . esc_attr( $label ) . '"'
-				. ' aria-label="' . esc_attr( sprintf( 'Carte du lieu : %s', $label ) ) . '"></div>';
-
 			// « Voir sur Google Maps » : recherche par nom de lieu + adresse + ville (repli
 			// sur les coordonnées si rien n'est renseigné — lien sortant, au clic). Nom omis
 			// quand il duplique l'adresse ($name_is_address) : elle est déjà dans la requête,
@@ -308,6 +312,15 @@ class Passiflore_Events_Map {
 			$maps_url = 'https://www.google.com/maps/search/?api=1&query=' . rawurlencode( $search_q );
 			echo '<a class="button pf-btn pf-btn--outline pf-btn--sm pf-event-venue__go" href="' . esc_url( $maps_url )
 				. '" target="_blank" rel="noopener noreferrer">' . esc_html__( 'Google Maps', 'kadence-child' ) . '</a>';
+		}
+
+		echo '</div>'; // .pf-event-venue__info
+
+		if ( $has_coords ) {
+			echo '<div id="pf-event-venue-map" class="pf-event-venue__map"'
+				. ' data-lat="' . esc_attr( $lat ) . '" data-lng="' . esc_attr( $lng ) . '"'
+				. ' data-label="' . esc_attr( $label ) . '"'
+				. ' aria-label="' . esc_attr( sprintf( 'Carte du lieu : %s', $label ) ) . '"></div>';
 		}
 
 		echo '</div>';

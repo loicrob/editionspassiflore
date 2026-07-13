@@ -64,7 +64,8 @@ Updated: 2026-03-23 12:48:18
     --pf-radius-lg:      8px;  /* panneaux, tableaux (récap commande, paiement…) */
     --pf-radius-card:    12px; /* tuiles : auteurs, événements, livres associés */
     --pf-btn-pad:        0.65em 1.2em;
-    --pf-btn-pad-sm:     0.3em 0.7em;
+    --pf-btn-pad-sm:     0.5em 0.8em;
+    --pf-btn-font-size:  0.9rem; /* taille de police commune à TOUS les boutons (custom + natifs) */
     --pf-panel-pad:      var(--pf-space-5) var(--pf-space-6); /* padding des panneaux encadrés (.pf-panel, récap commande…) */
     --pf-btn-weight:     var(--pf-weight-normal);
     --pf-btn-transition: background .2s, border-color .2s, color .2s;
@@ -201,19 +202,30 @@ a.pf-value:hover, .pf-value-container a:hover, a.pf-value-highlight:hover, .pf-v
 /* Boutons — .pf-btn porte la forme commune ; un modificateur porte la couleur.
    Boutons custom : appliquer ces classes dans le markup.
    Boutons WooCommerce/plugins : garder le sélecteur existant et pointer ses valeurs sur les mêmes tokens. */
-.pf-btn {
-    display: inline-block;
+/* Géométrie commune à TOUS les boutons — custom .pf-btn ET natifs (WooCommerce,
+   Kadence, Gutenberg). Source unique = tokens --pf-btn-*. Le thème enfant charge
+   après Kadence, à spécificité égale (0,1,0) → surcharge la forme sans !important :
+   un bouton natif (sans .pf-btn) adopte donc les mêmes padding/taille/graisse/radius. */
+.pf-btn,
+.button,
+.wp-block-button__link,
+.wp-element-button {
     padding: var(--pf-btn-pad);
-    border: 1px solid transparent;
     border-radius: var(--pf-radius);
-    font-family: var(--pf-font-body);
-    font-size: 0.9rem;
+    font-size: var(--pf-btn-font-size);
     font-weight: var(--pf-btn-weight);
     line-height: var(--pf-leading-tight);
+    box-shadow: none;
+    transition: var(--pf-btn-transition);
+}
+/* Propriétés propres au markup custom (les boutons natifs les portent déjà). */
+.pf-btn {
+    display: inline-block;
+    border: 1px solid transparent;
+    font-family: var(--pf-font-body);
     text-align: center;
     text-decoration: none;
     cursor: pointer;
-    transition: var(--pf-btn-transition);
 }
 .pf-btn--primary {
     background: var(--pf-accent);
@@ -257,26 +269,38 @@ a.pf-value:hover, .pf-value-container a:hover, a.pf-value-highlight:hover, .pf-v
     padding: var(--pf-btn-pad-sm);
     font-size: 0.85rem;
 }
+/* Boutons « small » natifs Kadence (ex. bouton compte du header) alignés sur le même token
+   → « small » a une source unique. (0,2,0) = spécificité de Kadence, chargé après → gagne sans !important. */
+.button.button-size-small {
+    padding: var(--pf-btn-pad-sm);
+}
 .pf-btn--block {
     display: block;
     width: 100%;
 }
 
-/* Boutons natifs (Gutenberg core, Kadence, shortcodes) — alignés sur nos tokens de forme
-   pour que le contenu créé par les admins reste cohérent. La couleur vient de la palette Kadence. */
-.wp-block-button__link,
-.wp-element-button,
-.button,
-.button-style-fill,
-.button-style-outline {
-    border-radius: var(--pf-radius);
-    font-weight: var(--pf-btn-weight);
-    box-shadow: none;
-    transition: var(--pf-btn-transition);
-}
+/* État visité — un bouton reste au repos une fois son lien visité (sinon un <a> bouton
+   hérite d'une couleur de lien visité : générique a:visited de Kadence pour les .pf-btn,
+   ou variable de palette pour les .button). On ré-affirme la couleur/le fond de repos de
+   chaque variante, via les mêmes tokens que l'état normal → « visité == repos ». */
+.pf-btn--primary:visited { color: var(--pf-surface); }
+.pf-btn--outline:visited { color: var(--pf-accent); }
+.pf-btn--neutral:visited { color: var(--pf-text); }
+.button:visited,
+.wp-block-button__link:visited,
+.wp-element-button:visited { color: var(--global-palette-btn); background-color: var(--global-palette-btn-bg); }
+.button.button-style-outline:visited   { color: var(--pf-text); background-color: transparent; }
+.button.button-style-secondary:visited { color: var(--global-palette-btn-sec); background-color: var(--global-palette-btn-sec-bg); }
+/* Bouton double-classé .button + .pf-btn (ex. « Google Maps » de la fiche événement) :
+   garde l'apparence .pf-btn (spécificité (0,3,0) → bat le remplissage visité de .button ci-dessus et de Kadence). */
+.button.pf-btn--outline:visited { color: var(--pf-accent); background-color: transparent; }
+
+/* Pas d'ombre au survol (custom + natifs) ; la géométrie est posée par le groupe unifié
+   plus haut. La couleur des natifs reste pilotée par la palette Kadence (--global-palette-btn-*). */
+.pf-btn:hover,                .pf-btn:focus,                .pf-btn:active,
 .wp-block-button__link:hover, .wp-block-button__link:focus, .wp-block-button__link:active,
-.wp-element-button:hover,    .wp-element-button:focus,    .wp-element-button:active,
-.button:hover,               .button:focus,               .button:active {
+.wp-element-button:hover,     .wp-element-button:focus,     .wp-element-button:active,
+.button:hover,                .button:focus,                .button:active {
     box-shadow: none;
 }
 
@@ -431,9 +455,9 @@ h6 { font-family: var(--pf-font-body);    font-weight: var(--pf-weight-normal); 
     line-height: var(--pf-leading-normal);
 }
 
-p a:not(.button):not(.wp-block-button__link):not(.wp-element-button):not(.pf-value),
-span a:not(.button):not(.wp-block-button__link):not(.wp-element-button),
-.entry-content a:not(.button):not(.wp-block-button__link):not(.wp-element-button):not(.pf-card):not(.menu-item-link):not(.tribe-events-c-subscribe-dropdown__list-item-link) {
+p a:not(.button):not(.wp-block-button__link):not(.wp-element-button):not(.pf-value):not(.leaflet-control *),
+span a:not(.button):not(.wp-block-button__link):not(.wp-element-button):not(.leaflet-control *),
+.entry-content a:not(.button):not(.wp-block-button__link):not(.wp-element-button):not(.pf-card):not(.menu-item-link):not(.tribe-events-c-subscribe-dropdown__list-item-link):not(.leaflet-control *):not(.leaflet-popup-close-button) {
     color: var(--pf-accent) !important;
     text-decoration: underline !important;
     text-underline-offset: .15em !important;
@@ -443,9 +467,9 @@ span a:not(.button):not(.wp-block-button__link):not(.wp-element-button),
     text-decoration: underline !important;
     text-underline-offset: .15em !important;
 }
-p a:not(.button):not(.wp-block-button__link):not(.wp-element-button):not(.pf-value):hover,
-span a:not(.button):not(.wp-block-button__link):not(.wp-element-button):hover,
-.entry-content a:not(.button):not(.wp-block-button__link):not(.wp-element-button):not(.pf-card):not(.menu-item-link):not(.tribe-events-c-subscribe-dropdown__list-item-link):hover,
+p a:not(.button):not(.wp-block-button__link):not(.wp-element-button):not(.pf-value):not(.leaflet-control *):hover,
+span a:not(.button):not(.wp-block-button__link):not(.wp-element-button):not(.leaflet-control *):hover,
+.entry-content a:not(.button):not(.wp-block-button__link):not(.wp-element-button):not(.pf-card):not(.menu-item-link):not(.tribe-events-c-subscribe-dropdown__list-item-link):not(.leaflet-control *):not(.leaflet-popup-close-button):hover,
 .contact-info-footer:hover {
     opacity: 0.8 !important;
     text-decoration: underline !important;
@@ -886,16 +910,7 @@ body.admin-bar { --pf-adminbar: 32px; }
 /* =========================================================
    Titre de section — ornements partagés (accueil, réutilisable site-wide).
    La typo vient des classes .pf-titre-2 / .pf-titre-3 portées par le markup ;
-   .pf-section-titre n'ajoute que l'ornement : trait rouge (titre simple) ou
-   flèche ➜ animée (titre-lien). Les h2 de grande section restent nus. ========================================================= */
-.pf-section-titre:not(:has(a))::after {
-    content: '';
-    display: inline-block;
-    width: 2.5rem;
-    height: 2px;
-    background: var(--pf-accent);
-}
-/* Titres-liens : le <a> devient le conteneur flex (texte + flèche cliquables) */
+   .pf-section-titre n'ajoute que l'ornement : flèche ➜ animée (titre-lien). ========================================================= */
 .pf-section-titre a {
     display: inline-flex;
     align-items: center;
@@ -913,10 +928,6 @@ body.admin-bar { --pf-adminbar: 32px; }
 }
 .pf-section-titre a:hover::after {
     transform: translateX(8px);
-}
-h2.pf-section-titre::after,
-h2.pf-section-titre a::after {
-    display: none;
 }
 
 /* =========================================================
@@ -1340,7 +1351,8 @@ h2.pf-section-titre a::after {
     border-radius: var(--pf-radius-md);
     overflow: hidden;
 }
-.pf-switch__btn {
+.pf-switch__btn,
+.pf-cat-univers-btn { /* bouton « univers » du catalogue : même segment (deltas dans catalogue.css) */
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1358,8 +1370,10 @@ h2.pf-section-titre a::after {
     transition: background 0.15s ease, color 0.15s ease;
 }
 .pf-switch__btn:not(:last-child) { border-right: 1px solid var(--pf-border-light); }
-.pf-switch__btn.is-active { background: var(--pf-red-soft); color: var(--pf-accent); box-shadow: none; }
-.pf-switch__btn:not(.is-active):hover { background: var(--pf-red-soft-strong); color: var(--pf-accent); box-shadow: none; }
+.pf-switch__btn.is-active,
+.pf-cat-univers-btn.is-active { background: var(--pf-red-soft); color: var(--pf-accent); box-shadow: none; }
+.pf-switch__btn:not(.is-active):hover,
+.pf-cat-univers-btn:not(.is-active):hover { background: var(--pf-red-soft-strong); color: var(--pf-accent); box-shadow: none; }
 .pf-switch__btn:disabled { opacity: 0.35; cursor: not-allowed; }
 /* Variante --solid : segment actif en aplat rouge (sélecteur de vue Liste/Mois TEC). */
 .pf-switch--solid .pf-switch__btn.is-active { background: var(--pf-accent); color: var(--pf-surface); }

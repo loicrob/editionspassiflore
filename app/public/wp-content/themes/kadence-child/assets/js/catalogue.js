@@ -34,6 +34,11 @@
 		const bar             = root.querySelector('.pf-catalogue-bar:not(.pf-catalogue-bar-top)');
 		const dropdowns       = root.querySelectorAll('.pf-cat-dropdown');
 
+		// Gate progressif : la bascule vers le panneau de filtres mobile
+		// (masquage de la rangée à scroll, bouton « Filtres ») n'est active que
+		// si le JS tourne. Sans JS, la barre garde son fallback empilé.
+		root.classList.add('pf-cat-js');
+
 		// Portal menus to <body> so their `position:fixed` is viewport-relative,
 		// regardless of any ancestor that creates a containing block (sticky
 		// transform, transitions, theme wrappers with filter/transform, etc.).
@@ -53,30 +58,130 @@
 		syncDisplayUI();
 		syncNavMenu();
 
-		// ── Sort placement: on desktop sort lives inside .pf-cat-search-sort
-		// (next to search, so collapsing it on focus lets search grow). On
-		// mobile sort is just another filter in the horizontal scroll line,
-		// so we move it into .pf-cat-row-scroll at the start.
-		const sortEl       = root.querySelector('.pf-cat-sort');
-		const searchSort   = root.querySelector('.pf-cat-search-sort');
-		const scrollRow    = root.querySelector('.pf-cat-row-scroll');
-		const mqDesktop    = window.matchMedia('(min-width: 1024px)');
-		function placeSort() {
-			if (!sortEl) return;
+		// ── Filtres / tri : sur desktop (≥1024px) les contrôles restent dans la
+		// barre (tri près de la recherche, format/PDF dans le top bar, le reste
+		// dans la rangée à scroll). Sur mobile/tablette ils sont relogés dans un
+		// panneau bottom-sheet ouvert par le bouton « Filtres ». Le panneau est
+		// rendu hors du conteneur sticky (transformé/flouté une fois collé) pour
+		// que son position:fixed reste relatif au viewport, mais reste dans
+		// .pf-catalogue (= root) → tous les root.querySelector le voient encore.
+		const mqDesktop      = window.matchMedia('(min-width: 1024px)');
+		const filterTrigger  = root.querySelector('.pf-cat-filter-trigger');
+		const filterPanel    = root.querySelector('.pf-cat-filter-panel');
+		const filterBackdrop = root.querySelector('.pf-cat-filter-backdrop');
+		const panelBody      = filterPanel ? filterPanel.querySelector('.pf-cat-filter-panel__body') : null;
+		const filterCount    = filterTrigger ? filterTrigger.querySelector('.pf-cat-filter-count') : null;
+
+		// Regroupement dans le panneau : chaque sous-tableau = une rangée
+		// (contrôles côte à côte). L'emplacement d'origine de chaque contrôle est
+		// capturé pour restauration au retour desktop. Un wrapper de groupe est
+		// créé une fois dans panelBody ; les groupes vides sont masqués en CSS.
+		const PANEL_GROUPS = [
+			[ '.pf-cat-sort', '.pf-cat-dropdown[data-filter="_pdf"]' ],
+			[ '.pf-cat-format-switch' ],
+			[ '.pf-cat-dropdown[data-filter="public"]', '.pf-cat-dropdown[data-filter="type"]' ],
+			[ '.pf-cat-dropdown[data-filter="langues"]', '.pf-cat-dropdown[data-filter="decouvrir"]' ],
+			[ '.pf-cat-display' ],
+		];
+		const relocatable = [];
+		const groupEls = [];
+		PANEL_GROUPS.forEach((sels, gi) => {
+			let g = null;
+			if (panelBody) {
+				g = document.createElement('div');
+				g.className = 'pf-cat-panel-group';
+				panelBody.appendChild(g);
+			}
+			groupEls.push(g);
+			sels.forEach(sel => {
+				const el = root.querySelector(sel);
+				if (el) relocatable.push({ el: el, parent: el.parentNode, next: el.nextSibling, group: gi });
+			});
+		});
+
+		function placeControls() {
 			if (mqDesktop.matches) {
-				if (searchSort && sortEl.parentElement !== searchSort) {
-					searchSort.appendChild(sortEl);
-				}
+				relocatable.forEach(r => {
+					if (r.next && r.next.parentNode === r.parent) r.parent.insertBefore(r.el, r.next);
+					else r.parent.appendChild(r.el);
+				});
 			} else {
-				if (scrollRow && sortEl.parentElement !== scrollRow) {
-					// Sort appears just after the PDF (which jumps to order:-1
-					// via CSS), so practically it's the second visible item.
-					scrollRow.insertBefore(sortEl, scrollRow.firstChild);
-				}
+				relocatable.forEach(r => { if (groupEls[r.group]) groupEls[r.group].appendChild(r.el); });
 			}
 		}
-		placeSort();
-		mqDesktop.addEventListener('change', placeSort);
+		placeControls();
+		mqDesktop.addEventListener('change', () => { placeControls(); closePanel(); });
+
+		function openPanel() {
+			if (!filterPanel) return;
+			filterPanel.classList.add('is-open');
+			if (filterBackdrop) filterBackdrop.classList.add('is-open');
+			if (filterTrigger) filterTrigger.setAttribute('aria-expanded', 'true');
+			document.body.style.overflow = 'hidden';
+		}
+		function closePanel() {
+			if (!filterPanel || !filterPanel.classList.contains('is-open')) return;
+			filterPanel.classList.remove('is-open');
+			if (filterBackdrop) filterBackdrop.classList.remove('is-open');
+			if (filterTrigger) filterTrigger.setAttribute('aria-expanded', 'false');
+			document.body.style.overflow = '';
+			closeAllDropdowns();
+		}
+		if (filterTrigger) {
+			filterTrigger.addEventListener('click', () => {
+				if (filterPanel && filterPanel.classList.contains('is-open')) closePanel();
+				else openPanel();
+			});
+		}
+		if (filterBackdrop) filterBackdrop.addEventListener('click', closePanel);
+		if (filterPanel) {
+			const closeBtn = filterPanel.querySelector('.pf-cat-filter-close');
+			if (closeBtn) closeBtn.addEventListener('click', closePanel);
+			const applyBtn = filterPanel.querySelector('.pf-cat-panel-apply');
+			if (applyBtn) applyBtn.addEventListener('click', closePanel);
+			const panelReset = filterPanel.querySelector('.pf-cat-panel-reset');
+			if (panelReset) panelReset.addEventListener('click', resetAll);
+		}
+
+		// Badge du bouton « Filtres » : nombre de filtres actifs dans le panneau
+		// (format, public, type×n, langue×n, découvrir, tri non-défaut).
+		function activeFilterCount() {
+			let n = 0;
+			if (state.format)    n++;
+			if (state.public)    n++;
+			['type', 'langues'].forEach(k => {
+				if (state[k]) n += String(state[k]).split(',').filter(Boolean).length;
+			});
+			if (state.decouvrir) n++;
+			if (state.orderby !== DEFAULTS.orderby || state.order !== DEFAULTS.order) n++;
+			return n;
+		}
+		function updateFilterBadge() {
+			if (!filterCount) return;
+			const n = activeFilterCount();
+			filterCount.textContent = String(n);
+			filterCount.hidden = (n === 0);
+			if (filterTrigger) filterTrigger.classList.toggle('has-active', n > 0);
+		}
+
+		// Réinitialisation complète — partagée par le chip « Tout réinitialiser »
+		// (rebindé à chaque réponse AJAX) et le bouton du panneau.
+		function resetAll() {
+			const cleared = {};
+			Object.keys(state).forEach(k => { cleared[k] = (DEFAULTS[k] !== undefined) ? DEFAULTS[k] : ''; });
+			cleared.category = '';
+			cleared.univers  = '';
+			setFilters(cleared);
+			root.querySelectorAll('.pf-cat-dropdown').forEach(dd => {
+				const f = dd.dataset.filter;
+				if (f === '_pdf') return;
+				setSelectedInDropdown(dd, '', dd.dataset.multi === 'true');
+			});
+			syncSortUI();
+			if (searchInput) { searchInput.value = ''; refreshSearchState(); }
+		}
+
+		updateFilterBadge();
 
 		// ── Dropdowns: open/close + positioning + outside-click
 		dropdowns.forEach(dd => {
@@ -104,7 +209,7 @@
 			closeAllDropdowns();
 		}, true);
 
-		document.addEventListener('keydown', e => { if (e.key === 'Escape') closeAllDropdowns(); });
+		document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeAllDropdowns(); closePanel(); } });
 		window.addEventListener('scroll', closeAllDropdowns, { passive: true });
 		window.addEventListener('resize', closeAllDropdowns);
 
@@ -325,21 +430,7 @@
 				});
 			});
 			const reset = root.querySelector('.pf-cat-reset-all');
-			if (reset) reset.addEventListener('click', () => {
-				const cleared = {};
-				Object.keys(state).forEach(k => { cleared[k] = (DEFAULTS[k] !== undefined) ? DEFAULTS[k] : ''; });
-				cleared.category = '';
-				cleared.univers  = '';
-				setFilters(cleared);
-				// Reset every dropdown DOM state
-				root.querySelectorAll('.pf-cat-dropdown').forEach(dd => {
-					const f = dd.dataset.filter;
-					if (f === '_pdf') return;
-					setSelectedInDropdown(dd, '', dd.dataset.multi === 'true');
-				});
-				syncSortUI();
-				if (searchInput) { searchInput.value = ''; refreshSearchState(); }
-			});
+			if (reset) reset.addEventListener('click', resetAll);
 		}
 
 		function syncSortUI() {
@@ -444,6 +535,7 @@
 			// Rayon switch
 			syncUniversUI();
 			syncNavMenu();
+			updateFilterBadge();
 		}
 
 		// ── URL sync
