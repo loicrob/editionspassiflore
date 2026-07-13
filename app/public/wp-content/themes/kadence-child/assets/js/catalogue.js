@@ -51,6 +51,7 @@
 
 		syncFormatUI();
 		syncDisplayUI();
+		syncNavMenu();
 
 		// ── Sort placement: on desktop sort lives inside .pf-cat-search-sort
 		// (next to search, so collapsing it on focus lets search grow). On
@@ -372,6 +373,26 @@
 			});
 		}
 
+		// ── Header nav sub-menu sync. Catalogue filtering never triggers a
+		// full page reload (pushState only), so the server-rendered
+		// current-menu-item classes on the category sub-menu (header-hooks.php)
+		// go stale as soon as a filter changes in-page. Re-derive them from
+		// the live state instead, on every filter change (and on init, which
+		// also fills in the ancestor highlight the server-side render skips).
+		function syncNavMenu() {
+			document.querySelectorAll('a[data-pf-cat]').forEach(a => {
+				const li = a.closest('li.menu-item');
+				if (!li) return;
+				li.classList.remove('current-menu-item', 'current_page_item', 'current-product_cat-ancestor');
+				const slug = a.dataset.pfCat;
+				if (state.category ? slug === state.category : slug === state.univers) {
+					li.classList.add('current-menu-item', 'current_page_item');
+				} else if (state.category && slug === state.univers) {
+					li.classList.add('current-product_cat-ancestor');
+				}
+			});
+		}
+
 		// ── Display switch : grise l'option tranches quand le format peut
 		// afficher des liseuses, et rebascule sur couvertures si besoin.
 		// Retourne true si le display a dû changer.
@@ -422,6 +443,7 @@
 			});
 			// Rayon switch
 			syncUniversUI();
+			syncNavMenu();
 		}
 
 		// ── URL sync
@@ -461,6 +483,7 @@
 			syncUniversUI();
 			syncFormatUI();
 			syncDisplayUI();
+			syncNavMenu();
 			fetchAndUpdate();
 		});
 

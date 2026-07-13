@@ -80,9 +80,15 @@ function passiflore_render_event_organizer( $event_id ) {
 			$rows[] = '<a href="' . esc_url( $site ) . '" target="_blank" rel="noopener noreferrer">'
 				. esc_html( preg_replace( '#^https?://(www\.)?#', '', untrailingslashit( $site ) ) ) . '</a>';
 		}
-		$email = function_exists( 'tribe_get_organizer_email' ) ? tribe_get_organizer_email( $oid ) : '';
-		if ( $email && is_email( $email ) ) {
-			$rows[] = '<a href="mailto:' . esc_attr( $email ) . '">' . esc_html( $email ) . '</a>';
+		// Email brut pour la validation is_email() (antispambot() remplace le @ par une
+		// entité HTML, is_email() ne le reconnaîtrait plus) ; obfusqué pour l'affichage —
+		// même protection que TEC applique nativement (tribe_get_organizer_email(), qui
+		// antispambot() par défaut). esc_url()/esc_html() sont "entity aware" (n'encodent
+		// pas deux fois les entités déjà valides) : l'obfuscation survit intacte.
+		$email_raw = function_exists( 'tribe_get_organizer_email' ) ? tribe_get_organizer_email( $oid, false ) : '';
+		if ( $email_raw && is_email( $email_raw ) ) {
+			$email_obfuscated = antispambot( $email_raw );
+			$rows[] = '<a href="' . esc_url( 'mailto:' . $email_obfuscated ) . '">' . esc_html( $email_obfuscated ) . '</a>';
 		}
 		$phone = function_exists( 'tribe_get_organizer_phone' ) ? tribe_get_organizer_phone( $oid ) : '';
 		if ( $phone ) {

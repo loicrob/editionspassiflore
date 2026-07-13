@@ -257,7 +257,7 @@
 			topWrap = el('div', 'pf-ev-top');
 			pastBtn = roundBtn('pf-ev-pastbtn', 'Charger les événements passés', ARROW_UP, true);
 			topWrap.appendChild(pastBtn);
-			topWrap.appendChild(btnLabel('Événements précédents'));
+			topWrap.appendChild(btnLabel('Événements passés'));
 			list.parentNode.insertBefore(topWrap, list);
 
 			pastBtn.addEventListener('click', onPastClick);

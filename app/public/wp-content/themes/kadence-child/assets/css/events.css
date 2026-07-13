@@ -218,18 +218,21 @@
 }
 
 /* « S'abonner » : bouton primary calqué sur le trigger primary du catalogue
-   (.pf-cat-pdf.pf-cat-primary .pf-cat-trigger) — padding/typo/rayon/gap identiques,
-   icône kebab ⋮ à droite (comme .pf-cat-caret) au lieu du chevron TEC.
-   `!important` car le survol natif de TEC est très spécifique (0,4,0). */
+   (.pf-cat-pdf.pf-cat-primary .pf-cat-trigger). Sans JS (fallback), reste un
+   pill uni avec kebab décoratif (::after) : clique n'importe où ouvre le menu
+   natif TEC à 6 options. `!important` car le survol natif de TEC est très
+   spécifique (0,4,0). */
 .pf-events-header-bar__right .tribe-events-c-subscribe-dropdown__button {
     display: flex;
     align-items: center;
     gap: 6px;
-    padding: 8px 12px !important;
     font-size: 14px;
     font-weight: var(--pf-weight-normal);
     line-height: 1.2;
     border-radius: var(--pf-radius-md);
+}
+.pf-events-header-bar__right .tribe-events-c-subscribe-dropdown__button:not([data-pf-ical-enhanced]) {
+    padding: 8px 12px !important;
     background-color: var(--pf-accent) !important;
     border-color: var(--pf-accent) !important;
     color: var(--pf-surface) !important;
@@ -239,12 +242,14 @@
    navigateur (fond, bordure, contour) ressort par-dessus le fond rouge → cadre
    blanc autour du texte. On la neutralise nous-mêmes plutôt que de dépendre
    d'une feuille de style tribe-common tierce. */
-.pf-events-header-bar__right .tribe-events-c-subscribe-dropdown__button-text {
+.pf-events-header-bar__right .tribe-events-c-subscribe-dropdown__button:not([data-pf-ical-enhanced]) .tribe-events-c-subscribe-dropdown__button-text {
     background: transparent !important;
     border: 0 !important;
     outline: none !important;
     padding: 0 !important;
     color: inherit !important;
+}
+.pf-events-header-bar__right .tribe-events-c-subscribe-dropdown__button-text {
     font-weight: var(--pf-weight-normal);
     /* Sans ça, le texte repasse à la ligne pendant la transition mobile
        is-searching (le conteneur rétrécit en continu jusqu'à max-width:0) →
@@ -257,19 +262,66 @@
 .pf-events-header-bar__right .tribe-events-c-subscribe-dropdown__button-icon {
     display: none !important;
 }
-.pf-events-header-bar__right .tribe-events-c-subscribe-dropdown__button::after {
+.pf-events-header-bar__right .tribe-events-c-subscribe-dropdown__button:not([data-pf-ical-enhanced])::after {
     content: '⋮';
     font-size: 16px;
     line-height: 1;
     letter-spacing: -1px;
 }
-.pf-events-header-bar__right .tribe-events-c-subscribe-dropdown__button:hover,
-.pf-events-header-bar__right .tribe-events-c-subscribe-dropdown__button:focus,
-.pf-events-header-bar__right .tribe-events-c-subscribe-dropdown__button:focus-within,
-.pf-events-header-bar__right .tribe-events-c-subscribe-dropdown__button.tribe-events-c-subscribe-dropdown__button--active {
+.pf-events-header-bar__right .tribe-events-c-subscribe-dropdown__button:not([data-pf-ical-enhanced]):hover,
+.pf-events-header-bar__right .tribe-events-c-subscribe-dropdown__button:not([data-pf-ical-enhanced]):focus,
+.pf-events-header-bar__right .tribe-events-c-subscribe-dropdown__button:not([data-pf-ical-enhanced]):focus-within,
+.pf-events-header-bar__right .tribe-events-c-subscribe-dropdown__button:not([data-pf-ical-enhanced]).tribe-events-c-subscribe-dropdown__button--active {
     background-color: var(--pf-accent-dark) !important;
     border-color: var(--pf-accent-dark) !important;
     color: var(--pf-surface) !important;
+}
+
+/* Amélioré par subscribe-calendar.js : le pill uni ci-dessus devient deux
+   moitiés soudées, motif de la paire rayon/thématiques du catalogue
+   (.pf-splitbtn--solid, style.css, mêmes padding/font-size/line-height que
+   .pf-switch__btn → même hauteur que le sélecteur Liste/Mois/Carte) —
+   libellé = action directe vers le calendrier détecté, kebab = rouvre le menu
+   natif TEC à 6 options (aucun handler dédié : un clic dans .__button suffit
+   à déclencher son toggle délégué, cf. subscribe-calendar.js). */
+.pf-events-header-bar__right .tribe-events-c-subscribe-dropdown__button[data-pf-ical-enhanced] {
+    gap: 0;
+    align-items: stretch;
+    padding: 0 !important;
+    background: none !important;
+    border: 0 !important;
+}
+/* `.pf-splitbtn__main` (style.css) perd la bataille de spécificité contre
+   `.tribe-common-c-btn--clear` (TEC, common-full.css, même spécificité 0,1,0,
+   gagne à l'ordre de chargement) qui repasse padding/border/background à 0 —
+   on réaffirme les valeurs du composant partagé en `!important`. */
+.pf-events-header-bar__right .tribe-events-c-subscribe-dropdown__button[data-pf-ical-enhanced] .pf-splitbtn__main {
+    display: flex !important;
+    padding: 8px 14px !important;
+    border: 1px solid var(--pf-accent) !important;
+    background: var(--pf-accent) !important;
+    color: var(--pf-surface) !important;
+}
+.pf-events-header-bar__right .tribe-events-c-subscribe-dropdown__button[data-pf-ical-enhanced] .pf-splitbtn__main:hover {
+    background: var(--pf-accent-dark) !important;
+    border-color: var(--pf-accent-dark) !important;
+}
+/* Même gotcha pour le kebab (`.tribe-common *`, cf. règle 5 plus haut dans ce
+   fichier CLAUDE.md — reset (0,1,0) qui écrase `.pf-splitbtn__more`, même
+   spécificité, gagné à l'ordre de chargement). */
+.pf-events-header-bar__right .tribe-events-c-subscribe-dropdown__button[data-pf-ical-enhanced] .pf-splitbtn__more {
+    display: flex !important;
+    padding: 0 10px !important;
+    min-width: 36px !important;
+    border: 1px solid var(--pf-accent) !important;
+    border-left: none !important;
+    background: var(--pf-accent) !important;
+    color: var(--pf-surface) !important;
+    font-size: 20px !important;
+}
+.pf-events-header-bar__right .tribe-events-c-subscribe-dropdown__button[data-pf-ical-enhanced] .pf-splitbtn__more:hover {
+    background: var(--pf-accent-dark) !important;
+    border-color: var(--pf-accent-dark) !important;
 }
 
 @media (max-width: 781px) {
@@ -428,7 +480,7 @@
    quand les deux sont !important (la spécificité tranche avant l'ordre des règles). Ancestor
    qualifié pour dépasser confortablement TEC sur les deux propriétés. */
 .tribe-events-calendar-list__event-wrapper.pf-card .tribe-events-calendar-list__event-description.pf-card-text.pf-card-text--clamp-2 {
-    margin-top: var(--tec-spacer-2, 0.8rem) !important;
+    margin-top: 0 !important;
     display: -webkit-box !important;
 }
 
@@ -436,8 +488,8 @@
    passiflore_render_event_card_meta) — porte le filet qui séparait auparavant
    .pf-event-participants seul, puisque celui-ci n'est plus qu'une ligne parmi d'autres ici. */
 .pf-event-card-meta {
-    margin-top: var(--tec-spacer-3, 1rem) !important;
-    padding-top: var(--tec-spacer-3, 0.9rem) !important;
+    margin-top: var(--pf-space-3) !important;
+    padding-top: var(--pf-space-3) !important;
     border-top: 1px solid var(--pf-border) !important;
     display: flex;
     flex-direction: column;
@@ -452,8 +504,8 @@
 }
 .pf-event-card-meta-icon {
     grid-row: 1 / 3;
-    width: 1.4rem;
-    height: 1.4rem;
+    width: 1.9rem;
+    height: 1.9rem;
     color: var(--pf-muted);
 }
 .pf-event-card-meta-icon svg {
@@ -464,8 +516,34 @@
 .pf-event-card-meta-row .pf-label,
 .pf-event-card-meta-row .pf-card-text {
     grid-column: 2;
+    line-height: var(--pf-leading-snug);
 }
 .pf-event-card-meta-row .pf-label {
+    font-size: var(--pf-text-xs);
+}
+/* Lignes sans label (date, lieu) : flex plutôt que la grille label/valeur — centre
+   l'icône avec le .pf-card-text quel que soit son nombre de lignes (1 ou 2). */
+.pf-event-card-meta-row--nolabel {
+    display: flex;
+    align-items: center;
+}
+/* Ligne principale + sous-ligne (date/heure, lieu/ville) : chacune clampée à une ligne,
+   interligne resserré (--pf-leading-snug) pour rapprocher les deux lignes. */
+.pf-event-card-meta-name,
+.pf-event-card-meta-sub {
+    display: block;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    line-height: var(--pf-leading-tight);
+}
+.pf-event-card-meta-name {
+    font-weight: var(--pf-weight-bold);
+}
+.pf-event-card-meta-row--lieu .pf-event-card-meta-name {
+    font-weight: var(--pf-weight-normal);
+}
+.pf-event-card-meta-sub {
     font-size: var(--pf-text-xs);
 }
 
@@ -615,7 +693,7 @@
     aspect-ratio: auto;
     min-height: 180px;
     overflow: hidden;
-    border-radius: var(--pf-radius-card);
+    border-radius: var(--pf-radius-md);
 }
 .tribe-common--breakpoint-medium.tribe-events .tribe-events-calendar-list__event-wrapper.pf-card .tribe-events-calendar-list__event-featured-image {
     position: absolute !important;
@@ -626,12 +704,24 @@
     height: 100% !important;
     object-fit: contain !important;
     transform: translateX(-50%) !important;   /* centré + annule le zoom au survol de .pf-card */
-    border-radius: var(--pf-radius-card);
+    border-radius: var(--pf-radius-md);
     display: block;
 }
 .tribe-common--breakpoint-medium.tribe-events .tribe-events-calendar-list__event-wrapper.pf-card .tribe-events-calendar-list__event-details {
     flex: 1 1 auto;
     min-width: 0;
+    /* La colonne détails s'étire (align-items:stretch de la rangée) à la hauteur de
+       l'image quand celle-ci est plus grande que son contenu — d'où un espace vide
+       sous le bloc meta si le titre/texte est court. On passe en colonne flex pour
+       pouvoir la coller en bas (règle suivante) plutôt que la laisser flotter en haut. */
+    display: flex;
+    flex-direction: column;
+    gap: var(--pf-space-3);
+}
+/* Colle le bloc Lieu/Organisateur/Participants en bas de la colonne détails, quelle
+   que soit la hauteur imposée par l'image (cf. règle ci-dessus). */
+.tribe-common--breakpoint-medium.tribe-events .tribe-events-calendar-list__event-wrapper.pf-card .pf-event-card-meta {
+    margin-top: auto !important;
 }
 
 .tribe-events-c-subscribe-dropdown {
@@ -818,7 +908,7 @@ h3:has(> .tribe-events-calendar-list__month-separator-text) {
    Plus de padding ici : il est porté par le wrapper interne .pf-card-content, donc
    l'image reste plein-cadre sans marges négatives. */
 .pf-event-tile {
-    flex: 0 0 290px;
+    flex: 0 0 250px;
 }
 
 .pf-event-tile__image {
@@ -835,81 +925,64 @@ h3:has(> .tribe-events-calendar-list__month-separator-text) {
     display: block;
 }
 
+/* Pas d'image mise en avant : pictogramme calendrier centré sur fond crème. */
+.pf-event-tile__image--placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--pf-cream-dark);
+    color: var(--pf-border);
+}
+.pf-event-tile__image--placeholder svg {
+    width: 28%;
+    height: 28%;
+}
+
 /* (survol → rouge du titre + zoom image : gérés globalement par .pf-card:hover) */
 
 /* ── Éléments intérieurs ── */
-
-/* Filet de séparation date/info : géré par .pf-card-content--separated. */
-.pf-event-date {
-    display: flex;
-    flex-direction: column;
-}
-
-.pf-event-mois {
-    font-size: 0.62rem;
-    letter-spacing: 0.18em;
-    font-weight: 700;
-    color: var(--pf-accent);
-    line-height: 1;
-    margin-bottom: 0.15rem;
-}
-
-.pf-event-date-ligne {
-    display: flex;
-    align-items: baseline;
-    gap: 0.35rem;
-}
-
-.pf-event-jour {
-    font-size: 2.6rem;
-    font-weight: 700;
-    line-height: 1;
-    color: var(--pf-heading);
-}
-
-.pf-event-heure {
-    font-size: 0.72rem;
-    font-weight: 600;
-    letter-spacing: 0.06em;
-    color: var(--pf-text);
-    margin-top: 0.3rem;
-}
 
 .pf-event-info {
     flex: 1;
 }
 
-/* Titre de tuile : style global .pf-card-title (style.css). L'espacement vers
-   le lieu (ex-margin-bottom du titre) est porté par le margin-top du lieu. */
-
-.pf-event-lieu {
-    font-size: 0.8rem;
-    color: var(--pf-muted);
-    margin: 0.5rem 0 0;
-    line-height: 1.4;
+/* Titre de tuile : style global .pf-card-title (style.css), taille réduite. */
+.pf-event-tile .pf-card-title {
+    font-size: var(--pf-text-sm) !important;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
 }
 
 .pf-event-tile .pf-card-text {
     font-size: 0.82rem;
     line-height: 1.6;
-    margin: 0.75rem 0 0;
+    margin: var(--pf-space-1) 0 0;
     display: -webkit-box;
-    -webkit-line-clamp: 4;
-    line-clamp: 4;
+    -webkit-line-clamp: 3;
+    line-clamp: 3;
     -webkit-box-orient: vertical;
     overflow: hidden;
 }
 
-.pf-event-tile .pf-event-participants {
-    font-size: 0.82rem;
-    /* L'espacement/filet vient de .pf-card-content--separated (gap) ;
-       on annule le margin-top !important de la base pour ne pas doubler. */
+/* Neutralise le clamp 3 lignes + margin-top de l'extrait (règle ci-dessus) pour la
+   valeur de la ligne "Lieu" — pas un extrait, pas d'espacement au-dessus du nom. */
+.pf-event-tile .pf-event-card-meta-row .pf-card-text {
+    margin-top: 0;
+    display: block;
+}
+
+/* Dans la card (contrairement aux tiles liste/recherche), .pf-event-card-meta est un
+   enfant flex direct de .pf-card-content--separated : son propre margin-top s'ajoute
+   au `gap` du conteneur (flexbox n'effondre pas les marges) → double espacement. */
+.pf-card-content--separated > .pf-event-card-meta {
     margin-top: 0 !important;
 }
 
 @media ( max-width: 768px ) {
     .pf-event-tile  { flex: 0 0 250px; }
-    .pf-event-tile .pf-card-text { -webkit-line-clamp: 3; line-clamp: 3; }
 }
 
 @media ( max-width: 480px ) {

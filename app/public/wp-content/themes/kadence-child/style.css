@@ -280,6 +280,17 @@ a.pf-value:hover, .pf-value-container a:hover, a.pf-value-highlight:hover, .pf-v
     box-shadow: none;
 }
 
+/* Lien-bouton qui ouvre dans un nouvel onglet → flèche indicatrice après le texte,
+   posée automatiquement via [target="_blank"] (pas besoin de l'ajouter à la main dans
+   chaque libellé). Caractère ➜ (pointe vers l'est) tourné de -45deg pour pointer vers
+   le nord-est ; inline-block requis pour que la rotation s'applique proprement. */
+a.button[target="_blank"]::after {
+    content: "➜";
+    display: inline-block;
+    margin-left: 0.4em;
+    transform: rotate(-45deg);
+}
+
 /* Défauts de titres — s'appliquent aussi au contenu créé par les admins (Gutenberg).
    h1 serif, h2–h6 sans. Les classes .pf-titre-* / .pf-label surchargent au besoin. */
 h1,h2,h3,h4,h5,h6 {
@@ -369,7 +380,7 @@ h6 { font-family: var(--pf-font-body);    font-weight: var(--pf-weight-normal); 
     gap: var(--pf-space-3);
 }
 .pf-card-content--separated > * + * {
-    border-top: 1px solid var(--tec-color-border-default, var(--pf-border)) !important;
+    border-top: 1px solid var(--pf-border) !important;
     padding-top: var(--pf-space-3);
 }
 /* Texte descriptif (bio, extrait…) — secondaire, donc en gris atténué. */
@@ -1353,6 +1364,56 @@ h2.pf-section-titre a::after {
 /* Variante --solid : segment actif en aplat rouge (sélecteur de vue Liste/Mois TEC). */
 .pf-switch--solid .pf-switch__btn.is-active { background: var(--pf-accent); color: var(--pf-surface); }
 .pf-switch--solid .pf-switch__btn:not(.is-active):hover { background: var(--pf-cream-dark); color: var(--pf-accent); }
+
+/* =========================================================
+   Bouton scindé — libellé principal (action directe) + kebab accolé
+   (options secondaires), mêmes deux moitiés de pilule bordées que la
+   paire rayon/thématiques du catalogue (Littérature ⋮ / Culture Sud-Ouest ⋮).
+   Même formule padding/font-size/line-height que .pf-switch__btn pour
+   s'aligner en hauteur avec les contrôles de barre adjacents.
+   Variante --solid : aplat rouge permanent (CTA primaire, ex. « S'abonner »). ==== */
+.pf-splitbtn { display: inline-flex; align-items: stretch; }
+.pf-splitbtn__main {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    border: 1px solid var(--pf-border-light);
+    border-radius: var(--pf-radius-md) 0 0 var(--pf-radius-md);
+    background: var(--pf-cream);
+    color: var(--pf-text);
+    font-family: inherit;
+    font-size: 14px;
+    line-height: 1.2;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+.pf-splitbtn__more {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 10px;
+    min-width: 36px;
+    border: 1px solid var(--pf-border-light);
+    border-left: none;
+    border-radius: 0 var(--pf-radius-md) var(--pf-radius-md) 0;
+    background: var(--pf-cream);
+    color: var(--pf-text);
+    font-size: 20px;
+    line-height: 1;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+.pf-splitbtn__main:hover, .pf-splitbtn__more:hover { background: var(--pf-red-soft-strong); color: var(--pf-accent); }
+.pf-splitbtn--solid .pf-splitbtn__main,
+.pf-splitbtn--solid .pf-splitbtn__more {
+    border-color: var(--pf-accent);
+    background: var(--pf-accent);
+    color: var(--pf-surface);
+}
+.pf-splitbtn--solid .pf-splitbtn__main:hover,
+.pf-splitbtn--solid .pf-splitbtn__more:hover { background: var(--pf-accent-dark); border-color: var(--pf-accent-dark); }
 
 /* =========================================================
    Menu déroulant — trigger bordé + menu flottant (position:fixed, placé en JS).

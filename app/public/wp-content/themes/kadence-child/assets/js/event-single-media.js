@@ -19,6 +19,18 @@
 	var img = layout.querySelector('.pf-event-hero__img');
 	if (!img) return;
 
+	// Résout une longueur --pf-* (souvent en rem) en pixels. getComputedStyle sur une
+	// custom property renvoie la valeur BRUTE (ex. "1.5rem"), pas la valeur résolue —
+	// contrairement à une propriété standard. Un élément jetable la fait résoudre.
+	function pxVar( name ) {
+		var probe = document.createElement( 'div' );
+		probe.style.cssText = 'position:absolute;visibility:hidden;height:var(' + name + ');width:0;';
+		document.body.appendChild( probe );
+		var px = parseFloat( getComputedStyle( probe ).height ) || 0;
+		document.body.removeChild( probe );
+		return px;
+	}
+
 	function size() {
 		if (window.innerWidth < 1024) {
 			layout.style.removeProperty('--pf-event-media-col');
@@ -27,10 +39,11 @@
 		var natW = img.naturalWidth, natH = img.naturalHeight;
 		if (!natW || !natH) return; // image pas encore chargée
 
-		var offset = parseFloat(
+		var offset  = parseFloat(
 			getComputedStyle(document.documentElement).getPropertyValue('--pf-sticky-offset')
-		) || 0;
-		var availH = window.innerHeight - offset;     // hauteur de la boîte image collée
+		) || 0; // posé en JS (recherche-globale.js) → déjà en px, pas besoin de pxVar()
+		var gutter  = pxVar( '--pf-space-6' ); // margin haut+bas de .pf-event-hero__media-inner (event-single.css)
+		var availH  = window.innerHeight - offset - gutter * 2; // hauteur de la boîte image collée
 		var maxW   = layout.clientWidth * 0.4;         // plafond : 40% du conteneur
 		var byH    = availH * (natW / natH);           // largeur si l'image remplit la hauteur
 

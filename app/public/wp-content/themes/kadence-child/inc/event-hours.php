@@ -102,6 +102,19 @@ function pf_event_has_daily_hours( int $event_id ): bool {
 }
 
 /**
+ * Le planning contient-il au moins un jour "informatif" (ferme, journee entiere, ou avec
+ * une heure de debut saisie) ? Un planning ou AUCUN jour n'a d'info (jamais renseigne au-
+ * dela des dates de debut/fin) n'apporte rien — pas la peine d'afficher la section
+ * Horaires dans ce cas. Des journees entieres suffisent en revanche a la justifier.
+ */
+function pf_event_daily_hours_informative( array $hours ): bool {
+	foreach ( $hours as $h ) {
+		if ( ! empty( $h['closed'] ) || ! empty( $h['allday'] ) || ! empty( $h['start'] ) ) return true;
+	}
+	return false;
+}
+
+/**
  * Une heure "H:i:s" est-elle la sentinelle "pas d'heure de fin" (fin de journee) ?
  */
 function pf_event_is_sentinel_time( string $his ): bool {

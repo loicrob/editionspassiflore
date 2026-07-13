@@ -126,6 +126,17 @@ function passiflore_enqueue_auteurs_styles() {
             '1.0.0'
         );
     }
+    // Bouton « S'abonner » : action directe vers le calendrier probable du visiteur.
+    // Vues d'archive uniquement — la fiche événement n'utilise pas ce menu (simple lien .ics).
+    if ( function_exists( 'tribe_is_event_query' ) && tribe_is_event_query() ) {
+        wp_enqueue_script(
+            'pf-subscribe-calendar',
+            get_stylesheet_directory_uri() . '/assets/js/subscribe-calendar.js',
+            [],
+            filemtime( get_stylesheet_directory() . '/assets/js/subscribe-calendar.js' ),
+            true
+        );
+    }
     if ( is_singular( 'tribe_events' ) ) {
         wp_enqueue_style(
             'pf-event-single',
@@ -270,3 +281,4 @@ require_once get_stylesheet_directory() . '/inc/class-reading-list.php';
 require_once get_stylesheet_directory() . '/inc/class-mes-avis.php';
 require_once get_stylesheet_directory() . '/inc/recommendations.php';
 require_once get_stylesheet_directory() . '/inc/shipping.php';
+require_once get_stylesheet_directory() . '/inc/shortcodes.php';

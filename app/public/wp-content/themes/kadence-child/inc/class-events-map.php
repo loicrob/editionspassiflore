@@ -298,10 +298,16 @@ class Passiflore_Events_Map {
 				. ' data-label="' . esc_attr( $label ) . '"'
 				. ' aria-label="' . esc_attr( sprintf( 'Carte du lieu : %s', $label ) ) . '"></div>';
 
-			// « Y aller » : itinéraire Google Maps par coordonnées (lien sortant, au clic).
-			$dir_url = 'https://www.google.com/maps/dir/?api=1&destination=' . rawurlencode( $lat . ',' . $lng );
-			echo '<a class="pf-btn pf-btn--outline pf-btn--sm pf-event-venue__go" href="' . esc_url( $dir_url )
-				. '" target="_blank" rel="noopener noreferrer">' . esc_html__( 'Y aller', 'kadence-child' ) . '</a>';
+			// « Voir sur Google Maps » : recherche par nom de lieu + adresse + ville (repli
+			// sur les coordonnées si rien n'est renseigné — lien sortant, au clic). Nom omis
+			// quand il duplique l'adresse ($name_is_address) : elle est déjà dans la requête,
+			// pas la peine de la répéter deux fois.
+			$search_name = ( $name && ! $name_is_address ) ? $name : '';
+			$search_q    = trim( implode( ' ', array_filter( [ $search_name, $address, $city ] ) ) );
+			if ( '' === $search_q ) $search_q = $lat . ',' . $lng;
+			$maps_url = 'https://www.google.com/maps/search/?api=1&query=' . rawurlencode( $search_q );
+			echo '<a class="button pf-btn pf-btn--outline pf-btn--sm pf-event-venue__go" href="' . esc_url( $maps_url )
+				. '" target="_blank" rel="noopener noreferrer">' . esc_html__( 'Google Maps', 'kadence-child' ) . '</a>';
 		}
 
 		echo '</div>';

@@ -45,7 +45,7 @@ function passiflore_render_auteur_card( $term_id, $args = [] ) {
                 <span class="pf-auteur-nom-de-famille"><?php echo esc_html( $nom ); ?></span>
             </span>
             <?php if ( ( $args['variant'] !== 'compact' || $args['show_bio'] ) && $bio ) : ?>
-                <p class="pf-card-text"><?php echo esc_html( $bio ); ?></p>
+                <p class="pf-card-text"><?php echo nl2br( esc_html( $bio ) ); ?></p>
             <?php endif; ?>
         </div>
     </<?php echo $tag; ?>>

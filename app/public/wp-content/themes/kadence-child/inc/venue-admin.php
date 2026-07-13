@@ -135,6 +135,17 @@ const PF_VENUE_DEPARTEMENTS = [
 	[ 'code' => '78',  'name' => 'Yvelines' ],
 ];
 
+/**
+ * Code du departement (ex. "40") a partir du nom stocke en _VenueDepartement
+ * (ex. "Landes"). Utilise pour l'affichage "Ville (40)" des lieux d'evenement.
+ */
+function pf_venue_departement_code( string $name ): string {
+	foreach ( PF_VENUE_DEPARTEMENTS as $d ) {
+		if ( $d['name'] === $name ) return $d['code'];
+	}
+	return '';
+}
+
 const PF_VENUE_REGIONS = [
 	'Auvergne-Rhône-Alpes',
 	'Bourgogne-Franche-Comté',

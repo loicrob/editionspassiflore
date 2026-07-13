@@ -245,7 +245,7 @@ function passiflore_render_sections_layout() {
 		$sections[] = [
 			'id'    => 'bs-resume',
 			'label' => 'Résumé',
-			'html'  => '<div class="bs-section__body entry-content">' . wp_kses_post( $description ) . '</div>',
+			'html'  => '<div class="bs-section__body entry-content">' . apply_filters( 'the_content', $description ) . '</div>',
 		];
 	}
 
@@ -465,7 +465,7 @@ function passiflore_render_presse_section( array $items ): void {
 			echo '<strong class="pf-card-title">' . esc_html( $article['titre'] ) . '</strong>';
 		}
 		if ( ! empty( $article['description'] ) ) {
-			echo '<p class="pf-card-text">' . esc_html( $article['description'] ) . '</p>';
+			echo '<p class="pf-card-text">' . nl2br( esc_html( $article['description'] ) ) . '</p>';
 		}
 		if ( ( $article['type'] ?? '' ) === 'lien' && ! empty( $article['lien'] ) ) {
 			echo '<a class="bs-media-link" href="' . esc_url( $article['lien'] ) . '" target="_blank" rel="noopener noreferrer">Lire l’article ➜</a>';

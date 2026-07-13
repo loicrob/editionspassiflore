@@ -40,9 +40,12 @@
 		"nav  topsec media"
 		"nav  botsec botsec";
 	column-gap: var(--pf-space-8);
-	row-gap: var(--pf-space-4);
+	row-gap: var(--pf-space-6);
 	align-items: start;
-	padding: var(--pf-space-4) 0 var(--pf-space-10);
+	/* Pas de padding-top ici : `.entry-content.single-content` (Kadence) pose déjà
+	   un margin-top: var(--global-md-spacing) au-dessus — un padding-top propre à
+	   cette page s'ajouterait au lieu de le remplacer (double espacement en haut). */
+	padding: 0 0 var(--pf-space-10);
 }
 
 .pf-event-hero__head            { grid-area: head;   min-width: 0; }
@@ -66,10 +69,19 @@
 	max-width: 40vw; /* garde-fou avant que le JS ne pose --pf-event-media-col */
 }
 
+/* Espace propre à l'image, indépendant de l'espacement en tête de page (cf. .pf-event-hero
+   ci-dessus, qui n'a plus de padding-top) : porté sur `top`/`height`, PAS `margin`. Un
+   sticky se pose exactement sur la valeur de `top` une fois accroché — sa propre marge
+   ne compte pas à ce moment-là (vérifié : margin-top ignoré une fois collé). Décaler
+   `top` de var(--pf-space-6) donne donc un espace garanti sous la nav collée QUELLE QUE
+   SOIT l'image (contrairement au centrage flex seul, qui ne laisse du vide que si l'image
+   ne remplit pas toute la hauteur dispo) ; `height` réduite d'autant garde le même espace
+   en bas avant de décrocher (zone basse = Présence). Même valeur reprise en JS
+   (event-single-media.js) pour le calcul de largeur. */
 .pf-event-hero__media-inner {
 	position: sticky;
-	top: var(--pf-sticky-offset, 0px);
-	height: calc(100vh - var(--pf-sticky-offset, 0px));
+	top: calc(var(--pf-sticky-offset, 0px) + var(--global-md-spacing));
+	height: calc(100vh - var(--pf-sticky-offset, 0px) - (var(--global-md-spacing) * 2));
 	display: flex;
 	align-items: center;
 	justify-content: center;
@@ -111,10 +123,35 @@
 }
 
 /* ── Section « Lieu » : adresse + carte OSM + « Y aller » ────── */
+/* Mobile (≤767px) : empilé (nom+adresse, carte, « Y aller »). */
 .pf-event-venue {
 	display: grid;
 	gap: var(--pf-space-4);
 	justify-items: start;
+}
+
+/* Desktop + tablette (≥768px) : carte À DROITE du bloc {nom + adresse + bouton Google Maps}
+   (elle-même spanne les 2 rangées, à hauteur du bloc gauche complet). align-items:center :
+   la carte étant carrée (donc souvent plus haute que le texte de l'adresse), les deux
+   colonnes sont centrées l'une par rapport à l'autre plutôt que calées en haut. Scopé à
+   `:has(.pf-event-venue__map)` : un lieu sans coordonnées (pas de carte) garde son adresse
+   en pleine largeur au lieu d'être coincée dans une colonne étroite. */
+@media (min-width: 768px) {
+	.pf-event-venue:has(.pf-event-venue__map) {
+		/* Colonne adresse dimensionnée à son contenu (pas 1fr) : la carte étant
+		   désormais plafonnée à 350px, un 1fr aurait étiré la colonne adresse pour
+		   absorber tout l'espace restant, repoussant la carte loin à droite. */
+		grid-template-columns: minmax(0, max-content) minmax(0, 350px);
+		grid-template-areas:
+			"info map"
+			"go   map";
+		column-gap: var(--pf-space-6);
+		row-gap: var(--pf-space-3);
+		align-items: center;
+	}
+	.pf-event-venue:has(.pf-event-venue__map) .pf-event-venue__address { grid-area: info; }
+	.pf-event-venue:has(.pf-event-venue__map) .pf-event-venue__map     { grid-area: map; }
+	.pf-event-venue:has(.pf-event-venue__map) .pf-event-venue__go      { grid-area: go; justify-self: start; }
 }
 
 .pf-event-venue__address {
@@ -134,12 +171,15 @@
 	font-size: var(--pf-text-sm);
 }
 
-/* Conteneur Leaflet : hauteur explicite obligatoire (sinon rendu 0px). isolation
-   isolate → nouveau contexte d'empilement, les z-index internes de Leaflet
-   (contrôles ~1000) ne débordent pas au-dessus du header/nav sticky de la page. */
+/* Conteneur Leaflet : hauteur explicite obligatoire (sinon rendu 0px) — `aspect-ratio`
+   la dérive de la largeur (toujours carrée, quelle que soit la largeur disponible :
+   pleine largeur mobile, ou colonne étroite/large selon la présence de la nav+image
+   desktop). isolation:isolate → nouveau contexte d'empilement, les z-index internes
+   de Leaflet (contrôles ~1000) ne débordent pas au-dessus du header/nav sticky. */
 .pf-event-venue__map {
 	width: 100%;
-	height: 360px;
+	max-width: 350px;
+	aspect-ratio: 1 / 1;
 	border-radius: var(--pf-radius);
 	border: 1px solid var(--pf-border);
 	overflow: hidden;
@@ -211,9 +251,4 @@
 		max-width: 100%;
 		max-height: none;
 	}
-}
-
-/* Mobile seul : carte du lieu réduite. */
-@media (max-width: 767px) {
-	.pf-event-venue__map { height: 260px; }
 }

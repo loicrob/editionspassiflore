@@ -73,6 +73,23 @@ function passiflore_mobile_menu_account( $items, $args ) {
 }
 
 /**
+ * Marque chaque lien produit-catégorie du menu (réel ou injecté ci-dessous)
+ * d'un attribut data-pf-cat="{slug}". Le filtrage de la page Catalogue est
+ * entièrement AJAX (cf. class-catalogue.php / catalogue.js, history.pushState
+ * sans rechargement) : le JS s'appuie sur cet attribut pour resynchroniser
+ * l'état actif du sous-menu avec le filtre réellement appliqué dans la page.
+ */
+add_filter( 'nav_menu_link_attributes', function( $atts, $item ) {
+    if ( 'taxonomy' === $item->type && 'product_cat' === $item->object ) {
+        $term = get_term( $item->object_id, 'product_cat' );
+        if ( $term && ! is_wp_error( $term ) ) {
+            $atts['data-pf-cat'] = $term->slug;
+        }
+    }
+    return $atts;
+}, 10, 2 );
+
+/**
  * Sous-menus de catégories produit auto-synchronisés.
  *
  * Toute entrée de menu pointant vers une catégorie produit (product_cat, ex.
