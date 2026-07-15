@@ -34,9 +34,11 @@
 		const bar             = root.querySelector('.pf-catalogue-bar:not(.pf-catalogue-bar-top)');
 		const dropdowns       = root.querySelectorAll('.pf-cat-dropdown');
 
-		// Gate progressif : la bascule vers le panneau de filtres mobile
-		// (masquage de la rangée à scroll, bouton « Filtres ») n'est active que
-		// si le JS tourne. Sans JS, la barre garde son fallback empilé.
+		// Gate progressif : la bascule vers le panneau de filtres mobile n'est
+		// active que si le JS tourne (sans JS, repli sur la barre empilée). La
+		// classe est normalement déjà posée AVANT le 1er paint par un script
+		// inline (cf. render_shortcode) pour éviter tout clignotement ; on la
+		// re-confirme ici (idempotent) au cas où ce script serait retiré.
 		root.classList.add('pf-cat-js');
 
 		// Portal menus to <body> so their `position:fixed` is viewport-relative,
@@ -71,6 +73,16 @@
 		const filterBackdrop = root.querySelector('.pf-cat-filter-backdrop');
 		const panelBody      = filterPanel ? filterPanel.querySelector('.pf-cat-filter-panel__body') : null;
 		const filterCount    = filterTrigger ? filterTrigger.querySelector('.pf-cat-filter-count') : null;
+		const panelApply     = filterPanel ? filterPanel.querySelector('.pf-cat-panel-apply') : null;
+
+		// Compteur « N résultats » sur le bouton du panneau (les filtres sont
+		// appliqués en direct → il se met à jour à chaque réponse AJAX). Même règle
+		// de pluriel FR que le rendu PHP (results_label).
+		function updateResultCount(total) {
+			if (!panelApply || total == null) return;
+			const n = parseInt(total, 10) || 0;
+			panelApply.textContent = n + (n >= 2 ? ' résultats' : ' résultat');
+		}
 
 		// Regroupement dans le panneau : chaque sous-tableau = une rangée
 		// (contrôles côte à côte). L'emplacement d'origine de chaque contrôle est
@@ -137,8 +149,7 @@
 		if (filterPanel) {
 			const closeBtn = filterPanel.querySelector('.pf-cat-filter-close');
 			if (closeBtn) closeBtn.addEventListener('click', closePanel);
-			const applyBtn = filterPanel.querySelector('.pf-cat-panel-apply');
-			if (applyBtn) applyBtn.addEventListener('click', closePanel);
+			if (panelApply) panelApply.addEventListener('click', closePanel);
 			const panelReset = filterPanel.querySelector('.pf-cat-panel-reset');
 			if (panelReset) panelReset.addEventListener('click', resetAll);
 		}
@@ -635,6 +646,7 @@
 					if (!payload || !payload.success) return;
 					grid.innerHTML = payload.data.html;
 					updateCounts(payload.data.counts || {});
+					updateResultCount(payload.data.total);
 					updateChips();
 					scrollRows.forEach(updateFades);
 					// Re-bind bookshelf behaviors (spine hover flip, etc.)

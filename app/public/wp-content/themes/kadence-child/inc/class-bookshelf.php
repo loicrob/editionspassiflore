@@ -42,6 +42,13 @@ class Passiflore_Bookshelf {
 		self::$reco_annotations = $map;
 	}
 
+	/**
+	 * Nombre de livres (dédupliqués) du dernier rendu de [passiflore_etagere].
+	 * Sous-produit du rendu (count des $books, avant lazy-load d'affichage) : lu
+	 * par Passiflore_Catalogue pour le compteur « N résultats » du panneau.
+	 */
+	public static $last_total = 0;
+
 	public function __construct() {
 		add_shortcode( 'passiflore_etagere', [ $this, 'render_shortcode' ] );
 		add_action( 'wp_enqueue_scripts', [ $this, 'register_assets' ] );
@@ -84,12 +91,14 @@ class Passiflore_Bookshelf {
 
 		$products = $this->query_products( $atts );
 		if ( empty( $products ) ) {
-			return '<p class="pf-bookshelf-empty">' . esc_html__( 'Aucun livre à afficher.', 'kadence-child' ) . '</p>';
+			self::$last_total = 0;
+			return '<p class="pf-bookshelf-empty">' . esc_html__( 'Aucun livre ne correspond à votre recherche.', 'kadence-child' ) . '</p>';
 		}
 
 		$show_formats = filter_var( $atts['display_formats'], FILTER_VALIDATE_BOOLEAN );
 
 		$books        = $this->prepare_books( $products, $display );
+		self::$last_total = count( $books );
 
 		// Opt-in: arrange the books tallest → shortest. Enabled per shelf via
 		// orderby="hauteur" (used by the home-page « Culture Sud-Ouest » shelf).

@@ -38,13 +38,13 @@
     flex: 1;
     display: flex;
     flex-direction: column;
-    justify-content: center;
+    justify-content: space-between;
     align-items: center;
     padding: 3rem 3.5rem 5rem;
     position: relative;
     z-index: 2;
     color: var(--pf-heading);
-    gap: 1.5rem;
+    gap: var(--pf-space-3);
     overflow: hidden;
     text-align: center;
 }
@@ -76,11 +76,10 @@
 
 /* ── Typing text ── */
 
-.pf-hero-typage {
-    margin-top: 0.75rem;
+.pf-hero-typage-nom {
     display: flex;
     flex-direction: column;
-    align-items: center;
+    align-items: baseline;
     font-size: clamp(2.6rem, 4.2vw, 4.8rem);
     font-weight: 200;
     line-height: 1.08;
@@ -88,10 +87,15 @@
     color: var(--pf-heading);
 }
 
-.pf-hero-typage-nom {
+.pf-hero-sous-titre-wrap {
     display: flex;
     flex-direction: column;
-    align-items: baseline;
+    align-items: center;
+}
+
+.pf-hero-ligne {
+    min-height: 1.12em;
+    display: block;
 }
 
 .pf-hero-sous-titre {
@@ -102,25 +106,18 @@
     letter-spacing: 0.12em;
     color: var(--pf-accent);
     min-height: 1.4em;
-}
-
-.pf-hero-ligne {
-    min-height: 1.12em;
-    display: block;
+    line-height: 1.4em;
 }
 
 #pf-ligne-2 {
     font-weight: 700;
 }
 
-#pf-ligne-3 {
-    margin-top: 0.75rem;
-    margin-bottom: 4px;
-}
-
 /* Blinking cursor via ::after on the active line — absolute so it doesn't
    affect centering (the flex-column + align-items:center gives each line
-   fit-content width, so left:100% lands right after the last character). */
+   fit-content width, so left:100% lands right after the last character).
+   top:50%/translateY(-50%) centers it on the line box regardless of
+   line-height, instead of a fixed offset tuned to one specific value. */
 .pf-hero-ligne--active {
     position: relative;
 }
@@ -128,8 +125,9 @@
 .pf-hero-ligne--active::after {
     content: '';
     position: absolute;
-    top: -2px;
+    top: 50%;
     left: 100%;
+    transform: translateY(-60%);
     margin-left: 2px;
     width: 2px;
     height: clamp(1rem, 1.6vw, 1.2rem);
@@ -151,7 +149,6 @@
     line-height: 1.65;
     color: var(--pf-text);
     min-height: 1.65em;
-    text-align: center;
 }
 
 .pf-hero-presentation--active::after {
@@ -277,11 +274,8 @@
         padding: 2rem 2.5rem;
     }
 
-    .pf-hero-contenu .pf-hero-typage,
-    .pf-hero-contenu .pf-hero-sous-titre,
-    .pf-hero-contenu .pf-hero-presentation {
+    .pf-hero-contenu .pf-hero-sous-titre-wrap {
         align-items: flex-start;
-        text-align: left;
     }
 
     .pf-hero-contenu .pf-hero-btns {
@@ -598,10 +592,13 @@ Workaround: stack two pseudo-elements. ::before is the base gradient (always vis
 .pf-actualites-carousel .splide__arrow--prev { left: 1.75rem; }
 .pf-actualites-carousel .splide__arrow--next { right: 1.75rem; }
 
-/* Flèches à gauche/droite des points de pagination */
+/* Flèches à gauche/droite des points de pagination — collées en bas du
+   conteneur (.pf-actualites-carousel, position:relative) ; la pagination
+   garde un bottom supérieur de 0.75rem pour rester centrée verticalement
+   sur ces flèches, plus hautes qu'elle. */
 .pf-en-ce-moment-actualites .splide__arrow {
     top: auto;
-    bottom: 1rem;
+    bottom: 0;
     transform: none;
 }
 .pf-en-ce-moment-actualites .splide__arrow--prev {
@@ -614,7 +611,7 @@ Workaround: stack two pseudo-elements. ::before is the base gradient (always vis
 }
 
 /* Splide pagination */
-.pf-actualites-carousel .splide__pagination { bottom: 1.75rem; }
+.pf-actualites-carousel .splide__pagination { bottom: 0.75rem; }
 .pf-actualites-carousel .splide__pagination__page {
     background: var(--pf-border);
     opacity: 1;
@@ -759,7 +756,7 @@ Workaround: stack two pseudo-elements. ::before is the base gradient (always vis
     align-items: center;
     justify-content: center;
     min-height: 0;
-    padding: 0.2rem 0.2rem 4.2rem 0.2rem;
+    padding: 0.2rem 0.2rem 3rem 0.2rem;
 }
 
 /* Polaroid stylé et contraint.
@@ -839,19 +836,27 @@ Workaround: stack two pseudo-elements. ::before is the base gradient (always vis
 .pf-en-ce-moment-actualites .pf-actualite-titre {
     font-size: 1.5rem;
     font-weight: 600;
-    line-height: 1.35;
+    line-height: 1.2;
     color: var(--pf-heading);
 }
 
 .pf-en-ce-moment-actualites .pf-actualite-texte {
-    font-size: 0.9rem;
-    line-height: 1.6;
+    font-size: var(--pf-text-sm);
+    line-height: 1.45;
 }
 
 .pf-en-ce-moment-actualites .pf-actualite-lien {
-    align-self: flex-start;
+    align-self: center;
     font-size: 0.9rem;
 }
+
+/* Options par diapo (SCF) : taille « grande » et alignement centré du
+   titre / de la description. La taille « normale » garde les valeurs de base
+   ci-dessus. Sélecteurs à 2 classes pour l'emporter sur la base scopée. */
+.pf-en-ce-moment-actualites .pf-actualite-titre--grande { font-size: var(--pf-text-xl) !important; } /* !important : bat le h3 { font-size … !important } global de style.css */
+.pf-en-ce-moment-actualites .pf-actualite-texte--grande { font-size: var(--pf-text-base); }
+.pf-en-ce-moment-actualites .pf-actualite-titre--centre,
+.pf-en-ce-moment-actualites .pf-actualite-texte--centre { text-align: center; }
 
 .pf-en-ce-moment-events {
     padding-bottom: 0;
@@ -1047,14 +1052,11 @@ Workaround: stack two pseudo-elements. ::before is the base gradient (always vis
     }
 
     .pf-hero-contenu {
-        padding: 2.5rem 2rem 5rem;
-    }
-
-    .pf-hero-typage {
-        font-size: clamp(2rem, 7vw, 3rem);
+        padding: 2.5rem 2rem;
     }
 
     .pf-hero-typage-nom {
+        font-size: clamp(2rem, 7vw, 3rem);
         align-items: center;
     }
 
@@ -1082,7 +1084,7 @@ Workaround: stack two pseudo-elements. ::before is the base gradient (always vis
 }
 
 @media ( max-width: 480px ) {
-    .pf-hero-typage {
+    .pf-hero-typage-nom {
         font-size: clamp(1.9rem, 9vw, 2.8rem);
     }
 }

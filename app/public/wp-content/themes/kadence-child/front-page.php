@@ -89,48 +89,30 @@ $culture_url      = is_wp_error( $culture_link ) ? '' : $culture_link;
         >
             <div class="pf-hero-haut">
             <div class="pf-hero-contenu">
-                <div class="pf-hero-marque">
-                    <div class="pf-hero-logo-wrap">
-                        <?php
-                        $icon_url = get_site_icon_url( 256 )
-                            ?: content_url( 'uploads/2026/04/cropped-icone.png' );
-                        ?>
-                        <a href="<?php echo esc_url( home_url( '/' ) ); ?>"
-                           aria-label="<?php echo esc_attr( get_bloginfo( 'name' ) ); ?>">
-                            <img src="<?php echo esc_url( $icon_url ); ?>"
-                                 alt=""
-                                 width="90"
-                                 height="90" />
-                        </a>
-                    </div>
-                    <div class="pf-hero-typage" aria-label="Editions Passiflore">
-                        <div class="pf-hero-typage-nom">
-                            <div class="pf-hero-ligne" id="pf-ligne-1">Editions</div>
-                            <div class="pf-hero-ligne" id="pf-ligne-2">Passiflore</div>
-                        </div>
-                        <div class="pf-hero-ligne pf-hero-sous-titre" id="pf-ligne-3"></div>
-                        <div class="pf-hero-ligne pf-hero-sous-titre" id="pf-ligne-4"></div>
-                    </div>
+                <div class="pf-hero-logo-wrap">
+                    <?php
+                    $icon_url = get_site_icon_url( 256 )
+                        ?: content_url( 'uploads/2026/04/cropped-icone.png' );
+                    ?>
+                    <a href="<?php echo esc_url( home_url( '/' ) ); ?>"
+                       aria-label="<?php echo esc_attr( get_bloginfo( 'name' ) ); ?>">
+                        <img src="<?php echo esc_url( $icon_url ); ?>"
+                             alt=""
+                             width="90"
+                             height="90" />
+                    </a>
+                </div>
+                <div class="pf-hero-typage-nom" aria-label="Editions Passiflore">
+                    <div class="pf-hero-ligne" id="pf-ligne-1">Editions</div>
+                    <div class="pf-hero-ligne" id="pf-ligne-2">Passiflore</div>
+                </div>
+                <div class="pf-hero-sous-titre-wrap">
+                    <div class="pf-hero-ligne pf-hero-sous-titre" id="pf-ligne-3"></div>
+                    <div class="pf-hero-ligne pf-hero-sous-titre" id="pf-ligne-4"></div>
                 </div>
                 <?php if ( $hero_presentation ) : ?>
                 <p id="pf-hero-presentation" class="pf-hero-presentation"><?php echo nl2br( esc_html( $hero_presentation ) ); ?></p>
                 <?php endif; ?>
-                <?php /*
-                <div class="pf-hero-btns">
-                    <div class="wp-block-button is-style-outline">
-                        <button class="wp-block-button__link wp-element-button" data-scroll-to="pf-en-ce-moment">
-                            Actualités
-                            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M8 3v10M4 9l4 4 4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                        </button>
-                    </div>
-                    <div class="wp-block-button">
-                        <a href="/catalogue" class="wp-block-button__link wp-element-button">
-                            Notre catalogue
-                            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                        </a>
-                    </div>
-                </div>
-                */ ?>
             </div><!-- .pf-hero-contenu -->
 
                 <div class="pf-hero-actualites-slot">
@@ -148,6 +130,20 @@ $culture_url      = is_wp_error( $culture_link ) ? '' : $culture_link;
                                         $contenu    = $slide['contenu'] ?? '';
                                         $lien       = $slide['lien'] ?? '';
                                         $label_lien = $slide['label_lien'] ?? '';
+
+                                        // Options de mise en forme par diapo (sous-champs SCF lus
+                                        // par nom → indépendants des IDs de champ, cf. recréation en ligne).
+                                        $titre_classes = 'pf-actualite-titre';
+                                        if ( 'grande' === ( $slide['taille_de_titre'] ?? '' ) )  $titre_classes .= ' pf-actualite-titre--grande';
+                                        if ( 'centre' === ( $slide['aligner_le_titre'] ?? '' ) )  $titre_classes .= ' pf-actualite-titre--centre';
+
+                                        $texte_classes = 'pf-actualite-texte';
+                                        if ( 'grande' === ( $slide['taille_de_description'] ?? '' ) )  $texte_classes .= ' pf-actualite-texte--grande';
+                                        if ( 'centre' === ( $slide['aligner_la_description'] ?? '' ) )  $texte_classes .= ' pf-actualite-texte--centre';
+
+                                        $lien_attrs = ! empty( $slide['ouvrir_dans_un_nouvel_onglet'] )
+                                            ? ' target="_blank" rel="noopener noreferrer"'
+                                            : '';
                                     ?>
                                     <li class="splide__slide pf-actualite-slide">
                                         <div class="pf-polaroid">
@@ -173,18 +169,18 @@ $culture_url      = is_wp_error( $culture_link ) ? '' : $culture_link;
                                             <div class="pf-actualite-contenu">
                                                 <div class="pf-actualite-corps">
                                                     <?php if ( $titre ) : ?>
-                                                    <h3 class="pf-actualite-titre"><?php echo esc_html( $titre ); ?></h3>
+                                                    <h3 class="<?php echo esc_attr( $titre_classes ); ?>"><?php echo esc_html( $titre ); ?></h3>
                                                     <?php endif; ?>
 
                                                     <?php if ( $contenu ) : ?>
-                                                    <div class="pf-actualite-texte">
+                                                    <div class="<?php echo esc_attr( $texte_classes ); ?>">
                                                         <?php echo wp_kses_post( $contenu ); ?>
                                                     </div>
                                                     <?php endif; ?>
                                                 </div>
 
                                                 <?php if ( $lien ) : ?>
-                                                <a class="pf-actualite-lien wp-element-button" href="<?php echo esc_url( $lien ); ?>">
+                                                <a class="pf-actualite-lien pf-btn pf-btn--primary" href="<?php echo esc_url( $lien ); ?>"<?php echo $lien_attrs; ?>>
                                                     <?php echo esc_html( $label_lien ?: __( 'En savoir plus', 'kadence-child' ) ); ?>
                                                 </a>
                                                 <?php endif; ?>

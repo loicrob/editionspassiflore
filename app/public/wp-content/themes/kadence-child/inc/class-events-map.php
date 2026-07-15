@@ -332,7 +332,7 @@ class Passiflore_Events_Map {
 	/**
 	 * Barre de recherche de la vue carte. Rendue dans le `__left` du header
 	 * (cf. tribe/.../components/header.php). Reprend le composant visuel
-	 * `.pf-search--sm` (comme la recherche liste) mais avec des classes propres
+	 * `.pf-search--cat` (comme la recherche liste) mais avec des classes propres
 	 * (`.pf-map-search*`) pour que le contrôleur de la liste (events-search.js,
 	 * qui cible `.pf-ev-search-input`) ne la détourne pas.
 	 */
@@ -342,7 +342,7 @@ class Passiflore_Events_Map {
 		ob_start();
 		?>
 		<div class="pf-map-search">
-			<div class="pf-search pf-search--sm">
+			<div class="pf-search pf-search--cat">
 				<?php echo $svg_loupe; // phpcs:ignore WordPress.Security.EscapeOutput ?>
 				<input
 					type="search"
@@ -428,15 +428,16 @@ class Passiflore_Events_Map {
 
 			$evs = [];
 			foreach ( $venue_events as $event ) {
-				$thumb = get_the_post_thumbnail_url( $event->ID, 'thumbnail' );
 				$evs[] = [
-					'id'    => (int) $event->ID, // pour le filtrage par la recherche carte
-					// Texte brut (décodé) : le JS l'échappe au rendu — éviter le
-					// double-encodage des entités (ex. « & » dans un titre/lieu).
-					'title' => html_entity_decode( get_the_title( $event->ID ), ENT_QUOTES ),
-					'url'   => esc_url_raw( get_permalink( $event->ID ) ),
-					'date'  => tribe_get_start_date( $event->ID, false, 'j F Y' ),
-					'thumb' => $thumb ? esc_url_raw( $thumb ) : '',
+					'id'   => (int) $event->ID, // pour le filtrage par la recherche carte
+					// Card d'événement pré-rendue côté serveur : composant global partagé
+					// avec l'accueil/fiche auteur (Passiflore_Event_Tiles::render_tile).
+					// Ligne « Lieu » omise (show_lieu=false) : le lieu est déjà le titre
+					// de l'infobulle. HTML déjà échappé par render_tile → injecté tel quel.
+					'html' => Passiflore_Event_Tiles::render_tile(
+						Passiflore_Event_Tiles::normalize_event( (int) $event->ID ),
+						false
+					),
 				];
 			}
 

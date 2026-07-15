@@ -54,4 +54,5 @@
     text-align: center;
     color: var(--pf-muted);
     padding: var(--pf-space-8) 0;
+    font-style: italic;
 }

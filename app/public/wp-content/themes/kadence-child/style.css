@@ -265,12 +265,20 @@ a.pf-value:hover, .pf-value-container a:hover, a.pf-value-highlight:hover, .pf-v
     color: var(--pf-accent);
     box-shadow: none;
 }
+/* Boutons « small » calqués sur les triggers de la barre principale du catalogue
+   (.pf-cat-trigger) : mêmes padding / taille de texte / radius / interligne.
+   La COULEUR reste portée par le modificateur (--neutral/--primary/--outline) ;
+   les états propres au trigger (actif/ouvert, caret, jointures de radius) restent
+   sur le trigger. */
 .pf-btn--sm {
-    padding: var(--pf-btn-pad-sm);
-    font-size: 0.85rem;
+    padding: var(--pf-space-2) var(--pf-space-3); /* 8px 12px */
+    font-size: 13px;                              /* aligné sur .pf-cat-trigger (barre principale) */
+    line-height: 1.2;
+    border-radius: var(--pf-radius-md);           /* 6px, comme les déroulants/contrôles */
 }
-/* Boutons « small » natifs Kadence (ex. bouton compte du header) alignés sur le même token
-   → « small » a une source unique. (0,2,0) = spécificité de Kadence, chargé après → gagne sans !important. */
+/* Bouton « small » natif Kadence (ex. bouton compte du header) : garde le token
+   historique --pf-btn-pad-sm, indépendant du calage ci-dessus sur les triggers.
+   (0,2,0) = spécificité de Kadence, chargé après → gagne sans !important. */
 .button.button-size-small {
     padding: var(--pf-btn-pad-sm);
 }
@@ -306,9 +314,13 @@ a.pf-value:hover, .pf-value-container a:hover, a.pf-value-highlight:hover, .pf-v
 
 /* Lien-bouton qui ouvre dans un nouvel onglet → flèche indicatrice après le texte,
    posée automatiquement via [target="_blank"] (pas besoin de l'ajouter à la main dans
-   chaque libellé). Caractère ➜ (pointe vers l'est) tourné de -45deg pour pointer vers
-   le nord-est ; inline-block requis pour que la rotation s'applique proprement. */
-a.button[target="_blank"]::after {
+   chaque libellé). Couvre les trois conventions de bouton-lien du site : .pf-btn (custom
+   design system), .button (Woo/thème) et .wp-element-button (boutons de bloc WP créés en
+   Gutenberg). Caractère ➜ (pointe vers l'est) tourné de -45deg pour pointer vers le
+   nord-est ; inline-block requis pour que la rotation s'applique proprement. */
+a.pf-btn[target="_blank"]::after,
+a.button[target="_blank"]::after,
+a.wp-element-button[target="_blank"]::after {
     content: "➜";
     display: inline-block;
     margin-left: 0.4em;
@@ -457,7 +469,7 @@ h6 { font-family: var(--pf-font-body);    font-weight: var(--pf-weight-normal); 
 
 p a:not(.button):not(.wp-block-button__link):not(.wp-element-button):not(.pf-value):not(.leaflet-control *),
 span a:not(.button):not(.wp-block-button__link):not(.wp-element-button):not(.leaflet-control *),
-.entry-content a:not(.button):not(.wp-block-button__link):not(.wp-element-button):not(.pf-card):not(.menu-item-link):not(.tribe-events-c-subscribe-dropdown__list-item-link):not(.leaflet-control *):not(.leaflet-popup-close-button) {
+.entry-content a:not(.button):not(.wp-block-button__link):not(.wp-element-button):not(.pf-card):not(.menu-item-link):not(.tribe-events-c-subscribe-dropdown__list-item-link):not(.leaflet-control *):not(.leaflet-popup-close-button):not(.tribe-events-calendar-month__day-date-link):not(.tribe-events-calendar-month__calendar-event-title-link):not(.tooltipstered) {
     color: var(--pf-accent) !important;
     text-decoration: underline !important;
     text-underline-offset: .15em !important;
@@ -469,7 +481,7 @@ span a:not(.button):not(.wp-block-button__link):not(.wp-element-button):not(.lea
 }
 p a:not(.button):not(.wp-block-button__link):not(.wp-element-button):not(.pf-value):not(.leaflet-control *):hover,
 span a:not(.button):not(.wp-block-button__link):not(.wp-element-button):not(.leaflet-control *):hover,
-.entry-content a:not(.button):not(.wp-block-button__link):not(.wp-element-button):not(.pf-card):not(.menu-item-link):not(.tribe-events-c-subscribe-dropdown__list-item-link):not(.leaflet-control *):not(.leaflet-popup-close-button):hover,
+.entry-content a:not(.button):not(.wp-block-button__link):not(.wp-element-button):not(.pf-card):not(.menu-item-link):not(.tribe-events-c-subscribe-dropdown__list-item-link):not(.leaflet-control *):not(.leaflet-popup-close-button):not(.tribe-events-calendar-month__day-date-link):not(.tribe-events-calendar-month__calendar-event-title-link):not(.tooltipstered):hover,
 .contact-info-footer:hover {
     opacity: 0.8 !important;
     text-decoration: underline !important;
@@ -498,6 +510,9 @@ input[type="number"]:focus:not(:read-only), textarea:focus:not(:read-only), sele
    togglent .is-hidden (glisse vers le haut) et .is-stuck (ombre détachée). */
 .pf-sticky-bar {
     position: sticky;
+    display: flex;
+    flex-direction: column;
+    gap: var(--pf-space-2);
     top: var(--pf-sticky-offset, 0px);
     z-index: 10; /* sous le header sticky Kadence : glisse derrière lui */
     background: var(--pf-cream);
@@ -507,6 +522,8 @@ input[type="number"]:focus:not(:read-only), textarea:focus:not(:read-only), sele
     margin-left:  calc(50% - 50vw + var(--scrollbar-offset, 0px) / 2);
     margin-right: calc(50% - 50vw + var(--scrollbar-offset, 0px) / 2);
     margin-bottom: var(--pf-space-6);
+    padding-top: var(--pf-space-3);
+    padding-bottom: var(--pf-space-3);
     padding-left:  calc(50vw - 50% - var(--scrollbar-offset, 0px) / 2);
     padding-right: calc(50vw - 50% - var(--scrollbar-offset, 0px) / 2);
     box-sizing: border-box;
@@ -533,25 +550,18 @@ input[type="number"]:focus:not(:read-only), textarea:focus:not(:read-only), sele
     z-index: 20 !important;
 }
 
-/* Sous-en-tête : le contenu (barre de recherche auteurs, menu de filtres catalogue)
-   à l'intérieur d'une .pf-sticky-bar. Ne porte que le rythme vertical ; la mise en
-   page reste propre à chaque barre. */
-.pf-sub-header {
-    padding: var(--pf-space-3) 0;
-}
-@media (max-width: 1023px) {
-    .pf-sub-header { padding: var(--pf-space-2) 0; }
-}
-
 /* Champ de recherche — composant réutilisable : loupe + champ + bouton effacer.
    Le bord, la transition et le focus (bord transparent + anneau) viennent de la règle
    globale input. Géométrie surchargeable via les variables locales (cf. .pf-search--sm). */
 .pf-search {
-    --search-h:     44px;              /* hauteur du champ */
-    --search-icon:  18px;             /* taille de l'icône loupe */
-    --search-inset: 14px;             /* marge latérale de l'icône */
-    --search-clear: 26px;             /* diamètre du bouton effacer */
-    --search-pad-y: var(--pf-space-3); /* padding vertical du champ */
+    --search-h:      44px;              /* hauteur du champ */
+    --search-icon:   18px;             /* taille de l'icône loupe */
+    --search-inset:  14px;             /* marge latérale de l'icône */
+    --search-clear:  26px;             /* diamètre du bouton effacer */
+    --search-pad-y:  var(--pf-space-3); /* padding vertical du champ */
+    --search-font:   var(--pf-text-sm); /* taille de texte du champ */
+    --search-radius: var(--pf-radius-lg); /* radius du champ */
+    --search-placeholder: var(--pf-muted); /* couleur du texte indicatif */
     position: relative;
     flex: 1 1 auto;
     width: 100%;
@@ -577,10 +587,10 @@ input[type="number"]:focus:not(:read-only), textarea:focus:not(:read-only), sele
     /* Dégagement gauche (icône) ; à droite, padding réduit au repos —
        élargi seulement quand le bouton effacer apparaît (cf. :has plus bas). */
     padding: var(--search-pad-y) var(--search-pad-y) var(--search-pad-y) calc(var(--search-inset) + var(--search-icon) + var(--pf-space-3)) !important;
-    border-radius: var(--pf-radius-lg) !important; /* plus arrondi que le radius global */
+    border-radius: var(--search-radius) !important;
     background: var(--pf-surface-alt) !important;  /* fond crème au repos (le global ne pose le fond qu'au focus) */
     font-family: inherit;
-    font-size: var(--pf-text-sm);
+    font-size: var(--search-font);
     line-height: var(--pf-leading-tight);
     color: var(--pf-text) !important;
 }
@@ -588,7 +598,7 @@ input[type="number"]:focus:not(:read-only), textarea:focus:not(:read-only), sele
     box-shadow: var(--pf-focus-ring-accent) !important; /* anneau rouge */
     background: var(--pf-surface) !important; /* fond blanc au focus */
 }
-.pf-search-input::placeholder { color: var(--pf-muted); }
+.pf-search-input::placeholder { color: var(--search-placeholder); }
 .pf-search-input::-webkit-search-decoration,
 .pf-search-input::-webkit-search-cancel-button,
 .pf-search-input::-webkit-search-results-button,
@@ -633,6 +643,23 @@ input[type="number"]:focus:not(:read-only), textarea:focus:not(:read-only), sele
     --search-pad-y: var(--pf-space-2);
 }
 .pf-search--sm .pf-search-clear {
+    font-size: 18px;
+}
+/* Variante calée sur les dimensions ET couleurs de la barre /catalogue (.pf-cat-search,
+   bespoke — cf. catalogue.css) : hauteur/police/placeholder cohérents avec les autres
+   boutons de cette barre sticky. Utilisée par /auteurs et /evenements (liste + carte)
+   pour une apparence de barre de recherche unifiée sur ces 3 pages. */
+.pf-search--cat {
+    --search-h:      34px;
+    --search-icon:   16px;
+    --search-inset:  11px;
+    --search-clear:  22px;
+    --search-pad-y:  var(--pf-space-2);
+    --search-font:   13px;
+    --search-radius: var(--pf-radius-md);
+    --search-placeholder: var(--pf-text-dim);
+}
+.pf-search--cat .pf-search-clear {
     font-size: 18px;
 }
 
@@ -846,6 +873,10 @@ input[type="number"]:focus:not(:read-only), textarea:focus:not(:read-only), sele
 #mobile-drawer .mobile-navigation ul li.menu-item-has-children > .drawer-nav-drop-wrap {
     color: var(--pf-text);
 }
+/* Retrait à gauche des libellés (respiration dans la pastille). */
+#mobile-drawer .mobile-navigation ul li a {
+    padding-left: 1em;
+}
 #mobile-drawer .mobile-navigation ul li.menu-item-has-children .drawer-nav-drop-wrap,
 #mobile-drawer .mobile-navigation ul li:not(.menu-item-has-children) a {
     border-bottom-color: var(--pf-border);
@@ -855,13 +886,23 @@ input[type="number"]:focus:not(:read-only), textarea:focus:not(:read-only), sele
     color: var(--pf-accent);
     background: var(--pf-red-soft);
 }
-/* Item actif : rouge plein + texte crème (comme le nav desktop). */
+/* Item actif : rouge plein + texte crème (comme le nav desktop). Inclut la
+   catégorie parente de la sous-catégorie visitée (current-product_cat-ancestor,
+   ex. « Culture Sud-Ouest » quand on est sur « Art ») — parité avec le nav
+   desktop, cf. .header-menu-container ul ul …current-product_cat-ancestor. */
 #mobile-drawer .mobile-navigation ul li.current-menu-item > a,
-#mobile-drawer .mobile-navigation ul li.current-menu-item.menu-item-has-children > .drawer-nav-drop-wrap {
+#mobile-drawer .mobile-navigation ul li.current-product_cat-ancestor > a,
+#mobile-drawer .mobile-navigation ul li.current-menu-item.menu-item-has-children > .drawer-nav-drop-wrap,
+#mobile-drawer .mobile-navigation ul li.current-product_cat-ancestor.menu-item-has-children > .drawer-nav-drop-wrap {
     color: var(--pf-cream);
     background: var(--pf-accent);
     border-radius: var(--pf-radius-lg);
     border-bottom-color: transparent;
+    /* Décolle les pastilles rouges consécutives (catégorie parente + sous-catégorie
+       + Catalogue) : sans marge, leurs cadres arrondis se touchent. Marge sur les
+       deux côtés → jour visible entre deux pastilles empilées. */
+    margin-top: var(--pf-space-1);
+    margin-bottom: var(--pf-space-1);
 }
 
 .pf-auteur-events-date, .tribe-events-calendar-list__event-datetime, .tribe-events-calendar-month__calendar-event-datetime, .tribe-events-calendar-month__calendar-event-tooltip-datetime, .tribe-events-calendar-day__event-datetime {
@@ -1089,6 +1130,141 @@ body.admin-bar { --pf-adminbar: 32px; }
 
 .pf-scroll-fade.is-scroll-left::before  { opacity: 1; }
 .pf-scroll-fade.is-scroll-right::after  { opacity: 1; }
+
+/* =========================================================
+   Popup d'événement flottant (.pf-map-pop) — COMPOSANT PARTAGÉ.
+   -----------------------------------------------------------------------------
+   Contenu d'infobulle « en-tête + rangée de tuiles d'événement » réutilisé par :
+     - la vue Carte (events-map.js/.css) : rendu dans un popup Leaflet, en-tête =
+       lieu (simple) ou dénominateur commun (cluster) ;
+     - la vue Mois sur mobile (events-month-mobile-pop.js, override mobile-day.php) :
+       rendu dans un « carton » flottant .pf-month-pop-layer au-dessus du jour tapé,
+       en-tête = le jour.
+   Seul le SHELL de contenu vit ici (mise en page, en-tête, zone de scroll, rangée de
+   tuiles). Le « carton » extérieur (fond/rayon/ombre/padding) et le positionnement
+   restent propres à chaque contexte : wrapper Leaflet (events-map.css) côté carte,
+   .pf-month-pop-layer (events.css) côté mois.
+   Nom historique `.pf-map-pop` conservé (composant né avec la vue carte) pour éviter
+   une réécriture de events-map.js.
+   Classes doublées (.foo.foo → 0,2,0) : battent le reset `.tribe-common div/p/…`
+   (0,1,1) sur les pages TEC (cf. gotcha CLAUDE.md) — inoffensif hors TEC. ========= */
+.pf-map-pop {
+    display: flex;
+    flex-direction: column;
+    gap: var(--pf-space-3);
+    width: 100%;
+}
+
+/* En-tête (nom de lieu, dénominateur commun de cluster, ou jour) : toujours hors
+   de la zone de scroll → toujours visible. padding-right = place pour le bouton × */
+.pf-map-pop__header.pf-map-pop__header {
+    flex: 0 0 auto;
+    padding-right: var(--pf-space-5);
+    padding-bottom: var(--pf-space-2);
+    border-bottom: 1px solid var(--pf-border);
+}
+
+/* Zone de scroll : rangée d'événements (infobulle simple / jour) ou pile de blocs
+   par lieu (cluster). Hauteur bornée (une tuile tient sans scroll vertical) ; au-delà
+   le scroll vertical prend le relais. */
+.pf-map-pop__scroll.pf-map-pop__scroll {
+    display: flex;
+    flex-direction: column;
+    gap: var(--pf-space-4);
+    flex: 1 1 auto;
+    min-height: 0;
+    max-height: min(340px, 46vh);
+    overflow-y: auto;
+}
+
+/* Dégagement de la barre de scroll VERTICALE : réservé aux clusters (plusieurs
+   rangées empilées) — une infobulle simple / un jour n'a qu'une rangée. */
+.pf-map-pop--cluster .pf-map-pop__scroll {
+    padding-right: var(--pf-space-2);
+}
+
+.pf-map-pop__area-label {
+    display: block;
+    font-weight: var(--pf-weight-semibold);
+    color: var(--pf-heading);
+    font-size: var(--pf-text-base);
+    line-height: var(--pf-leading-snug, 1.3);
+}
+
+.pf-map-pop__area-count {
+    display: block;
+    color: var(--pf-muted);
+    font-size: var(--pf-text-xs);
+}
+
+/* Bloc d'un lieu (en-tête + cartes) — flex-shrink:0 : enfant de la zone de scroll,
+   sans quoi il se comprimerait au lieu de déborder et déclencher le scroll. */
+.pf-map-pop__group {
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    gap: var(--pf-space-2);
+}
+
+.pf-map-pop__venue-name {
+    display: block;
+    font-weight: var(--pf-weight-semibold);
+    color: var(--pf-heading);
+    font-size: var(--pf-text-base);
+    line-height: var(--pf-leading-snug, 1.3);
+}
+
+.pf-map-pop__venue-city {
+    display: block;
+    color: var(--pf-muted);
+    font-size: var(--pf-text-xs);
+}
+
+/* Dans un cluster, l'en-tête donne déjà la zone → le nom de lieu passe en sous-titre. */
+.pf-map-pop--cluster .pf-map-pop__venue-name {
+    font-size: var(--pf-text-sm);
+}
+
+/* Séparateur entre lieux d'un même cluster. */
+.pf-map-pop--cluster .pf-map-pop__group + .pf-map-pop__group {
+    border-top: 1px solid var(--pf-border-light);
+    padding-top: var(--pf-space-4);
+}
+
+/* Enveloppe scroll-fade de la rangée : porte les ombres de bord gauche/droite.
+   C'est l'enfant direct du conteneur flex column → flex-shrink:0 pour ne pas la
+   comprimer. Couleur du fondu = fond du popup (surchargée par le contexte si besoin). */
+.pf-map-pop__fade {
+    flex-shrink: 0;
+    --pf-scroll-fade-color: var(--pf-surface-alt);
+}
+.pf-map-pop__fade::before,
+.pf-map-pop__fade::after {
+    width: 36px;
+}
+
+/* Rangée horizontale des cartes d'événement (composant global .pf-event-tile,
+   pré-rendu côté serveur). On ne pose ici QUE la mise en rangée + le scroll
+   horizontal (via .pf-hscroll) ; padding (0,2,0) : dégage l'ombre portée des tuiles
+   au survol et les écarte de la barre de scroll. */
+.pf-map-pop__events.pf-map-pop__events {
+    display: flex;
+    gap: var(--pf-space-3);
+    padding: var(--pf-space-2);
+}
+
+/* Tuile un peu resserrée pour le popup (l'accueil est à 250px). zoom (et non
+   transform:scale) : réduit AUSSI la boîte de mise en page → popup plus compact. */
+.pf-map-pop__events .pf-event-tile {
+    flex: 0 0 210px;
+    zoom: 0.9;
+}
+
+/* Graisse du titre de tuile réimposée (0,2,0) : sous .tribe-common (vue carte) le
+   reset `.tribe-common h*` (0,1,1) la ramènerait sinon à 400. Inoffensif hors TEC. */
+.pf-map-pop__events .pf-card-title {
+    font-weight: var(--pf-weight-semibold);
+}
 
 /* =========================================================
    Section-nav — nav sticky (verticale desktop ≥1024px / horizontale sticky mobile+tablette
@@ -1383,21 +1559,22 @@ body.admin-bar { --pf-adminbar: 32px; }
    Bouton scindé — libellé principal (action directe) + kebab accolé
    (options secondaires), mêmes deux moitiés de pilule bordées que la
    paire rayon/thématiques du catalogue (Littérature ⋮ / Culture Sud-Ouest ⋮).
-   Même formule padding/font-size/line-height que .pf-switch__btn pour
-   s'aligner en hauteur avec les contrôles de barre adjacents.
+   Taille alignée sur .pf-btn--sm (13px, padding 8px 12px, radius-md) → même
+   hauteur que le switch de vue (Liste/Mois/Carte) de la barre événements et que
+   les triggers du catalogue.
    Variante --solid : aplat rouge permanent (CTA primaire, ex. « S'abonner »). ==== */
 .pf-splitbtn { display: inline-flex; align-items: stretch; }
 .pf-splitbtn__main {
     display: flex;
     align-items: center;
     gap: 6px;
-    padding: 8px 14px;
+    padding: 8px 12px;
     border: 1px solid var(--pf-border-light);
     border-radius: var(--pf-radius-md) 0 0 var(--pf-radius-md);
     background: var(--pf-cream);
     color: var(--pf-text);
     font-family: inherit;
-    font-size: 14px;
+    font-size: 13px;
     line-height: 1.2;
     cursor: pointer;
     white-space: nowrap;

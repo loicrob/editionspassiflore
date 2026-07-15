@@ -81,7 +81,7 @@ class Passiflore_Recherche_Auteurs {
 		<div class="pf-rech-auteurs" data-config="<?php echo esc_attr( wp_json_encode( $config ) ); ?>">
 			<div class="pf-rech-sticky pf-sticky-bar">
 				<div class="pf-sub-header" role="search">
-					<div class="pf-search">
+					<div class="pf-search pf-search--cat">
 						<svg class="pf-search-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.5" y2="16.5"/></svg>
 						<input type="search" class="pf-search-input" placeholder="<?php echo esc_attr( $atts['placeholder'] ); ?>" value="<?php echo esc_attr( $search ); ?>" aria-label="Rechercher un auteur" />
 						<button type="button" class="pf-search-clear" aria-label="Effacer la recherche">×</button>

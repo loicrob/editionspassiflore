@@ -25,12 +25,16 @@ add_filter( 'nav_menu_css_class', function( $classes, $item ) {
 
 add_shortcode( 'passiflore_account_btn', function() {
     $url = wc_get_page_permalink( 'myaccount' );
+    // .pf-btn--sm pour la TAILLE (padding/texte/radius, cf. style.css) ; les
+    // couleurs restent portées par button-style-outline/secondary (Kadence).
+    // button-size-small retiré : sa règle de padding (0,2,0) battrait sinon
+    // .pf-btn--sm (0,1,0).
     if ( is_user_logged_in() ) {
         $label = 'Mon compte';
-        $class = 'button header-button button-size-small button-style-outline passiflore-account-btn is-logged-in';
+        $class = 'button header-button button-style-outline passiflore-account-btn is-logged-in pf-btn--sm';
     } else {
         $label = 'Connexion';
-        $class = 'button header-button button-size-small button-style-secondary passiflore-account-btn is-logged-out';
+        $class = 'button header-button button-style-secondary passiflore-account-btn is-logged-out pf-btn--sm';
     }
     return '<a href="' . esc_url( $url ) . '" class="' . esc_attr( $class ) . '">' . esc_html( $label ) . '</a>';
 } );

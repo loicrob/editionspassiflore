@@ -23,13 +23,15 @@
    comportements propres au scroll infini (états de chargement). */
 .pf-ev-arrow { display: block; }
 
-/* ─── Déclencheur du chargement des passés (haut, dans le flux) ─── */
+/* ─── Déclencheur du chargement des passés (haut, dans le flux) ───
+   Pas de padding-top : l'espacement avec le header sticky est désormais commun
+   aux 3 vues (margin-bottom du header, cf. events.css). */
 .pf-ev-top {
 	display: flex;
 	flex-direction: column;
 	align-items: center;
 	gap: 0.5rem;
-	padding: 1.25rem 0 1.5rem !important;
+	padding: 0 0 1.5rem !important;
 }
 
 /* ─── Bouton fixe « retour vers les à-venir » (bas) ──────────────── */

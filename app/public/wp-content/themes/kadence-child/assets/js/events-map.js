@@ -27,22 +27,93 @@
 		return arr.filter( function ( v, i ) { return v && arr.indexOf( v ) === i; } );
 	}
 
-	// Mini-carte d'événement : réutilise le système .pf-card global (variante
-	// --static --compact), passée en disposition horizontale via events-map.css.
-	function eventCard( e ) {
-		var media = e.thumb
-			? '<span class="pf-map-pop-card__media"><img src="' + encodeURI( e.thumb ) + '" alt="" loading="lazy"></span>'
-			: '';
-		return '<a class="pf-card pf-card--static pf-card--compact pf-map-pop-card" href="' + encodeURI( e.url ) + '">' +
-			media +
-			'<span class="pf-card-content">' +
-				'<span class="pf-card-title">' + esc( e.title ) + '</span>' +
-				( e.date ? '<span class="pf-card-text">' + esc( e.date ) + '</span>' : '' ) +
-			'</span>' +
-		'</a>';
+	// Recentre l'infobulle entièrement dans le conteneur carte, avec une marge `pad`
+	// tout autour. Remplace l'auto-pan natif de Leaflet (désactivé) : ce dernier
+	// calcule le débordement depuis sa géométrie interne, faussée ici par la pointe
+	// masquée + l'`offset` — il concluait « ça tient » et ne descendait pas (assez) la
+	// carte, laissant le haut de l'infobulle rogné. On mesure plutôt les rectangles
+	// réels (source de vérité) et on décale la carte de la juste quantité. Le haut est
+	// prioritaire sur le bas (en-tête + 1res tuiles visibles) si l'infobulle est plus
+	// haute que la carte. Signes des dérives calqués sur le _adjustPan de Leaflet :
+	// une dérive négative révèle le haut/gauche, positive le bas/droite.
+	function panPopupIntoView( map, mapEl, popup, pad ) {
+		var wrap = popup && popup._container
+			&& popup._container.querySelector( '.leaflet-popup-content-wrapper' );
+		if ( ! wrap ) { return; }
+
+		var mapRect = mapEl.getBoundingClientRect();
+		var popRect = wrap.getBoundingClientRect();
+		var dx = 0, dy = 0;
+
+		if ( popRect.top < mapRect.top + pad ) {
+			dy = popRect.top - ( mapRect.top + pad );            // haut rogné → révéler le haut
+		} else if ( popRect.bottom > mapRect.bottom - pad ) {
+			dy = popRect.bottom - ( mapRect.bottom - pad );      // bas rogné → révéler le bas
+		}
+		if ( popRect.left < mapRect.left + pad ) {
+			dx = popRect.left - ( mapRect.left + pad );
+		} else if ( popRect.right > mapRect.right - pad ) {
+			dx = popRect.right - ( mapRect.right - pad );
+		}
+
+		if ( dx || dy ) {
+			// animate:false : un panBy animé s'est révélé non fiable ici (parfois ignoré
+			// selon le timing d'ouverture de l'infobulle). Le recentrage est donc instantané.
+			map.panBy( [ dx, dy ], { animate: false } );
+		}
 	}
 
-	// Bloc d'un lieu : en-tête (nom + ville) + ses cartes d'événement.
+	// Résout un token CSS --pf-* (longueur) en pixels, via un élément-sonde jetable :
+	// getComputedStyle sur une custom property renvoie la valeur brute (ex. "0.5rem"),
+	// pas des px. Même idiome que pxVar() dans event-single-media.js. Sert à alimenter
+	// l'`offset` Leaflet et le recentrage maison (panPopupIntoView), forcément en px,
+	// tout en gardant les tokens comme source unique (--pf-space-2/6).
+	function pxVar( token ) {
+		var probe = document.createElement( 'div' );
+		probe.style.cssText = 'position:absolute;visibility:hidden;height:var(' + token + ',0)';
+		document.body.appendChild( probe );
+		var px = parseFloat( getComputedStyle( probe ).height ) || 0;
+		probe.remove();
+		return px;
+	}
+
+	// Rangée horizontale des cards d'événement d'un lieu, enveloppée dans le
+	// composant global .pf-scroll-fade (ombres de bord gauche/droite signalant
+	// qu'il reste des tuiles hors champ). Chaque card est le composant global
+	// .pf-event-tile pré-rendu côté serveur (e.html, déjà échappé par PHP) —
+	// même tuile que l'accueil, sans la ligne « Lieu ». .pf-scroll-fade exige
+	// que l'élément qui scrolle (.pf-hscroll) soit son unique enfant direct.
+	function eventsRow( m ) {
+		var cards = ( m.events || [] ).map( function ( e ) { return e.html || ''; } ).join( '' );
+		return '<div class="pf-scroll-fade pf-map-pop__fade">' +
+			'<div class="pf-map-pop__events pf-hscroll">' + cards + '</div>' +
+		'</div>';
+	}
+
+	// Ombres de bord horizontales : rejoue la logique de scroll-fade.js (bascule
+	// .is-scroll-left/.is-scroll-right selon la position de scroll de l'enfant
+	// .pf-hscroll) sur les rangées d'une infobulle. Nécessaire ici car
+	// scroll-fade.js ne scanne qu'au DOMContentLoaded → il ne voit pas les
+	// infobulles que Leaflet injecte dynamiquement à l'ouverture.
+	function wireScrollFade( popupEl ) {
+		if ( ! popupEl ) { return; }
+		popupEl.querySelectorAll( '.pf-scroll-fade' ).forEach( function ( wrap ) {
+			var scroll = wrap.firstElementChild;
+			if ( ! scroll ) { return; }
+			function update() {
+				var atStart     = scroll.scrollLeft <= 1;
+				var atEnd       = scroll.scrollLeft + scroll.clientWidth >= scroll.scrollWidth - 1;
+				var hasOverflow = scroll.scrollWidth > scroll.clientWidth;
+				wrap.classList.toggle( 'is-scroll-left',  ! atStart );
+				wrap.classList.toggle( 'is-scroll-right', hasOverflow && ! atEnd );
+			}
+			scroll.addEventListener( 'scroll', update, { passive: true } );
+			new ResizeObserver( update ).observe( scroll );
+			update();
+		} );
+	}
+
+	// Bloc d'un lieu : en-tête (nom + ville) + sa rangée de cards d'événement.
 	// `areaLabel` (contexte cluster) : si la ville est identique au dénominateur
 	// commun déjà affiché en en-tête, on masque la ville (évite « Dax » répété).
 	function venueBlock( m, areaLabel ) {
@@ -51,19 +122,17 @@
 			'<span class="pf-map-pop__venue-name">' + esc( m.venue || '' ) + '</span>' +
 			( showCity ? '<span class="pf-map-pop__venue-city">' + esc( m.city ) + '</span>' : '' ) +
 		'</div>';
-		var cards = ( m.events || [] ).map( eventCard ).join( '' );
-		return '<div class="pf-map-pop__group">' + venue + cards + '</div>';
+		return '<div class="pf-map-pop__group">' + venue + eventsRow( m ) + '</div>';
 	}
 
 	// Infobulle d'un lieu unique : titre (nom + ville) hors zone de scroll,
-	// seule la liste d'événements défile (cf. .pf-map-pop__header / __scroll).
+	// seule la rangée d'événements défile (cf. .pf-map-pop__header / __scroll).
 	function singlePopup( m ) {
 		var header = '<div class="pf-map-pop__header">' +
 			'<span class="pf-map-pop__venue-name">' + esc( m.venue || '' ) + '</span>' +
 			( m.city ? '<span class="pf-map-pop__venue-city">' + esc( m.city ) + '</span>' : '' ) +
 		'</div>';
-		var cards = ( m.events || [] ).map( eventCard ).join( '' );
-		return '<div class="pf-map-pop">' + header + '<div class="pf-map-pop__scroll">' + cards + '</div></div>';
+		return '<div class="pf-map-pop">' + header + '<div class="pf-map-pop__scroll">' + eventsRow( m ) + '</div></div>';
 	}
 
 	// Dénominateur commun d'un ensemble de lieux : ville si toutes identiques,
@@ -143,6 +212,15 @@
 			maxZoom: 19
 		} ).addTo( map );
 
+		// Dégagements verticaux de l'infobulle (en px, résolus depuis les tokens).
+		// Portés par l'option `offset` de Leaflet (et non un `bottom` CSS) : ainsi
+		// l'auto-pan, qui calcule le débordement à partir de sa propre géométrie
+		// interne, connaît la vraie position de l'infobulle et la repositionne
+		// correctement (un override CSS lui reste invisible → il sous-descendait).
+		var GAP_PIN     = pxVar( '--pf-space-2' ); // infobulle ↔ pin simple
+		var GAP_CLUSTER = pxVar( '--pf-space-6' ); // infobulle ↔ rond de cluster (plus haut)
+		var AUTOPAN_PAD = pxVar( '--pf-space-2' ); // marge conservée par l'auto-pan (haut de carte ↔ haut d'infobulle)
+
 		// Molette : n'active le zoom qu'après un clic sur la carte (ne détourne
 		// pas le scroll de la page tant que l'utilisateur n'a pas ciblé la carte).
 		map.on( 'focus', function () { map.scrollWheelZoom.enable(); } );
@@ -160,38 +238,17 @@
 
 		var currentLayer = null;
 
-		// Filet de sécurité : sur un conteneur carte bas (mobile notamment), une
-		// infobulle de cluster à plusieurs événements peut dépasser du haut du
-		// conteneur (rogné par son overflow:hidden) — l'auto-pan de Leaflet ne suffit
-		// pas toujours (position du marqueur trop haute pour le dégagement requis).
-		// On mesure le dépassement RÉEL une fois l'infobulle positionnée (source de
-		// vérité unique, valable quels que soient le zoom/pan courants) et on réduit
-		// la hauteur de la seule zone de scroll (.pf-map-pop__scroll) d'autant — le
-		// titre (.pf-map-pop__header) reste hors de cet ajustement, donc toujours visible.
+		// Débordement vertical : les cards d'événement sont des tuiles (.pf-event-tile)
+		// en RANGÉE horizontale par lieu → hauteur d'infobulle bornée (une rangée +
+		// max-height plafonnée de .pf-map-pop__scroll, cf. events-map.css). L'auto-pan
+		// natif de Leaflet étant faussé ici (pointe masquée + offset → il croit que
+		// l'infobulle tient et ne descend pas assez), il est désactivé (autoPan:false)
+		// au profit d'un recentrage maison mesuré sur les rectangles réels.
 		map.on( 'popupopen', function ( e ) {
-			var popupEl = e.popup._container;
-			var content = popupEl && popupEl.querySelector( '.pf-map-pop__scroll' );
-			if ( ! content ) { return; }
-
-			var margin = 20;
-			var overflow = el.getBoundingClientRect().top - popupEl.getBoundingClientRect().top + margin;
-			if ( overflow <= 0 ) { return; }
-
-			// height (et non max-height) + overflow-y explicites, SANS rappeler
-			// _updateLayout() de Leaflet : cette méthode s'applique à .leaflet-popup-content
-			// (pas à notre zone de scroll interne) et n'a donc plus lieu d'être invoquée ici.
-			content.style.height = Math.max( 120, content.offsetHeight - overflow ) + 'px';
-			e.popup._updatePosition();
-
-			// _updatePosition() déplace le popup en fonction de sa nouvelle taille,
-			// mais le rapport hauteur-retirée ↔ décalage obtenu n'est pas garanti
-			// strictement 1:1 (arrondis, chrome du popup) : une seconde mesure/passe
-			// referme tout résidu de dépassement.
-			var residual = el.getBoundingClientRect().top - popupEl.getBoundingClientRect().top + margin;
-			if ( residual > 0 ) {
-				content.style.height = Math.max( 100, content.offsetHeight - residual ) + 'px';
-				e.popup._updatePosition();
-			}
+			// Ombres de bord horizontales sur les rangées de tuiles.
+			wireScrollFade( e.popup._container );
+			// Recentrage de l'infobulle dans la carte (rAF : après mise en page).
+			requestAnimationFrame( function () { panPopupIntoView( map, el, e.popup, AUTOPAN_PAD ); } );
 		} );
 
 		// (Re)construit la couche de marqueurs à partir d'une liste (jeu complet ou
@@ -236,9 +293,13 @@
 					pfEventCount: ( m.events || [] ).length || 1
 				} );
 				mk.bindPopup( singlePopup( m ), {
-					minWidth: 220, maxWidth: 300, closeButton: true,
-					autoPan: false // l'auto-pan natif de Leaflet, exécuté après coup, entre en
-					// conflit avec l'ajustement de hauteur du handler popupopen ci-dessous.
+					// autoPan désactivé → recentrage maison au popupopen (panPopupIntoView).
+					// minWidth:0 → Leaflet dimensionne à la largeur naturelle du contenu,
+					// bornée par maxWidth : un lieu à 1 seul événement (rangée sans scroll
+					// horizontal) rétrécit à la largeur d'une tuile + ses marges ; à ≥2
+					// événements la rangée déborde et l'infobulle est plafonnée à maxWidth.
+					minWidth: 0, maxWidth: 300, closeButton: true, autoPan: false,
+					offset: [ 0, -GAP_PIN ]
 				} );
 				layer.addLayer( mk );
 				latlngs.push( [ m.lat, m.lng ] );
@@ -247,9 +308,22 @@
 			if ( useCluster ) {
 				layer.on( 'clusterclick', function ( a ) {
 					var cluster = a.layer;
+					// Lier + ouvrir seulement au 1er clic. Aux clics suivants, le handler
+					// de clic natif posé par bindPopup bascule l'infobulle (ouverte↔fermée)
+					// tout seul — on ne rappelle donc PAS openPopup, sinon la fermeture
+					// native (re-clic) serait aussitôt ré-ouverte par nous (fade-out/-in au
+					// lieu d'une fermeture, comme pour un marqueur simple).
+					if ( cluster.getPopup() ) {
+						return;
+					}
 					cluster.bindPopup( clusterPopup( cluster.getAllChildMarkers() ), {
-						minWidth: 240, maxWidth: 320, closeButton: true,
-						autoPan: false
+						// autoPan désactivé → recentrage maison au popupopen (panPopupIntoView).
+						// minWidth:0 : rétrécit à la largeur d'une tuile si AUCUN lieu du cluster
+						// n'a d'événements côte à côte ; sinon la rangée la plus large déborde et
+						// plafonne l'infobulle à maxWidth (même mécanisme que le marqueur simple).
+						minWidth: 0, maxWidth: 320, closeButton: true, autoPan: false,
+						// Dégagement accru : le repère de cluster est un rond, plus haut qu'un pin.
+						offset: [ 0, -GAP_CLUSTER ]
 					} ).openPopup();
 				} );
 			}

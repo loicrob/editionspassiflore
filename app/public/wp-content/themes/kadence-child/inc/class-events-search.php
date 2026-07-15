@@ -75,7 +75,7 @@ class Passiflore_Events_Search {
 		ob_start();
 		?>
 		<div class="pf-ev-search">
-			<div class="pf-search pf-search--sm">
+			<div class="pf-search pf-search--cat">
 				<?php echo $svg_loupe; // phpcs:ignore WordPress.Security.EscapeOutput ?>
 				<input
 					type="search"

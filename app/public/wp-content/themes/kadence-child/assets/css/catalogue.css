@@ -55,7 +55,7 @@ body.tax-product_cat .entry-hero.product-hero-section {
 .pf-catalogue-bar {
 	display: flex;
 	flex-direction: column;
-	gap: 6px;
+	gap: var(--pf-space-2);
 	/* Padding vertical : barre principale via .pf-sub-header (style.css) ;
 	   le top bar via .pf-catalogue-bar-top. */
 }
@@ -64,7 +64,7 @@ body.tax-product_cat .entry-hero.product-hero-section {
 	display: flex;
 	flex-wrap: nowrap;
 	align-items: center;
-	gap: 8px;
+	gap: var(--pf-space-2);
 }
 
 .pf-cat-bar-row[hidden] { display: none; }
@@ -78,7 +78,7 @@ body.tax-product_cat .entry-hero.product-hero-section {
 .pf-cat-row-scroll {
 	display: flex;
 	align-items: center;
-	gap: 8px;
+	gap: var(--pf-space-2);
 	overflow-x: auto;
 	scrollbar-width: thin;
 	-webkit-overflow-scrolling: touch;
@@ -100,16 +100,12 @@ body.tax-product_cat .entry-hero.product-hero-section {
 /* ─── Mobile / tablet (< 1024px) ─────────────────────────────────── */
 
 @media (max-width: 1023px) {
-	/* Reduce vertical breathing room on small screens — desktop padding
-	   was leaving an unjustified gap above and below the search bar. */
-	.pf-catalogue-bar { padding: 4px 0; gap: 4px; }
-
 	/* Primary row stacks: search-sort wrapper full width on top, then
 	   scroll container below. */
 	.pf-cat-bar-row-primary {
 		flex-direction: column;
 		align-items: stretch;
-		gap: 6px;
+		gap: var(--pf-space-2);
 	}
 	/* In column flex, flex-basis controls the cross-axis (height), not
 	   width, so reset to auto and force full width explicitly. Same fix
@@ -247,8 +243,8 @@ body.tax-product_cat .entry-hero.product-hero-section {
 	display: flex;
 	align-items: stretch;
 	gap: 0;
-	/* 8px visual gap from search; collapses to 0 along with max-width on focus. */
-	margin-left: 8px;
+	/* pf-space-2 visual gap from search; collapses to 0 along with max-width on focus. */
+	margin-left: var(--pf-space-2);
 	/* max-width: a large-enough upper bound so the natural width fits;
 	   the actual width is decided by content. Transitions cleanly to 0. */
 	max-width: 240px;
@@ -415,9 +411,14 @@ body.tax-product_cat .entry-hero.product-hero-section {
 .pf-catalogue-chips {
 	display: flex;
 	flex-wrap: wrap;
-	gap: 6px;
+	gap: var(--pf-space-2);
 	align-items: center;
 }
+/* Aucun chip → l'attribut `hidden` (PHP + JS) doit masquer le conteneur. Sa
+   valeur UA `display:none` (0,1,0) est sinon battue par `.pf-catalogue-chips`
+   (display:flex, 0,1,0) → conteneur vide qui laisse un espace. On rétablit avec
+   une spécificité supérieure (0,2,0). */
+.pf-catalogue-chips[hidden] { display: none; }
 
 @media (max-width: 1023px) {
 	.pf-catalogue-chips {
@@ -481,7 +482,7 @@ body.tax-product_cat .entry-hero.product-hero-section {
 	box-shadow: none;
 }
 
-@media (max-width: 1023px) { .pf-cat-reset-all { margin-left: 8px; } }
+@media (max-width: 1023px) { .pf-cat-reset-all { margin-left: var(--pf-space-2); } }
 
 /* ─── Hiérarchie visuelle entre les deux barres ─────────────────── */
 
@@ -494,6 +495,24 @@ body.tax-product_cat .entry-hero.product-hero-section {
 .pf-catalogue-bar-top .pf-cat-trigger,
 .pf-catalogue-bar-top .pf-cat-format-btn {
 	font-size: 15px;
+}
+
+/* Format switch + Catalogues PDF du top bar → taille .pf-btn--sm (13px, hauteur
+   34px, padding 8px 12px). Le rayon (Littérature / Culture Sud-Ouest) reste plus
+   grand (40px/15px) ; ces boutons plus petits se centrent verticalement contre le
+   rayon via le align-items:center de la barre. En pratique desktop only : en
+   mobile, format + PDF sont relogés dans le panneau de filtres. */
+.pf-catalogue-bar-top .pf-cat-format-switch,
+.pf-catalogue-bar-top .pf-cat-pdf {
+	--pf-control-h: 34px;
+}
+.pf-catalogue-bar-top .pf-cat-format-btn,
+.pf-catalogue-bar-top .pf-cat-format-switch .pf-cat-trigger,
+.pf-catalogue-bar-top .pf-cat-pdf .pf-cat-trigger {
+	font-size: 13px;
+}
+.pf-catalogue-bar-top .pf-cat-format-btn {
+	padding: 8px 12px;
 }
 
 /* Barre principale : légèrement plus compacte (filtres utilitaires) */
@@ -512,14 +531,12 @@ body.tax-product_cat .entry-hero.product-hero-section {
 .pf-catalogue-bar-top {
 	flex-direction: row;
 	align-items: center;
-	padding: 8px 0 6px;
-	gap: 16px;
-	border-bottom: 1px solid var(--pf-border-light);
+	gap: var(--pf-space-2);
 }
 
 .pf-cat-univers {
 	display: inline-flex;
-	gap: 8px;
+	gap: var(--pf-space-2);
 	align-items: center;
 }
 
@@ -529,14 +546,14 @@ body.tax-product_cat .entry-hero.product-hero-section {
 }
 
 .pf-cat-coll-pair .pf-cat-univers-btn {
-	border: 1px solid color-mix(in srgb, var(--pf-text) 43%, transparent);
+	border: 1px solid var(--pf-border-light);
 	border-radius: var(--pf-radius-md) 0 0 var(--pf-radius-md);
 }
 
 .pf-cat-coll-pair .pf-cat-dropdown { display: flex; }
 
 .pf-cat-coll-pair .pf-cat-trigger {
-	border: 1px solid color-mix(in srgb, var(--pf-text) 43%, transparent);
+	border: 1px solid var(--pf-border-light);
 	border-radius: 0 var(--pf-radius-md) var(--pf-radius-md) 0;
 	border-left: none;
 	padding: 0 10px;
@@ -550,10 +567,9 @@ body.tax-product_cat .entry-hero.product-hero-section {
 }
 
 /* Réutilise le segment .pf-switch__btn (style.css) : padding, couleurs, états is-active/hover.
-   Deltas propres au catalogue : graisse semibold + gap pour le caret. */
+   Delta propre au catalogue : gap pour le caret. */
 .pf-cat-univers-btn {
 	gap: 5px;
-	font-weight: var(--pf-weight-semibold);
 }
 
 .pf-cat-coll-pair .pf-cat-univers-btn.is-active { border-color: var(--pf-accent); }
@@ -592,8 +608,136 @@ body.tax-product_cat .entry-hero.product-hero-section {
 .pf-cat-cat-header:first-child { padding-top: 4px; }
 
 @media (max-width: 1023px) {
-	.pf-catalogue-bar-top { flex-wrap: wrap; gap: 8px; padding: 6px 0 4px; }
-	.pf-cat-univers-btn   { font-size: 14px; }
+	.pf-catalogue-bar-top { flex-wrap: wrap; }
+	/* Mobile + tablette (<1024px) : les boutons rayon (Littérature / Culture
+	   Sud-Ouest) gardent leur hauteur (40px) mais adoptent la taille de texte et
+	   le padding de .pf-btn--sm (13px, 8px 12px) — plus compact là où l'espace est
+	   serré. Desktop (≥1024px) : rayon à 15px / 8px 14px (plus grand). Sélecteur en
+	   (0,2,0), placé après la règle 15px (même spécificité) → gagne par l'ordre. */
+	/* height:auto : le bouton se dimensionne sur son contenu (padding +
+	   line-height + font ≈ 34px, taille btn-small) au lieu des 40px figés par la
+	   règle globale `.pf-cat-univers-btn { height: var(--pf-control-h) }` — sans
+	   ça, la line-height n'a aucun effet visible sur la hauteur. */
+	.pf-catalogue-bar-top .pf-cat-univers-btn { font-size: 13px; padding: 8px 12px; height: auto; }
+	/* Le ⋮ (caret) de la paire rayon suit : conteneur en 13px (→ line-height
+	   15.6px, comme le libellé, au lieu de 15px/18px), height:auto pour ne pas
+	   re-imposer 40px à la paire (align-items:stretch → il s'aligne sur le
+	   libellé), et glyphe ⋮ ramené à 16px (proportionné au libellé 13px, aligné
+	   sur les ⋮ des autres déroulants, au lieu de 20px). Desktop : inchangé. */
+	.pf-catalogue-bar-top .pf-cat-coll-pair .pf-cat-trigger { font-size: 13px; height: auto; }
+	.pf-catalogue-bar-top .pf-cat-coll-pair .pf-cat-caret { font-size: 16px; }
+}
+
+/* Mobile (<768px) : rayon pleine largeur, les deux paires se partagent la ligne
+   et flexent. Le LIBELLÉ grandit pour remplir la paire (padding latéral retiré →
+   il s'étend/rétrécit sur son seul texte, tronqué en dernier recours). Le KEBAB
+   garde un padding latéral généreux (max) mais peut rétrécir (min-width:36px
+   levé + flex-shrink) : quand la place manque, il se comprime au lieu de faire
+   déborder la paire. `.pf-cat-dropdown` est le vrai enfant flex de la paire (il
+   enveloppe le trigger) → c'est lui qui doit shrinker. */
+@media (max-width: 767px) {
+	.pf-cat-univers { display: flex; width: 100%; }
+	.pf-cat-coll-pair { flex: 1 1 auto; min-width: 0; }
+	.pf-catalogue-bar-top .pf-cat-univers-btn {
+		flex: 1 1 auto;
+		min-width: 0;
+		padding-left: 0;
+		padding-right: 0;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+	.pf-cat-coll-pair .pf-cat-dropdown { flex: 0 1 auto; min-width: 0; }
+	.pf-catalogue-bar-top .pf-cat-coll-pair .pf-cat-trigger {
+		flex: 1 1 auto;
+		min-width: 0;
+		width: 100%;
+		padding-left: 16px;
+		padding-right: 16px;
+	}
+}
+
+/* Tablette (768-1023px) : tout sur une seule ligne — rayon (Littérature /
+   Culture Sud-Ouest) à gauche, puis la barre de recherche (+ bouton Filtres) qui
+   remplit le reste. Le conteneur sticky passe en flex-row : le top bar (rayon) se
+   cale à gauche à sa largeur de contenu, la barre principale prend le reste, les
+   chips passent en 2e ligne (flex-basis:100%). Gaté .pf-cat-js : sans JS la
+   rangée de filtres reste visible dans la barre (pas reléguée au panneau) → on
+   garde l'empilé pour ne pas la comprimer. */
+@media (min-width: 768px) and (max-width: 1023px) {
+	.pf-catalogue.pf-cat-js .pf-catalogue-sticky {
+		/* .pf-sticky-bar (style.css) est déjà display:flex mais flex-direction:column
+		   (barres empilées) → on force row pour aligner rayon + recherche sur une ligne.
+		   La chips, en flex-basis:100%, passe en 2e ligne (row-gap du .pf-sticky-bar). */
+		flex-direction: row;
+		flex-wrap: wrap;
+		align-items: center;
+		justify-content: flex-start;
+		column-gap: var(--pf-space-2);
+	}
+	/* margin:0 : les .pf-catalogue-bar portent des marges horizontales auto qui,
+	   en tant qu'items flex, absorbaient l'espace libre et centraient tout (top
+	   bar + barre principale se retrouvaient au centre au lieu de gauche). */
+	.pf-catalogue.pf-cat-js .pf-catalogue-bar-top {
+		flex: 0 0 auto;
+		border-bottom: none;
+		padding: 0;
+		margin: 0;
+	}
+	.pf-catalogue.pf-cat-js .pf-catalogue-bar:not(.pf-catalogue-bar-top) {
+		/* flex-basis 0 : ne réclame pas sa largeur de contenu (sinon flex-wrap la
+		   fait passer à la ligne au lieu de la rétrécir) → reste sur la ligne 1 et
+		   remplit l'espace restant. */
+		flex: 1 1 0;
+		min-width: 0;
+		margin: 0;
+	}
+	.pf-catalogue.pf-cat-js .pf-catalogue-chips { flex-basis: 100%; margin: 0; }
+}
+
+/* Recherche active (.is-searching, posé sur la barre principale par le JS quand le
+   champ a le focus ou du texte) : on replie ce qui empêche le champ de s'étendre,
+   comme le bouton « Tri » sur desktop. Repli animé (max-width → 0) ; la recherche
+   grandit ensuite par flex.
+   — Mobile + tablette : le bouton « Tri et filtres ».
+   — Tablette (rayon sur la même ligne) : + le rayon (Littérature / Culture Sud-Ouest). */
+@media (max-width: 1023px) {
+	.pf-catalogue.pf-cat-js .pf-cat-filter-trigger {
+		max-width: 200px;
+		overflow: hidden;
+		transition: max-width 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+		            padding 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+		            margin 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+		            opacity 0.2s ease;
+	}
+	.pf-catalogue.pf-cat-js .pf-catalogue-bar.is-searching .pf-cat-filter-trigger {
+		max-width: 0;
+		padding-left: 0;
+		padding-right: 0;
+		margin-left: calc(var(--pf-space-2) * -1); /* absorbe le gap de la rangée (.pf-cat-bar-row-primary) */
+		border-width: 0;
+		opacity: 0;
+		pointer-events: none;
+	}
+}
+
+@media (min-width: 768px) and (max-width: 1023px) {
+	.pf-catalogue.pf-cat-js .pf-catalogue-bar-top {
+		max-width: 400px;      /* borne haute pour animer vers 0 (le rayon ~310px n'est pas contraint) */
+		overflow: hidden;
+		transition: max-width 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+		            margin 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+		            opacity 0.2s ease;
+	}
+	/* :has() — le sticky qui contient la barre .is-searching replie son top bar
+	   (le rayon est frère de la barre principale, pas descendant → pas de sélecteur
+	   direct possible sans :has). */
+	.pf-catalogue.pf-cat-js .pf-catalogue-sticky:has(.pf-catalogue-bar.is-searching) .pf-catalogue-bar-top {
+		max-width: 0;
+		margin-right: calc(var(--pf-space-2) * -1); /* absorbe le column-gap du sticky */
+		opacity: 0;
+		pointer-events: none;
+	}
 }
 
 /* ─── Grid AJAX loading state ───────────────────────────────────── */
@@ -620,7 +764,7 @@ body.tax-product_cat .entry-hero.product-hero-section {
 	.pf-catalogue.pf-cat-js .pf-cat-bar-row-primary {
 		flex-direction: row;
 		align-items: center;
-		gap: 8px;
+		gap: var(--pf-space-2);
 	}
 	.pf-catalogue.pf-cat-js .pf-cat-search-sort {
 		flex: 1 1 auto !important;
@@ -629,6 +773,17 @@ body.tax-product_cat .entry-hero.product-hero-section {
 	}
 	/* Contrôles relogés dans le panneau → rangée à scroll vidée et masquée. */
 	.pf-catalogue.pf-cat-js .pf-cat-row-scroll { display: none; }
+
+	/* Anti-clignotement : les contrôles qui seront relogés dans le panneau sont
+	   masqués tant qu'ils vivent encore dans la barre (sticky), avant le
+	   déplacement JS. Le scroll-row est déjà masqué ci-dessus ; ceci couvre
+	   format + PDF (top bar) et le tri (bloc recherche). Le panneau étant rendu
+	   HORS de .pf-catalogue-sticky, ces règles ne s'y appliquent pas → une fois
+	   relogés, les contrôles redeviennent visibles. La classe .pf-cat-js est
+	   posée avant le 1er paint (script inline, cf. render_shortcode). */
+	.pf-catalogue.pf-cat-js .pf-catalogue-sticky .pf-cat-format-switch,
+	.pf-catalogue.pf-cat-js .pf-catalogue-sticky .pf-cat-pdf,
+	.pf-catalogue.pf-cat-js .pf-catalogue-sticky .pf-cat-sort { display: none; }
 
 	.pf-catalogue.pf-cat-js .pf-cat-filter-trigger { display: inline-flex; }
 

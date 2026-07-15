@@ -634,10 +634,17 @@ class Passiflore_Event_Tiles {
         return ob_get_clean();
     }
 
-    public static function render_tile( array $event ): string {
+    /**
+     * @param bool $show_lieu Afficher la ligne meta « Lieu ». Mise à false quand le
+     *                        contexte donne déjà le lieu (ex. infobulle carte, dont
+     *                        le titre EST le lieu → pas de redite).
+     */
+    public static function render_tile( array $event, bool $show_lieu = true ): string {
         $ts       = $event['start_date'] instanceof DateTime ? $event['start_date']->getTimestamp() : 0;
         $end_ts   = isset( $event['end_date'] ) && $event['end_date'] instanceof DateTime ? $event['end_date']->getTimestamp() : 0;
-        $lieu_row = pf_render_lieu_meta_row( (string) ( $event['venue_name'] ?? '' ), (string) ( $event['venue_city'] ?? '' ) );
+        $lieu_row = $show_lieu
+            ? pf_render_lieu_meta_row( (string) ( $event['venue_name'] ?? '' ), (string) ( $event['venue_city'] ?? '' ) )
+            : '';
 
         // Fin effective : decale de 12h pour neutraliser la sentinelle "23h59 = pas de fin"
         // (evenement mono-jour) sans la confondre avec un veritable evenement multi-jours.

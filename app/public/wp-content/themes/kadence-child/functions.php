@@ -37,6 +37,16 @@ function passiflore_enqueue_auteurs_styles() {
         'nonce'    => wp_create_nonce( 'pf_newsletter' ),
     ] );
 
+    // Tiroir mobile : déplie automatiquement la catégorie produit courante
+    // (site-wide, le header/tiroir existe sur toutes les pages).
+    wp_enqueue_script(
+        'pf-mobile-nav',
+        get_stylesheet_directory_uri() . '/assets/js/mobile-nav.js',
+        [],
+        filemtime( get_stylesheet_directory() . '/assets/js/mobile-nav.js' ),
+        true
+    );
+
     // Composant partagé « section-nav » (fiche livre + fiche événement).
     if ( is_product() || is_singular( 'tribe_events' ) ) {
         wp_enqueue_script(
@@ -123,7 +133,7 @@ function passiflore_enqueue_auteurs_styles() {
             'pf-events',
             get_stylesheet_directory_uri() . '/assets/css/events.css',
             [ 'pf-auteurs' ],
-            '1.0.0'
+            filemtime( get_stylesheet_directory() . '/assets/css/events.css' )
         );
     }
     // Bouton « S'abonner » : action directe vers le calendrier probable du visiteur.

@@ -28,7 +28,7 @@
     padding: 8px 12px !important; /* même padding que les triggers du catalogue (le switch global est à 8px 14px) */
     background: var(--pf-cream) !important;
     color: var(--pf-text) !important;
-    font-size: 14px;
+    font-size: 13px; /* aligné sur .pf-btn--sm / triggers de la barre catalogue */
     line-height: 1.2; /* aligne la hauteur sur le bouton « S'abonner » (la classe .button impose sinon ~1.6) */
     text-decoration: none !important;
     box-shadow: none !important;
@@ -48,6 +48,253 @@
     color: var(--pf-accent) !important;
 }
 
+/* ── Vue mois : datepicker (libellé = mois sélectionné) ───────
+   Override tribe/.../month/top-bar/datepicker.php : « 07/2026 » (mobile) / « Juillet 2026 »
+   (tablette + desktop). Deux réglages ici (les libellés eux-mêmes sont dans le template) : */
+
+/* (a) Bascule mobile→nom-complet dès la TABLETTE. TEC ne swappait les deux <span> qu'au
+   point de rupture `--breakpoint-full` (desktop) → tablette restait en « 07/2026 ». Les
+   classes de rupture de TEC étant cumulatives, une règle en `--breakpoint-medium` couvre
+   tablette ET desktop. `!important` : contre les règles TEC `full` et `.tribe-common-a11y-hidden`
+   (display:none !important) du <span> desktop. */
+.tribe-common--breakpoint-medium.tribe-events .tribe-events-c-top-bar__datepicker-mobile {
+    display: none !important;
+}
+.tribe-common--breakpoint-medium.tribe-events .tribe-events-c-top-bar__datepicker-desktop {
+    display: block !important;
+    visibility: visible;
+}
+
+/* (b) Look = trigger de déroulant du /catalogue (.pf-cat-trigger .pf-dropdown__trigger) :
+   pastille bordée crème, radius-md, 14px, kebab ⋮ (à la place du caret). Bordure/texte rouge
+   au survol, à l'ouverture (classe TEC `--open`) et à l'état « actif » (`pf-is-active` posée
+   par datepicker.php quand le mois affiché ≠ mois courant). Réimposé en (0,2,0) + `!important`
+   contre le reset bouton de TEC (`.tribe-events button.…datepicker-button`, 0,2,0) — le
+   composant global `.pf-dropdown__trigger` (0,1,0) perdrait seul. Tokens identiques. */
+.tribe-events .tribe-events-c-top-bar__datepicker-button {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 12px !important;
+    border: 1px solid var(--pf-border-light) !important;
+    border-radius: var(--pf-radius-md) !important;
+    background: var(--pf-cream) !important;
+    color: var(--pf-text) !important;
+    font-size: var(--pf-text-sm) !important;
+    line-height: 1.2 !important;
+    font-weight: var(--pf-weight-normal) !important;
+    box-shadow: none !important;
+    transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+.tribe-events .tribe-events-c-top-bar__datepicker-button:hover,
+.tribe-events .tribe-events-c-top-bar__datepicker-button:focus,
+.tribe-events .tribe-events-c-top-bar__datepicker-button--open {
+    border-color: var(--pf-accent) !important;
+    background: var(--pf-red-soft) !important;
+    color: var(--pf-accent) !important;
+}
+.tribe-events .tribe-events-c-top-bar__datepicker-button.pf-is-active {
+    border-color: var(--pf-accent) !important;
+    color: var(--pf-accent) !important;
+}
+/* Kebab ⋮ (même rendu que .pf-cat-caret du /catalogue, dont le CSS n'est pas chargé ici). */
+.tribe-events-c-top-bar__datepicker-button .pf-cat-caret {
+    font-size: 16px;
+    line-height: 1;
+}
+
+/* (c) Popup calendrier (bootstrap-datepicker, vendored par TEC) : apparence carte
+   du site (mêmes tokens que .pf-card) plutôt que le look Bootstrap par défaut
+   (fond blanc, bordure grise, ombre plate codée en dur). `.datepicker.dropdown-menu` :
+   sélecteur natif de la lib (0,2,0), même spécificité que sa propre règle — pas de
+   scope `.tribe-events` possible, le popup est ajouté en fin de <body>, hors de ce
+   conteneur. `!important` contre cette règle plugin (cf. règle CLAUDE.md sur TEC). */
+.datepicker.dropdown-menu {
+    background: var(--pf-surface) !important;
+    border: 0 !important;
+    border-radius: var(--pf-radius-card) !important;
+    box-shadow: var(--pf-shadow) !important;
+    overflow: hidden;
+}
+
+/* (d) TEC borne le conteneur du datepicker à `calc(100% + Npx)` du bouton déclencheur
+   (étroit sur petit écran) avant de retirer toute limite à partir de `--breakpoint-full` —
+   sur mobile la popup se retrouve donc écrasée à la largeur du bouton plutôt qu'à celle de
+   l'écran. On la borne plutôt à la largeur du viewport (marges globales du thème
+   déduites), quel que soit le point de rupture TEC. */
+.tribe-events .tribe-events-c-top-bar__datepicker-container {
+    max-width: calc(100vw - var(--global-content-edge-padding) * 2) !important;
+}
+
+/* (e) Sélecteurs mois/année (vue mois → clic sur le libellé pour changer de mois/année) :
+   TEC applique le même outline de focus clavier à `.day`/`.month`/`.year` via une seule
+   règle groupée — confirmé identique pour month et year, donc traité pareil ici.
+   `!important` : bat aussi la variante `.month.current.focused`/`:focus` (plus spécifique
+   côté TEC), qui reprend le même outline. */
+.tribe-events .datepicker .month.focused,
+.tribe-events .datepicker .year.focused {
+    outline: none !important;
+}
+
+/* (f) Mois/année « courant(e) » : fond `--tec-color-accent-primary-background-datepicker`
+   (token TEC) remplacé par notre propre teinte `--pf-red-soft`, déjà utilisée pour les
+   états survol de ce même composant (cf. bouton déclencheur ci-dessus). Confirmé identique
+   pour month et year. Repris aussi sur :hover/.focused/:focus, qui pointent vers exactement
+   le même token TEC pour rester uniformes (pas de flash de couleur au survol/focus) —
+   `.day.current` n'est volontairement pas touché.
+   `:not(.active)` : le mois courant est aussi la valeur sélectionnée par défaut à
+   l'ouverture (« month focused active current », cas le plus fréquent) — sans exclusion
+   notre `!important` écrasait le fond plein `--tec-color-accent-primary` que TEC pose pour
+   `.active`, qui perdait alors son indicateur « sélectionné » (réduit à notre teinte pâle).
+   Pas de règle Kadence concurrente ici (contrairement à `.past` plus bas) : exclure suffit,
+   TEC reprend la main tout seul. */
+.tribe-events .datepicker .month.current:not(.active),
+.tribe-events .datepicker .year.current:not(.active),
+.tribe-events .datepicker .month.current:not(.active):hover,
+.tribe-events .datepicker .year.current:not(.active):hover,
+.tribe-events .datepicker .month.current.focused:not(.active),
+.tribe-events .datepicker .month.current:not(.active):focus,
+.tribe-events .datepicker .year.current.focused:not(.active),
+.tribe-events .datepicker .year.current:not(.active):focus {
+    background: var(--pf-red-soft) !important;
+}
+
+/* (f-bis) Anneau `:before` du mois/année courant(e) + focused (même mécanisme redondant que
+   l'outline neutralisé en (e), mais via une pseudo-bordure) : bordure générique
+   `--tec-outline-color-default` + box-shadow interne `--tec-color-accent-primary` remplacées
+   par la bordure simple de l'état current non focused (`.current:before` plus haut dans TEC),
+   pour que le focus clavier n'ajoute plus un double anneau. */
+.tribe-events .datepicker .month.current.focused:before,
+.tribe-events .datepicker .month.current:focus:before,
+.tribe-events .datepicker .year.current.focused:before,
+.tribe-events .datepicker .year.current:focus:before {
+    border: 1px solid var(--tec-color-accent-primary) !important;
+    box-shadow: none !important;
+}
+
+/* (g) Le thème parent Kadence (kadence/assets/css/tribe-events.min.css) applique une
+   couleur fixe (--global-palette6) aux mois/années passés du datepicker. On neutralise
+   cette couleur — `color: inherit` ne suffit pas ici : le popup bootstrap-datepicker pose
+   lui-même `color:#333` sur `.datepicker.dropdown-menu`, donc `inherit` remonte à CE gris
+   générique plutôt qu'au `--pf-text` que portent déjà les mois non passés (résolu par une
+   règle TEC de spécificité inférieure, normalement battue par celle du parent Kadence) —
+   on réimpose donc `--pf-text` explicitement pour rester identique aux mois non passés, et
+   on assombrit plutôt via opacité. Même sélecteur que la règle du parent (spécificité
+   identique) + `!important` : le parent enqueue sa feuille après la nôtre malgré une
+   priorité de hook plus faible côté enfant (10 < 60 chez Kadence), l'ordre de sortie seul
+   ne garantit donc pas la victoire. `:not(.active)` : un mois passé peut être la valeur
+   sélectionnée (`.month.active`, fond plein `--tec-color-accent-primary` posé par TEC),
+   qui a besoin de son texte clair `--tec-color-background` pour rester lisible — sans cette
+   exclusion notre `!important` l'écrasait avec `--pf-text` (sombre, illisible sur fond
+   plein) ; l'opacité 0.8 est exclue pour la même raison (ne pas délaver l'état actif).
+   ⚠️ Exclure `.active` ici ne suffit pas à faire gagner TEC : sans concurrent, c'est ENCORE
+   la règle du parent Kadence (id `#primary`, spécificité (1,3,0)) qui l'emporte sur la règle
+   TEC `.month.active(.focused)` (classes seules, (0,5,0) au mieux — un id bat n'importe quel
+   nombre de classes) ; aucune des deux n'a `!important`. D'où la règle dédiée ci-dessous, qui
+   neutralise spécifiquement Kadence pour ce cas et réimpose la couleur TEC voulue. */
+#primary .tribe-events .datepicker .past:not(.active) {
+    color: var(--pf-text) !important;
+    opacity: 0.8;
+}
+#primary .tribe-events .datepicker .past.active,
+#primary .tribe-events .datepicker .past.active:hover,
+#primary .tribe-events .datepicker .past.active.focused,
+#primary .tribe-events .datepicker .past.active:focus {
+    color: var(--tec-color-background) !important;
+}
+
+/* ── Vue mois : nav mois préc./suiv. (grand écran) = boutons ronds outline + chevron arrondi ──
+   TEC rend de petits liens 24×24 avec un caret PLEIN (coins droits). On en fait des boutons
+   ronds outline (mêmes tokens de bordure/survol que les contrôles du header) et on remplace le
+   caret par un chevron TRACÉ à coins arrondis (stroke-linejoin: round), dessiné en `mask-image`
+   → couleur pilotée par un token via `currentColor` (rouge au survol). `!important` contre les
+   tailles/reset TEC. */
+.tribe-events .tribe-events-c-top-bar__nav-link {
+    width: 34px !important;
+    height: 34px !important;
+    border: 1px solid var(--pf-border-light) !important;
+    border-radius: 50% !important;
+    background: transparent !important;
+    transition: border-color 0.15s ease, background 0.15s ease;
+}
+.tribe-events .tribe-events-c-top-bar__nav-link:hover,
+.tribe-events .tribe-events-c-top-bar__nav-link:focus {
+    border-color: var(--pf-accent) !important;
+    background: var(--pf-red-soft) !important;
+}
+.tribe-events .tribe-events-c-top-bar__nav-link[disabled] {
+    opacity: 0.4;
+}
+/* Espacement des deux flèches : gap sur la liste (flex chez TEC) plutôt que le
+   padding-right:15px des items. `!important` bat la variante `.entry-content-wrapper …`
+   de TEC (0,3,0). */
+.tribe-events .tribe-events-c-top-bar__nav-list {
+    gap: var(--pf-space-2);
+}
+.tribe-events .tribe-events-c-top-bar__nav-list-item {
+    padding-right: 0 !important;
+}
+/* Caret plein de TEC masqué → chevron arrondi en pseudo-élément (mask). Couleur posée en
+   dur (token) sur le ::before — pas `currentColor` : la couleur de l'ancre est déjà forcée
+   en rouge par la règle globale `p a:not(.button)… { color:var(--pf-accent)!important }`. */
+.tribe-events-c-top-bar__nav-link .tribe-events-c-top-bar__nav-link-icon-svg {
+    display: none !important;
+}
+.tribe-events-c-top-bar__nav-link::before {
+    content: "";
+    width: 8px;
+    height: 13px;
+    background-color: var(--pf-text);
+    -webkit-mask: center / contain no-repeat;
+            mask: center / contain no-repeat;
+}
+.tribe-events .tribe-events-c-top-bar__nav-link:hover::before,
+.tribe-events .tribe-events-c-top-bar__nav-link:focus::before {
+    background-color: var(--pf-accent);
+}
+.tribe-events-c-top-bar__nav-link--prev::before {
+    -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 16' fill='none' stroke='%23000' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M7.5 2 L2.5 8 L7.5 14'/%3E%3C/svg%3E");
+            mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 16' fill='none' stroke='%23000' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M7.5 2 L2.5 8 L7.5 14'/%3E%3C/svg%3E");
+}
+.tribe-events-c-top-bar__nav-link--next::before {
+    -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 16' fill='none' stroke='%23000' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M2.5 2 L7.5 8 L2.5 14'/%3E%3C/svg%3E");
+            mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 16' fill='none' stroke='%23000' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M2.5 2 L7.5 8 L2.5 14'/%3E%3C/svg%3E");
+}
+
+/* ── Vue mois : nav mobile préc./mois-année/suiv. (< 768px, entre header et grille) ──
+   Rendu par l'override components/filter-bar.php (composant natif vide, détourné en
+   point d'ancrage). Réutilise les boutons flèche ci-dessus (mêmes classes TEC) → même
+   apparence/comportement que le top-bar desktop/tablette. Masquée à 768px, seuil TEC
+   `--breakpoint-medium` où le nav natif du header prend le relais (jamais les deux
+   en même temps).
+   `.pf-month-mobile-nav.pf-month-mobile-nav` (0,2,0) : c'est un `<nav>` — le reset
+   `.tribe-common nav { display:block }` (0,1,1, cf. gotcha CLAUDE.md) bat sinon aussi
+   bien le `display:flex` de base que le `display:none` du media query.
+   `list-style:none` : les flèches réutilisent les partiels `<li>` de TEC sans le `<ul>`
+   qui porte normalement ce reset (`.tribe-events-c-top-bar__nav-list`, non repris ici,
+   cf. filter-bar.php) — hérité par les `<li>` enfants (list-style-type est inheritable),
+   sinon la puce par défaut du user-agent apparaît devant chaque flèche. */
+.pf-month-mobile-nav.pf-month-mobile-nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-bottom: var(--pf-space-6);
+    list-style: none;
+}
+
+.pf-month-mobile-nav__label {
+    font-family: var(--pf-font-heading);
+    font-size: var(--pf-text-base);
+    font-weight: var(--pf-weight-semibold);
+    color: var(--pf-heading);
+}
+
+@media (min-width: 768px) {
+    .pf-month-mobile-nav.pf-month-mobile-nav {
+        display: none;
+    }
+}
+
 /* ── Vue mois : header sticky « smart-hide » ──────────────────
    Markup posé par l'override tribe/.../components/header.php :
    .pf-sticky-bar (full-bleed + smart-hide + aéro, mécanisme commun style.css)
@@ -65,13 +312,16 @@
    (spécificité 0,2,0), ce qui écrase le sticky ET le full-bleed de `.pf-sticky-bar`
    (0,1,0) : le header gardait `margin-left:0`/`padding:0` → décalé à droite (la barre
    débordait sous l'écran) et non collant. On réapplique les deux avec une spécificité
-   supérieure (0,3,0) ; valeurs identiques à `.pf-sticky-bar` de style.css. */
+   supérieure (0,3,0) ; valeurs identiques à `.pf-sticky-bar` de style.css — dont
+   `margin-bottom` (espacement avec le contenu sous la barre, même valeur que /catalogue
+   et /auteurs), lui aussi écrasé par le `margin:0` de TEC. */
 .tribe-events-view .tribe-events-header.pf-sticky-bar {
     position: sticky;
     top: var(--pf-sticky-offset, 0px);
     width: calc(100vw - var(--scrollbar-offset, 0px));
     margin-left:  calc(50% - 50vw + var(--scrollbar-offset, 0px) / 2);
     margin-right: calc(50% - 50vw + var(--scrollbar-offset, 0px) / 2);
+    margin-bottom: var(--pf-space-6);
     padding-left:  calc(50vw - 50% - var(--scrollbar-offset, 0px) / 2);
     padding-right: calc(50vw - 50% - var(--scrollbar-offset, 0px) / 2);
     padding-top: var(--pf-space-3);
@@ -83,7 +333,7 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 12px 8px;
+    gap: var(--pf-space-2);
     flex-wrap: wrap;
     width: 100%;
 }
@@ -104,7 +354,7 @@
 }
 
 .pf-events-header-bar__right {
-    gap: 8px; /* même écart entre boutons que le header /catalogue (.pf-cat-bar-row) */
+    gap: var(--pf-space-2); /* même écart entre boutons que le header /catalogue (.pf-cat-bar-row) */
     margin-left: auto;
     justify-content: flex-end;
     flex-wrap: wrap;
@@ -122,7 +372,7 @@
     margin: 0 !important;
     padding: 0;
     justify-content: flex-start;
-    gap: 8px;
+    gap: var(--pf-space-2);
 }
 
 /* L'events-bar (sélecteur de vue) se réduit à son contenu (le switch Liste/Mois)
@@ -297,7 +547,8 @@
    on réaffirme les valeurs du composant partagé en `!important`. */
 .pf-events-header-bar__right .tribe-events-c-subscribe-dropdown__button[data-pf-ical-enhanced] .pf-splitbtn__main {
     display: flex !important;
-    padding: 8px 14px !important;
+    padding: 8px 12px !important;      /* taille .pf-btn--sm (le padding est piloté ici, pas par style.css) */
+    font-size: 13px !important;        /* idem : TEC repose sinon la police du bouton */
     border: 1px solid var(--pf-accent) !important;
     border-right: 1px solid var(--pf-cream) !important; /* filet crème de séparation avec le kebab */
     border-radius: var(--pf-radius-md) 0 0 var(--pf-radius-md) !important;
@@ -420,17 +671,17 @@
 /* Recherche événements — vue liste uniquement (Passiflore_Events_Search::render_bar(),
    rendue dans __left par tribe/.../components/header.php ; en vue mois cet
    emplacement reste occupé par le top-bar préc./suiv./datepicker). Composant
-   .pf-search/.pf-search--sm (style.css) : ici, seules la largeur (pleine largeur
-   de __left, qui grandit pour occuper l'espace disponible — cf. règle __left
-   ci-dessus) et la taille de texte (alignée sur les boutons 14px de cette même
-   barre — .pf-search-input utilise --pf-text-sm par défaut, un rem relatif à la
-   taille de base du thème, plus grand que ce 14px fixe) sont propres à cet
-   emplacement. */
+   .pf-search/.pf-search--cat (style.css, dimensions calées sur la barre /catalogue) :
+   seule la largeur (pleine largeur de __left, qui grandit pour occuper l'espace
+   disponible — cf. règle __left ci-dessus) est propre à cet emplacement. */
 .pf-ev-search {
     width: 100%;
 }
+/* Shim (0,2,0) : le reset TEC `.tribe-common input { font-size: inherit }` (0,1,1)
+   bat sinon le `font-size: var(--search-font)` du composant (0,1,0), remontant
+   jusqu'au 17px de `body` — même gotcha que le reset `.tribe-common *` (CLAUDE.md). */
 .pf-ev-search .pf-search-input {
-    font-size: 14px;
+    font-size: var(--search-font);
 }
 
 /* ============================================================
@@ -541,7 +792,8 @@
     line-height: var(--pf-leading-tight);
 }
 .pf-event-card-meta-name {
-    font-weight: var(--pf-weight-bold);
+    font-size: var(--pf-text-sm);
+    font-weight: var(--pf-weight-semibold);
 }
 .pf-event-card-meta-row--lieu .pf-event-card-meta-name {
     font-weight: var(--pf-weight-normal);
@@ -960,9 +1212,9 @@ h3:has(> .tribe-events-calendar-list__month-separator-text) {
 }
 
 .pf-event-tile .pf-card-text {
-    font-size: 0.82rem;
-    line-height: 1.6;
-    margin: var(--pf-space-1) 0 0;
+    font-size: var(--pf-text-xs);
+    line-height: 1.4;
+    margin: var(--pf-space-2) 0 0;
     display: -webkit-box;
     -webkit-line-clamp: 3;
     line-clamp: 3;
@@ -990,6 +1242,176 @@ h3:has(> .tribe-events-calendar-list__month-separator-text) {
 
 @media ( max-width: 480px ) {
     .pf-event-tile { flex: 0 0 240px; }
+}
+
+/* =============================================================================
+   Vue mois — popup d'événement = card générique (Passiflore_Event_Tiles)
+   -----------------------------------------------------------------------------
+   Le contenu du popup (override tooltip.php) est notre .pf-event-tile. tooltipster
+   ajoute la bulle au <body>, MAIS pose `tribe-common tribe-events` comme classes
+   sur `.tooltipster-base` (mécanisme de thème de TEC) → le reset `.tribe-common *`
+   (`.tribe-common a` (0,1,1), `.tribe-common h*, p` (0,1,1)) frappe la card comme sur
+   les vues TEC. On :
+   1) neutralise le cadre par défaut de tooltipster (bord/fond/ombre de
+      `.tooltipster-base`) pour laisser la card fournir seule son fond/rayon/ombre.
+      `:has()` → (0,3,0) > (0,2,0) de TEC, scopé à nos popups (pas de !important) ;
+   2) restaure le fond de la card (le reset `.tribe-common a` la rend transparente)
+      et la graisse du titre (reset `.tribe-common h*` → 400), via des shims (0,2,0)
+      qui battent le reset (0,1,1) — même parade que l'infobulle carte.
+   La card, hors flex-row, reçoit une largeur fixe (elle est en `flex: 0 0 250px`
+   sur l'accueil). Le meta (Lieu/date) est déjà blindé dans le composant.
+   ============================================================================= */
+.tooltipster-base.tribe-events-tooltip-theme:has( .pf-month-tooltip ) {
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+}
+
+.pf-month-tooltip .pf-event-tile {
+    width: 260px;
+    background: var(--pf-surface);
+}
+
+.pf-month-tooltip .pf-card-title {
+    font-weight: var(--pf-weight-semibold);
+}
+
+/* =============================================================================
+   Vue mois (mobile) — popup d'événements au-dessus du jour tapé
+   -----------------------------------------------------------------------------
+   Dès que le JS (events-month-mobile-pop.js) est actif, le panneau natif des
+   événements du jour (…__mobile-day) devient une source de données cachée : son
+   contenu .pf-map-pop (composant partagé avec la vue carte, défini dans style.css)
+   est cloné dans le carton flottant .pf-month-pop-layer, positionné au-dessus du
+   jour tapé. Sans JS, `.pf-month-pop-active` n'est jamais posée → panneau natif
+   visible en bas de grille (repli).
+   ============================================================================= */
+
+/* Panneau natif masqué quand le popup flottant est actif (source de données seule).
+   (0,2,0) : bat le natif `…--show { display:block }` (0,1,0) sans !important. */
+.pf-month-pop-active .tribe-events-calendar-month-mobile-events__mobile-day--show {
+    display: none;
+}
+
+/* Nav prev/aujourd'hui/suivant native TEC (partagée, rendue une fois en bas de TOUS les
+   panneaux jour) : perd son utilité dès que le popup flottant gère la navigation (tap
+   direct sur un jour de la grille). Même condition que le panneau ci-dessus → repli sans
+   JS conservé (la nav y redevient le seul moyen de changer de jour). */
+.pf-month-pop-active .tribe-events-calendar-month-nav.tribe-events-c-nav {
+    display: none;
+}
+
+/* Carton flottant : analogue du wrapper Leaflet de la vue carte (fond/rayon/ombre/
+   padding). Positionné en JS (coordonnées document). Le SHELL interne (.pf-map-pop) et
+   les tuiles viennent du composant partagé (style.css). Rendu hors .tribe-common
+   (ajouté à <body>) → pas de reset TEC à contrer ici.
+   `max-width` = cap seul ; la largeur EFFECTIVE est posée en JS (fitWidth) = largeur
+   naturelle du contenu plafonnée à ce cap → un seul événement rétrécit le carton à la
+   largeur d'une tuile + ses espacements (comme l'infobulle Leaflet minWidth:0/maxWidth). */
+.pf-month-pop-layer {
+    position: absolute;
+    z-index: 100;
+    max-width: min( 320px, calc( 100vw - 2 * var(--pf-space-4) ) );
+    padding: var(--pf-space-3);
+    background: var(--pf-surface-alt);
+    border-radius: var(--pf-radius-card);
+    box-shadow: var(--pf-shadow-hover);
+}
+
+/* Bouton × — logé dans le padding-right réservé par .pf-map-pop__header. */
+.pf-month-pop__close {
+    position: absolute;
+    top: var(--pf-space-2);
+    right: var(--pf-space-2);
+    width: 1.75rem;
+    height: 1.75rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--pf-muted);
+    font-size: var(--pf-text-lg);
+    line-height: 1;
+    cursor: pointer;
+    border-radius: var(--pf-radius);
+}
+.pf-month-pop__close:hover {
+    color: var(--pf-accent);
+}
+
+/* =============================================================================
+   Vue mois — pastilles d'événements (mono-jour ET multi-jours)
+   -----------------------------------------------------------------------------
+   Mono-jour et multi-jours partagent le même rendu « pastille » : fond --pf-accent,
+   texte --pf-surface, radius --pf-radius-lg. Au survol / popup ouverte : fond
+   --pf-accent-dark, texte inchangé — exactement comme .pf-btn--primary:hover.
+
+   Spécificités TEC/Kadence rencontrées (d'où les `!important`, autorisés contre
+   TEC/Kadence) :
+   - Fond multi-jours : l'intégration Kadence pose `#primary .tribe-events
+     …__multiday-event-bar-inner { background: var(--tec-color-background-primary-multiday,
+     …palette7) }`. On ne touche pas à cette règle : on redéfinit la variable sur
+     `.tribe-events.tribe-events` (0,2,0 > 0,1,0, indépendant de l'ordre de chargement).
+     Cette même règle `#primary` (1,2,0) bat les règles TEC `:hover` (0,3,0) ET `--past`
+     (0,3,0) → le fond ne varie jamais tout seul (multi-jours passés déjà rouges comme les
+     à-venir) ; d'où le survol forcé en `!important` plus bas.
+   - Couleur des titres/dates : `#primary .tribe-events .tribe-common-h8 { color: palette3 }`
+     (1,2,0) + couleur de date secondaire TEC (0,2,0) → forcées en --pf-surface `!important`.
+   - Souligné mono-jour : `.tribe-common .tribe-common-anchor-thin:hover { border-bottom }`
+     (0,2,1) → neutralisé (border-bottom transparente).
+   - État « popup ouverte » : tooltipster garde le déclencheur en
+     `.tribe-events-tooltip-trigger--hover` même quand la souris passe sur le popup (survol
+     perdu sur la pastille) → `:has()` maintient le fond foncé tant que le popup est visible.
+   ============================================================================= */
+
+/* ── Fond (base) ─────────────────────────────────────────────────── */
+.tribe-events.tribe-events {
+    --tec-color-background-primary-multiday: var(--pf-accent);
+}
+/* Mono-jour : TEC ne pose aucun fond → le bloc « détails » devient la pastille, ET une
+   ancre <a> vers l'événement (override calendar-event.php) → toute la pastille est
+   cliquable, curseur main natif. `display: block` : l'<a> est inline par défaut, on le
+   repasse en bloc pour empiler date + titre comme le faisait le <div> d'origine.
+   Sélecteur en (0,2,0) (préfixe `.tribe-events`) : le padding doit battre le reset
+   `.tribe-common div { padding: 0 }` (0,1,1) — le `background`, lui, n'a pas de
+   concurrent et passait déjà en (0,1,0). Radius --pf-radius-lg (8px) ≈ le 9.5px natif
+   des barres multi-jours (segment-aware start/end, laissé tel quel) → rendu identique. */
+.tribe-events .tribe-events-calendar-month__calendar-event-details {
+    display: block;
+    background: var(--pf-accent);
+    border-radius: var(--pf-radius-lg);
+    padding: var(--pf-space-1) var(--pf-space-2);
+    text-decoration: none;
+}
+
+/* ── Texte blanc (titres + heures) ───────────────────────────────── */
+/* Côté mono-jour le titre est un simple conteneur `-title` (plus de lien) portant
+   `tribe-common-h8` → forcé par `#primary .tribe-events .tribe-common-h8` (1,2,0), d'où
+   le `!important`. */
+.tribe-events-calendar-month__multiday-event-bar-title,
+.tribe-events-calendar-month__calendar-event-title,
+.tribe-events-calendar-month__calendar-event-datetime {
+    color: var(--pf-surface) !important;
+}
+
+/* ── Survol / popup dévoilée : fond plus foncé (cf. .pf-btn--primary:hover) ──
+   `:hover` = repli sans JS (survol DIRECT de la pastille ; côté multi-jours il ne
+   noircit que le 1er jour, les couches invisibles de TEC masquant les autres). La
+   classe `.pf-event-hot` est posée par assets/js/events-month-pills.js : elle étend
+   l'état foncé à toute la barre multi-jours quel que soit le jour survolé, l'ouvre
+   depuis toute la pastille (pas seulement le titre) et le MAINTIENT tant que le popup
+   est dévoilé (même curseur parti sur le popup). */
+.tribe-events-calendar-month__calendar-event:hover .tribe-events-calendar-month__calendar-event-details,
+.tribe-events-calendar-month__calendar-event-details.pf-event-hot {
+    background: var(--pf-accent-dark);
+}
+/* Multi-jours : `!important` pour battre le fond `#primary` (1,2,0). */
+.tribe-events-calendar-month__multiday-event:hover .tribe-events-calendar-month__multiday-event-bar-inner,
+.tribe-events-calendar-month__multiday-event-bar-inner.pf-event-hot {
+    background: var(--pf-accent-dark) !important;
 }
 
 /* Horaires par jour (fiche evenement) */

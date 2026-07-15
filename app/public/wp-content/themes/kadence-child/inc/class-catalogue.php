@@ -112,19 +112,26 @@ class Passiflore_Catalogue {
 		// filters exclude them).
 		$global_counts = $bs->get_filter_counts( $this->to_bookshelf_atts( $this->default_atts() ) );
 		$grid          = $this->render_grid( $atts );
+		$total         = Passiflore_Bookshelf::$last_total; // posé par render_grid()
 		$config        = $this->js_config( $atts, $counts );
 
 		ob_start();
 		?>
 		<div class="pf-catalogue"
 		     data-config="<?php echo esc_attr( wp_json_encode( $config ) ); ?>">
+			<?php /* Pose .pf-cat-js AVANT le 1er paint (script synchrone, exécuté au
+			       parsing) : la mise en page mobile/tablette (bouton Filtres, barre
+			       repliée, contrôles masqués dans la barre) s'applique dès le premier
+			       rendu, sans clignotement. Sans JS, la classe n'est jamais posée →
+			       repli sur la barre empilée. */ ?>
+			<script>document.currentScript.parentNode.classList.add('pf-cat-js');</script>
 			<div class="pf-catalogue-sticky pf-sticky-bar">
 				<?php echo $this->render_top_bar( $atts, $counts, $global_counts ); ?>
 				<?php echo $this->render_bar( $atts, $counts, $global_counts ); ?>
 				<?php echo $this->render_chips( $atts ); ?>
 			</div>
 			<div class="pf-catalogue-grid"><?php echo $grid; ?></div>
-			<?php echo $this->render_filter_panel(); ?>
+			<?php echo $this->render_filter_panel( $total ); ?>
 		</div>
 		<?php
 		return ob_get_clean();
@@ -137,7 +144,7 @@ class Passiflore_Catalogue {
 	 * voient toujours les contrôles qu'il y reloge. Le JS y déplace tri, format,
 	 * public, type, langue, découvrir, affichage et PDF en mobile. Masqué ≥1024px.
 	 */
-	private function render_filter_panel() {
+	private function render_filter_panel( $total = 0 ) {
 		ob_start();
 		?>
 		<div class="pf-cat-filter-backdrop"></div>
@@ -149,7 +156,7 @@ class Passiflore_Catalogue {
 			<div class="pf-cat-filter-panel__body"></div>
 			<div class="pf-cat-filter-panel__foot">
 				<button type="button" class="pf-cat-panel-reset">Tout réinitialiser</button>
-				<button type="button" class="pf-cat-panel-apply pf-btn pf-btn--primary pf-btn--sm">Voir les résultats</button>
+				<button type="button" class="pf-cat-panel-apply pf-btn pf-btn--primary pf-btn--sm"><?php echo esc_html( $this->results_label( $total ) ); ?></button>
 			</div>
 		</div>
 		<?php
@@ -261,7 +268,14 @@ class Passiflore_Catalogue {
 		wp_send_json_success( [
 			'html'   => $html,
 			'counts' => $counts,
+			'total'  => Passiflore_Bookshelf::$last_total, // posé par le rendu de l'étagère
 		] );
+	}
+
+	/** Libellé du compteur de résultats (règle de pluriel FR : 0/1 → singulier). */
+	private function results_label( $n ) {
+		$n = (int) $n;
+		return $n . ( $n >= 2 ? ' résultats' : ' résultat' );
 	}
 
 	private function render_grid( $atts ) {
@@ -489,7 +503,7 @@ class Passiflore_Catalogue {
 				       de la recherche). Masqué ≥1024px et sans JS (classe .pf-cat-js). */ ?>
 				<button type="button" class="pf-cat-filter-trigger" aria-haspopup="dialog" aria-expanded="false">
 					<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="6" x2="20" y2="6"/><line x1="7" y1="12" x2="17" y2="12"/><line x1="10" y1="18" x2="14" y2="18"/></svg>
-					<span class="pf-cat-filter-trigger-label">Filtres</span>
+					<span class="pf-cat-filter-trigger-label">Tris et filtres</span>
 					<span class="pf-cat-filter-count" hidden>0</span>
 				</button>
 

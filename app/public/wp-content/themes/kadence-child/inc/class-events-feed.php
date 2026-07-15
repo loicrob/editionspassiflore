@@ -77,6 +77,34 @@ class Passiflore_Events_Feed {
 			filemtime( $dir . '/assets/js/events-month.js' ),
 			true
 		);
+		// Pastilles (vue mois) : état « foncé » unifié mono + multi-jours (multi-segment
+		// + persistance pendant que le popup est dévoilé). Le popup lui-même reste natif
+		// (TEC/tooltipster) → pas de dépendance jQuery ici.
+		wp_enqueue_script(
+			'pf-events-month-pills',
+			$uri . '/assets/js/events-month-pills.js',
+			[],
+			filemtime( $dir . '/assets/js/events-month-pills.js' ),
+			true
+		);
+		// Composant global .pf-scroll-fade (ombres de bord) : requis par le popup mobile
+		// de la vue mois (contenu cloné après chargement → re-câblage via window.pfScrollFade).
+		wp_enqueue_script(
+			'pf-scroll-fade',
+			$uri . '/assets/js/scroll-fade.js',
+			[],
+			filemtime( $dir . '/assets/js/scroll-fade.js' ),
+			true
+		);
+		// Vue mois, mobile : popup d'événements au-dessus du jour tapé (remplace le
+		// panneau natif « en bas de grille »). Inerte hors vue mois / hors mobile.
+		wp_enqueue_script(
+			'pf-events-month-mobile-pop',
+			$uri . '/assets/js/events-month-mobile-pop.js',
+			[ 'pf-scroll-fade' ],
+			filemtime( $dir . '/assets/js/events-month-mobile-pop.js' ),
+			true
+		);
 	}
 
 	/* ─── Endpoint AJAX ──────────────────────────────────────────── */
