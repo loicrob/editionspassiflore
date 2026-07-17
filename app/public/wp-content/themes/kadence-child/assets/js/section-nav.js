@@ -53,6 +53,32 @@
 	// Nav sections : surlignage du lien actif via IntersectionObserver
 	var navLinks = Array.from(document.querySelectorAll('.pf-sectionnav a[href^="#"]'));
 	var pfSections = Array.from(document.querySelectorAll('.pf-section[id]'));
+
+	// Scroll fluide partagé : neutralise le re-calage de l'ancre initiale
+	// (stopAnchorPin) puis scrollIntoView (respecte scroll-margin-top, cf.
+	// plus haut). Utilisé par les liens de nav ET par tout autre lien de la
+	// page pointant vers une section (ex. « Lire la suite » du résumé hero).
+	function scrollToSection(id) {
+		var sec = document.getElementById(id);
+		if (!sec) return;
+		stopAnchorPin();
+		sec.scrollIntoView({ behavior: 'smooth' });
+		history.pushState(null, '', '#' + id);
+	}
+
+	// Liens hors nav (donc sans le scrollspy/suivi de piste, propre à la nav)
+	// pointant vers une section : même scroll fluide.
+	Array.from(document.querySelectorAll('a[href^="#"]')).forEach(function (l) {
+		if (l.closest('.pf-sectionnav')) return;
+		var id = l.getAttribute('href').slice(1);
+		var target = id && document.getElementById(id);
+		if (!target || !target.classList.contains('pf-section')) return;
+		l.addEventListener('click', function (e) {
+			e.preventDefault();
+			scrollToSection(id);
+		});
+	});
+
 	if (navLinks.length && pfSections.length) {
 		var current = '';
 		// Coupé pendant/juste après un clic direct sur un lien de nav (voir plus
@@ -99,13 +125,10 @@
 		navLinks.forEach(function (l) {
 			l.addEventListener('click', function (e) {
 				var id = l.getAttribute('href').slice(1);
-				var sec = document.getElementById(id);
-				if (!sec) return;
+				if (!document.getElementById(id)) return;
 				e.preventDefault();
-				stopAnchorPin();
 				suppressTrackScroll = true;
-				sec.scrollIntoView({ behavior: 'smooth' });
-				history.pushState(null, '', '#' + id);
+				scrollToSection(id);
 				// Réactivé une fois le scroll (et le scrollspy qui suit) stabilisés :
 				// 'scrollend' si dispo, mais TOUJOURS avec un filet par timeout (le
 				// premier des deux qui arrive gagne) — 'scrollend' peut en théorie ne

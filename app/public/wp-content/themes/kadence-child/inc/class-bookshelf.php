@@ -129,6 +129,7 @@ class Passiflore_Bookshelf {
 		$per_shelf    = absint( $atts['per_shelf'] );
 		$nb_first     = absint( $atts['nb_books_first_displayed'] );
 		$is_hero      = filter_var( $atts['hero'], FILTER_VALIDATE_BOOLEAN );
+		$libraires_url = ( $is_hero && $atts['libraires_url'] ) ? esc_url( rawurldecode( $atts['libraires_url'] ) ) : '';
 
 		// Étiquettes « À paraître » / « Nouveauté » : actives par défaut.
 		// Si l'une ou l'autre est désactivée, on neutralise le drapeau correspondant.
@@ -151,10 +152,10 @@ class Passiflore_Bookshelf {
 		$cat_theme = $this->resolve_category_theme( $atts );
 
 		if ( $mode === 'scroll' ) {
-			return $this->render_scroll( $books, $display, $show_price, $shelf_inner, $nb_first, $is_hero, $cat_theme, $show_formats );
+			return $this->render_scroll( $books, $display, $show_price, $shelf_inner, $nb_first, $is_hero, $cat_theme, $show_formats, $libraires_url );
 		}
 
-		return $this->render_shelves( $books, $display, $show_price, $shelf_inner, $per_shelf, $nb_first, $is_hero, $cat_theme, $show_formats );
+		return $this->render_shelves( $books, $display, $show_price, $shelf_inner, $per_shelf, $nb_first, $is_hero, $cat_theme, $show_formats, $libraires_url );
 	}
 
 	private function default_atts() {
@@ -183,6 +184,7 @@ class Passiflore_Bookshelf {
 			'nb_books_first_displayed' => 12,
 			'hero'                     => 'false',    // true = mode héros fiche livre (non cliquable, sans hover)
 			'display_formats'          => 'false',    // true — affiche le format (pa_format_particulier) dans le chevalet
+			'libraires_url'            => '',          // mode hero uniquement : lien « Voir sur Place des libraires », rendu dans .pf-shelf sous la planche. rawurlencode() côté appelant (l'URL traverse le parseur de shortcode en tant que chaîne).
 		];
 	}
 
@@ -503,7 +505,11 @@ class Passiflore_Bookshelf {
 	}
 
 	private function apply_search_filter( &$args, $atts ) {
-		$term = trim( (string) $atts['search'] );
+		// rawurldecode() est un no-op sur du texte sans séquence %XX, donc sûr
+		// aussi bien pour un $atts brut (get_filter_counts, tableau PHP direct)
+		// que pour un $atts issu du parseur de shortcode (render_grid, valeur
+		// rawurlencodée côté appelant — cf. commentaire class-catalogue.php).
+		$term = trim( rawurldecode( (string) $atts['search'] ) );
 		if ( $term === '' ) return;
 
 		$ranked = $this->get_search_ranked_ids( $term );
@@ -1006,7 +1012,7 @@ class Passiflore_Bookshelf {
 
 	/* ─── Render Modes ───────────────────────────────────────────── */
 
-	private function render_scroll( $books, $display, $show_price, $shelf_inner, $nb_first = 12, $is_hero = false, $cat_theme = '', $show_formats = false ) {
+	private function render_scroll( $books, $display, $show_price, $shelf_inner, $nb_first = 12, $is_hero = false, $cat_theme = '', $show_formats = false, $libraires_url = '' ) {
 		// En spines le chevalet n'apparaît qu'au survol (superposé) :
 		// seule la grille covers réserve de la hauteur pour lui.
 		$has_chevalet = $display === 'covers' && $show_price;
@@ -1026,11 +1032,20 @@ class Passiflore_Bookshelf {
 			$index++;
 		}
 
-		$html .= '</div><div class="pf-shelf-plank"></div></div></div></div>';
+		$html .= '</div><div class="pf-shelf-plank"></div>' . $this->render_libraires_link( $libraires_url ) . '</div></div></div>';
 		return $html;
 	}
 
-	private function render_shelves( $books, $display, $show_price, $shelf_inner, $per_shelf, $nb_first = 12, $is_hero = false, $cat_theme = '', $show_formats = false ) {
+	/**
+	 * Lien « Voir sur Place des libraires » — mode hero uniquement, rendu dans
+	 * .pf-shelf juste sous .pf-shelf-plank (cf. render_scroll()/render_shelves()).
+	 */
+	private function render_libraires_link( $libraires_url ) {
+		if ( ! $libraires_url ) return '';
+		return '<a class="bs-hero__libraires" href="' . esc_url( $libraires_url ) . '" target="_blank" rel="noopener noreferrer">Voir sur Place des libraires</a>';
+	}
+
+	private function render_shelves( $books, $display, $show_price, $shelf_inner, $per_shelf, $nb_first = 12, $is_hero = false, $cat_theme = '', $show_formats = false, $libraires_url = '' ) {
 		$has_chevalet = $display === 'covers' && $show_price;
 		$chevalet_h  = $has_chevalet ? 32 : 0;
 		$hero_class  = $is_hero ? ' pf-bookshelf--hero' : '';
@@ -1084,7 +1099,7 @@ class Passiflore_Bookshelf {
 				$html .= $this->render_book( $b, $display, $show_price, $index, $nb_first, $is_hero, $show_formats );
 				$index++;
 			}
-			$html .= '</div><div class="pf-shelf-plank"></div></div>';
+			$html .= '</div><div class="pf-shelf-plank"></div>' . $this->render_libraires_link( $libraires_url ) . '</div>';
 		}
 
 		$html .= '</div>';

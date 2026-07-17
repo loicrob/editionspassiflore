@@ -89,30 +89,49 @@ $culture_url      = is_wp_error( $culture_link ) ? '' : $culture_link;
         >
             <div class="pf-hero-haut">
             <div class="pf-hero-contenu">
-                <div class="pf-hero-logo-wrap">
-                    <?php
-                    $icon_url = get_site_icon_url( 256 )
-                        ?: content_url( 'uploads/2026/04/cropped-icone.png' );
-                    ?>
-                    <a href="<?php echo esc_url( home_url( '/' ) ); ?>"
-                       aria-label="<?php echo esc_attr( get_bloginfo( 'name' ) ); ?>">
-                        <img src="<?php echo esc_url( $icon_url ); ?>"
-                             alt=""
-                             width="90"
-                             height="90" />
-                    </a>
-                </div>
-                <div class="pf-hero-typage-nom" aria-label="Editions Passiflore">
-                    <div class="pf-hero-ligne" id="pf-ligne-1">Editions</div>
-                    <div class="pf-hero-ligne" id="pf-ligne-2">Passiflore</div>
-                </div>
-                <div class="pf-hero-sous-titre-wrap">
-                    <div class="pf-hero-ligne pf-hero-sous-titre" id="pf-ligne-3"></div>
-                    <div class="pf-hero-ligne pf-hero-sous-titre" id="pf-ligne-4"></div>
+                <div class="pf-hero-marque">
+                    <div class="pf-hero-logo-wrap">
+                        <?php
+                        $icon_url = get_site_icon_url( 256 )
+                            ?: content_url( 'uploads/2026/04/cropped-icone.png' );
+                        ?>
+                        <a href="<?php echo esc_url( home_url( '/' ) ); ?>"
+                           aria-label="<?php echo esc_attr( get_bloginfo( 'name' ) ); ?>">
+                            <img src="<?php echo esc_url( $icon_url ); ?>"
+                                 alt=""
+                                 width="90"
+                                 height="90" />
+                        </a>
+                    </div>
+                    <div class="pf-hero-texte">
+                        <div class="pf-hero-typage-nom" aria-label="Editions Passiflore">
+                            <div class="pf-hero-ligne" id="pf-ligne-1">Editions</div>
+                            <div class="pf-hero-ligne" id="pf-ligne-2">Passiflore</div>
+                        </div>
+                        <div class="pf-hero-sous-titre-wrap">
+                            <div class="pf-hero-ligne pf-hero-sous-titre" id="pf-ligne-3"></div>
+                            <div class="pf-hero-ligne pf-hero-sous-titre" id="pf-ligne-4"></div>
+                        </div>
+                    </div>
                 </div>
                 <?php if ( $hero_presentation ) : ?>
                 <p id="pf-hero-presentation" class="pf-hero-presentation"><?php echo nl2br( esc_html( $hero_presentation ) ); ?></p>
                 <?php endif; ?>
+
+                <div class="pf-hero-categories">
+                    <a class="pf-card pf-hero-cat" href="<?php echo esc_url( $litterature_url ); ?>">
+                        <div class="pf-card-content">
+                            <span class="pf-card-title">Littérature</span>
+                            <span class="pf-card-text">Des romans exigeants et accessibles, générateurs d’émotions</span>
+                        </div>
+                    </a>
+                    <a class="pf-card pf-hero-cat" href="<?php echo esc_url( $culture_url ); ?>">
+                        <div class="pf-card-content">
+                            <span class="pf-card-title">Culture Sud-Ouest</span>
+                            <span class="pf-card-text">Des beaux livres et des ouvrages sur nos sports et notre patrimoine</span>
+                        </div>
+                    </a>
+                </div>
             </div><!-- .pf-hero-contenu -->
 
                 <div class="pf-hero-actualites-slot">
@@ -197,17 +216,6 @@ $culture_url      = is_wp_error( $culture_link ) ? '' : $culture_link;
                     <?php endif; ?>
                 </div><!-- .pf-hero-actualites-slot -->
             </div><!-- .pf-hero-haut -->
-
-            <div class="pf-hero-categories">
-                <a class="pf-hero-cat" href="<?php echo esc_url( $litterature_url ); ?>">
-                    <span class="pf-hero-cat-titre">Littérature</span>
-                    <span class="pf-hero-cat-desc">Des romans exigeants et accessibles, générateurs d’émotions</span>
-                </a>
-                <a class="pf-hero-cat" href="<?php echo esc_url( $culture_url ); ?>">
-                    <span class="pf-hero-cat-titre">Culture Sud-Ouest</span>
-                    <span class="pf-hero-cat-desc">Des beaux livres et des ouvrages sur nos sports et notre patrimoine</span>
-                </a>
-            </div>
 
             <button type="button" class="pf-hero-scroll" data-scroll-to="pf-en-ce-moment" aria-label="Découvrir la suite">
                 <svg width="32" height="18" viewBox="0 0 22 12" fill="none" aria-hidden="true"><path d="M1 1 11 11 21 1" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>

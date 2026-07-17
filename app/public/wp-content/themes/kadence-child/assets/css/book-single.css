@@ -6,13 +6,32 @@
 
 .bs-hero {
 	display: grid;
-	grid-template-columns: 320px 1fr;
+	/* fit-content(50%) : se comporte comme max-content (colonne réduite à la
+	   largeur du titre sur une seule ligne quand la place manque — cf.
+	   minmax(0,max-content) avant, sinon la colonne déborderait sur le visuel
+	   au lieu de repasser le titre à la ligne) MAIS plafonné à 50% du hero.
+	   Sans plafond, une longue portion de texte sans retour à la ligne
+	   naturel (ex. résumé) gonfle le max-content bien au-delà de ce qui reste
+	   raisonnable pour le visuel à droite. Valeur par défaut = tablette
+	   (768–1023px) ; resserré à 33% sur ordinateur (≥1024px, cf. media query
+	   plus bas).
+	   ⚠ Ne PAS écrire minmax(0, min(max-content, 50%)) : max-content n'est pas
+	   un argument valide de min()/max() (testé — la déclaration entière est
+	   silencieusement invalide, la grille retombe sur un fallback à 1 seule
+	   colonne). fit-content() est la fonction dédiée à ce cas dans le spec
+	   Grid — pas de nesting requis. */
+	grid-template-columns: fit-content(50%) 1fr;
+	/* row2 en 1fr (pas auto) : visual s'étend sur les 2 lignes, sinon la grille
+	   répartit le surplus de hauteur qu'il réclame à parts égales entre les 2 lignes
+	   auto — gonflant heading (ligne 1) même quand il n'en a pas besoin. */
+	grid-template-rows: auto 1fr;
 	grid-template-areas:
 		"heading visual"
 		"info    visual";
 	gap: var(--pf-space-3) var(--pf-space-10);
 	align-items: start;
 	padding: var(--pf-space-8) 0 var(--pf-space-10);
+	min-height: 550px;
 }
 
 .bs-hero__heading {
@@ -23,10 +42,15 @@
 	font-family: var(--pf-font-heading);
 }
 
+/* align-self:stretch (≠ align-items:start hérité de .bs-hero) : remplit toute
+   la hauteur de la ligne (calée sur .bs-hero__visual, également stretch),
+   pour que .bs-hero__actions (flex:1 + justify-content:space-between,
+   cf. plus bas) ait de l'espace à répartir entre ses 3 blocs. */
 .bs-hero__info {
 	grid-area: info;
 	display: flex;
 	flex-direction: column;
+	align-self: stretch;
 	gap: var(--pf-space-3);
 }
 
@@ -36,7 +60,12 @@
 
 .bs-hero__visual {
 	grid-area: visual;
-	min-width: 0;
+	position: relative;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	align-self: stretch;
+	gap: var(--pf-space-3);
 }
 
 /* ─── Hero info — typographie ────────────────────────────────── */
@@ -74,6 +103,25 @@
 
 /* ─── Prix ───────────────────────────────────────────────────── */
 
+/* nowrap : le prix ne redescend jamais sous l'offre numérique — quand la place
+   manque, c'est le texte de .pf-numerique-offer qui passe sur 2 lignes (voir
+   min-width:0 plus bas), pas la ligne entière qui casse. */
+.bs-price-row {
+	display: flex;
+	align-items: center;
+	flex-wrap: nowrap;
+	gap: var(--pf-space-3);
+	justify-content: center;
+}
+
+.bs-price-row .price {
+	flex-shrink: 0;
+}
+
+.bs-price-row .pf-numerique-offer {
+	min-width: 0;
+}
+
 .bs-hero__price {
 	font-size: 1.3rem;
 	font-weight: 600;
@@ -86,25 +134,40 @@
 
 /* ─── Actions (boutons) ──────────────────────────────────────── */
 
+/* flex:1 : remplit .bs-hero__info (stretch, cf. plus haut). justify-content:
+   space-between répartit les 3 blocs (secondary-row / middle / purchase) —
+   1er en haut, dernier en bas, celui du milieu centré dans l'espace restant
+   (2 écarts égaux de part et d'autre, propriété de space-between à 3 items).
+   gap : écart plancher si jamais il n'y a pas d'espace à répartir (visuel
+   pas plus haut que le contenu). */
 .bs-hero__actions {
 	display: flex;
 	flex-direction: column;
-	gap: var(--pf-space-2);
+	flex: 1;
+	justify-content: space-between;
+	gap: var(--pf-space-4);
 	margin-top: var(--pf-space-1);
+}
+
+.bs-hero__middle,
+.bs-hero__purchase {
+	display: flex;
+	flex-direction: column;
+	gap: var(--pf-space-2);
 }
 
 .bs-hero__secondary-row {
 	display: flex;
-	flex-direction: column;
+	flex-direction: row;
 	gap: var(--pf-space-2);
 }
 
 .bs-hero__secondary-row > * {
-	flex: 1;
+	flex: 1 1 auto;
 	width: auto;
 }
 
-/* .pf-info__flip : .pf-btn .pf-btn--outline .pf-btn--block (style.css). On garde l'état disabled. */
+/* .pf-info__flip : .pf-btn .pf-btn--outline .pf-btn--icon (style.css) ; ici, seulement l'état disabled. */
 
 .pf-info__flip:disabled {
 	opacity: 0.5;
@@ -113,21 +176,7 @@
 
 /* Bouton WooCommerce (panier) : sélecteur composé conservé pour battre la spécificité WC ; valeurs sur tokens. */
 .bs-hero__cart.button {
-	display: block;
-	width: 100%;
-	padding: var(--pf-btn-pad);
-	border-radius: var(--pf-radius);
-	font-size: 0.9rem;
 	text-align: center;
-	background: var(--pf-accent);
-	color: var(--pf-surface) !important;
-	border: 1px solid var(--pf-accent);
-	transition: var(--pf-btn-transition);
-}
-
-.bs-hero__cart.button:hover {
-	background: var(--pf-accent-dark);
-	box-shadow: none;
 }
 
 /* Lien « Voir le panier » inséré par WooCommerce après un ajout AJAX : masqué
@@ -139,15 +188,92 @@
 
 /* ─── Lien Place des Libraires ───────────────────────────────── */
 
+/* Rendu par Passiflore_Bookshelf dans .pf-shelf, entre .pf-shelf-plank et le
+   bas de l'étagère (mode hero) — un enfant direct (pas de padding hérité),
+   donc display:block + padding assurent l'espacement et le centrage
+   qu'apportait avant .bs-hero__visual (flex, align-items:center).
+   margin-top négatif plutôt que padding-top:0 : .pf-shelf-plank
+   (position:relative, top:calc(-0.9 * var(--plank-h))) est remonté
+   visuellement de 0.9×plank-h sans libérer cet espace dans le flux — un vide
+   de cette hauteur existe donc déjà au-dessus du lien avant tout margin ;
+   on le résorbe jusqu'à pf-space-2 en remontant le lien du surplus. */
 .bs-hero__libraires {
+	display: block;
+	margin-top: calc(var(--pf-space-3) - 0.9 * var(--plank-h));
+	padding: 0 20px var(--pf-space-3);
+	text-align: center;
 	font-size: 0.85rem;
 	color: var(--pf-text);
 	text-decoration: none;
 	font-family: var(--pf-font-body);
+	transition: opacity var(--pf-transition);
 }
 
 .bs-hero__libraires:hover {
 	color: var(--pf-accent);
+}
+
+/* Masqué pendant le survol du livre (zoom/relevé de couverture, cf. plus bas
+   dans bookshelf.css) : évite le chevauchement visuel avec l'animation. */
+.pf-bookshelf--hero .pf-shelf:has(.pf-book:hover) .bs-hero__libraires {
+	opacity: 0;
+}
+
+/* Flèche pointant vers le nord-est : même technique que le composant global
+   a.pf-btn/.button/.wp-element-button[target="_blank"]::after (style.css),
+   reprise ici car .bs-hero__libraires est un lien texte simple (pas un bouton). */
+.bs-hero__libraires::after {
+	content: "➜";
+	display: inline-block;
+	margin-left: 0.1em;
+	transform: rotate(-45deg);
+}
+
+/* ─── Résumé (aperçu, hero) ──────────────────────────────────── */
+
+/* Aperçu tronqué du résumé complet (section « Résumé » plus bas sur la page,
+   même source $product->get_description() — cf. inc/book-single-tabs.php).
+   -webkit-line-clamp : le texte n'est jamais coupé en PHP, seule la
+   présentation est limitée (même principe que .pf-card-text--clamp-2,
+   style.css). « Lire la suite » est masqué par défaut (attribut hidden) et
+   révélé en JS uniquement si le texte déborde réellement (scrollHeight >
+   clientHeight, cf. inc/book-single-tabs.php) : line-clamp ne permet pas de
+   détecter le débordement en CSS pur (testé : text-overflow avec chaîne
+   personnalisée n'est pas respecté sur un bloc multi-lignes clampé). */
+.bs-hero__resume-text {
+	display: -webkit-box;
+	-webkit-box-orient: vertical;
+	-webkit-line-clamp: 4;
+	line-clamp: 4;
+	overflow: hidden;
+	font-size: 0.9rem;
+	line-height: 1.6;
+	color: var(--pf-text);
+}
+
+.bs-hero__resume-more {
+	margin-top: var(--pf-space-1);
+	font-size: 0.85rem;
+	font-weight: 600;
+	color: var(--pf-accent);
+	text-decoration: none;
+}
+
+/* display seulement quand visible : sinon cette règle (0,1,0) bat le
+   [hidden]{display:none} natif du navigateur (même spécificité, feuille
+   auteur après feuille UA) et l'attribut hidden n'a plus aucun effet. */
+.bs-hero__resume-more:not([hidden]) {
+	display: inline-block;
+}
+
+/* Flèche pointant vers le bas (la cible, la section Résumé, est plus bas sur
+   la page) : même technique que .bs-hero__libraires::after, rotation
+   différente (90deg au lieu de -45deg pour le nord-est). */
+.bs-hero__resume-more::after {
+	content: "➜";
+	display: inline-block;
+	margin-left: 0.3em;
+	transform: rotate(90deg);
 }
 
 /* ─── Boutons de format ──────────────────────────────────────── */
@@ -157,7 +283,6 @@
 	align-items: center;
 	flex-wrap: wrap;
 	gap: 0.4rem;
-	margin-top: var(--pf-space-1);
 	font-family: var(--pf-font-body);
 	font-size: 0.8rem;
 }
@@ -191,9 +316,23 @@
 	width: fit-content;
 }
 
-/* Curseur pointer pour signaler l'interactivité */
+/* Grandit dans la hauteur dispo de .bs-hero__visual (utile depuis min-height sur .bs-hero). */
+.pf-bookshelf--hero {
+	flex: 1;
+}
+
+/* Curseur pointer pour signaler l'interactivité. Masqué jusqu'à ce que
+   bookshelf.js ait calculé la bonne taille (heroFit) — sinon le livre
+   apparaît furtivement à sa taille "brute" (dimensions physiques) avant de
+   sauter à la taille finale une fois la mise à l'échelle appliquée. Repli
+   <noscript> dans content-single-product.php si JS est désactivé. */
 .pf-bookshelf--hero .pf-book {
 	cursor: pointer;
+	visibility: hidden;
+}
+
+.pf-bookshelf--hero.is-sized .pf-book {
+	visibility: visible;
 }
 
 /* ─── Overlay fullscreen — flipbook ──────────────────────────── */
@@ -379,11 +518,34 @@
 
 /* ─── Badge disponibilité ─────────── */
 
+/* Flottant dans le coin haut-droit de .pf-bookshelf (positionné via le parent
+   .bs-hero__visual, plus simple que de faire dépendre le shortcode étagère
+   d'un contexte hero-only : celui-ci est fit-content à la largeur du bookshelf). */
 .bs-dispo-line {
+	position: absolute;
+	top: calc(-1 * var(--pf-space-3) - 3px);
+	right: calc(-1 * var(--pf-space-3) - 3px);
+	z-index: 5;
 	display: flex;
 	align-items: center;
 	gap: var(--pf-space-2);
 	flex-wrap: wrap;
+	transition: opacity var(--pf-transition);
+}
+
+/* --pf-red-soft est translucide (fond cream normalement) : opaque ici, sinon
+   la bordure de .pf-bookshelf transparaît sous le badge flottant. */
+.bs-dispo-line .pf-badge--accent {
+	background: color-mix(in srgb, var(--pf-accent) 8%, var(--pf-surface));
+}
+
+/* Masqué pendant le survol du livre (zoom/relevé de couverture) : évite le
+   chevauchement visuel avec l'animation, même logique que .bs-hero__libraires
+   plus haut. .bs-dispo-line est un frère (pas un descendant) de .pf-bookshelf
+   dans .bs-hero__visual, d'où :has() posé sur cet ancêtre commun plutôt que
+   sur .pf-shelf. */
+.bs-hero__visual:has(.pf-book:hover) .bs-dispo-line {
+	opacity: 0;
 }
 
 .bs-caract-table {
@@ -741,12 +903,24 @@
 /* Tablette + desktop (hero deux colonnes) : contenu centré verticalement,
    et le visuel (fit-content) centré horizontalement dans sa cellule. */
 @media (min-width: 768px) {
-	.bs-hero {
-		align-items: center;
-	}
 
 	.bs-hero__visual {
 		justify-self: center;
+	}
+}
+
+/* Ordinateur uniquement : colonne de gauche resserrée à 33% (au lieu de 50%
+   sur tablette, cf. .bs-hero de base) — le visuel gagne d'autant.
+   2e colonne en max-content (≠ 1fr) : le 1fr consommait tout l'espace
+   restant et .bs-hero__visual (fit-content) se centrait dedans, créant un
+   grand vide entre le texte et le livre plutôt qu'une répartition uniforme.
+   En max-content, les deux colonnes se réduisent à leur contenu et
+   justify-content:space-evenly répartit l'espace restant en 3 (bord gauche /
+   entre les colonnes / bord droit). */
+@media (min-width: 1024px) {
+	.bs-hero {
+		grid-template-columns: fit-content(33%) max-content;
+		justify-content: space-evenly;
 	}
 }
 
@@ -829,4 +1003,28 @@
 	gap: var(--pf-space-2) var(--pf-space-6);
 	font-size: 0.95rem;
 	color: var(--pf-text);
+}
+
+/* ─── Offre « ajouter la version numérique » (case sous le prix) ─── */
+.pf-numerique-offer {
+	display: flex;
+	align-items: center;
+	gap: var(--pf-space-2);
+	font-size: var(--pf-text-sm);
+	color: var(--pf-text);
+	cursor: pointer;
+}
+.pf-numerique-offer__check {
+	margin-bottom: 0.08em;
+	flex-shrink: 0;
+	accent-color: var(--pf-accent);
+}
+.pf-numerique-offer__text ins.pf-numerique-price {
+	text-decoration: none;
+	font-weight: var(--pf-weight-semibold);
+	color: var(--pf-accent);
+}
+.pf-numerique-offer__text del.pf-numerique-price-old {
+	margin-left: 0.35em;
+	color: var(--pf-muted);
 }

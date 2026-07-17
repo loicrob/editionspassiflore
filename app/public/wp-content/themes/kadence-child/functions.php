@@ -211,6 +211,14 @@ function passiflore_enqueue_auteurs_styles() {
             [],
             filemtime( get_stylesheet_directory() . '/assets/css/checkout.css' )
         );
+        // Remplace le placeholder par défaut du champ « note de commande ».
+        wp_enqueue_script(
+            'pf-checkout-note-placeholder',
+            get_stylesheet_directory_uri() . '/assets/js/checkout-note-placeholder.js',
+            [],
+            filemtime( get_stylesheet_directory() . '/assets/js/checkout-note-placeholder.js' ),
+            true
+        );
     }
     // Pages portant les blocs Cart/Checkout (Store API) : resynchronise le
     // compteur du panier dans le header, que les blocs ne rafraîchissent pas.
@@ -291,4 +299,8 @@ require_once get_stylesheet_directory() . '/inc/class-reading-list.php';
 require_once get_stylesheet_directory() . '/inc/class-mes-avis.php';
 require_once get_stylesheet_directory() . '/inc/recommendations.php';
 require_once get_stylesheet_directory() . '/inc/shipping.php';
+require_once get_stylesheet_directory() . '/inc/numerique-offer.php';
+require_once get_stylesheet_directory() . '/inc/checkout.php';
+require_once get_stylesheet_directory() . '/inc/mini-cart.php';
 require_once get_stylesheet_directory() . '/inc/shortcodes.php';
+require_once get_stylesheet_directory() . '/inc/sticky-debug.php'; // DIAGNOSTIC TEMPORAIRE — header sticky

@@ -8,6 +8,7 @@
 
 	function init(btn) {
 		const label = btn.querySelector('.bs-hero__readlist-label');
+		const iconPath = btn.querySelector('.bs-hero__readlist-icon path');
 		let busy = false;
 
 		btn.addEventListener('click', function () {
@@ -28,8 +29,12 @@
 					btn.dataset.inList = inList ? '1' : '0';
 					btn.classList.toggle('is-in-list', inList);
 					btn.setAttribute('aria-pressed', inList ? 'true' : 'false');
+					btn.title = inList ? btn.dataset.titleIn : btn.dataset.titleAdd;
 					if (label) {
 						label.textContent = inList ? btn.dataset.labelIn : btn.dataset.labelAdd;
+					}
+					if (iconPath) {
+						iconPath.setAttribute('d', inList ? btn.dataset.iconIn : btn.dataset.iconAdd);
 					}
 				})
 				.catch(err => { console.error('pf-reading-list:', err); })

@@ -1120,6 +1120,19 @@ function passiflore_book_tabs_inline_js() {
 				}
 			});
 		});
+
+		// Résumé (hero) : « Lire la suite » n'est révélé que si le texte
+		// clampé (CSS -webkit-line-clamp) déborde réellement — line-clamp
+		// ne permet pas de détecter ça en CSS pur.
+		var resumeText = document.querySelector('.bs-hero__resume-text');
+		var resumeMore = document.querySelector('.bs-hero__resume-more');
+		if (resumeText && resumeMore) {
+			var syncResumeMore = function () {
+				resumeMore.hidden = resumeText.scrollHeight <= resumeText.clientHeight + 1;
+			};
+			syncResumeMore();
+			window.addEventListener('resize', syncResumeMore);
+		}
 	})();
 	</script>
 	<?php

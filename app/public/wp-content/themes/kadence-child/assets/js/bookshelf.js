@@ -169,14 +169,18 @@
 	// disponible (et non de sa taille propre), proportions conservées —
 	// setBookScale applique le même facteur à --cover-w / --spine-w / --book-h.
 	//
-	// • Desktop deux colonnes : la taille épouse la HAUTEUR de la colonne de
-	//   texte voisine. Aucune dépendance à la largeur, ce qui est essentiel :
-	//   l'étagère étant fit-content, mesurer sa largeur renverrait celle du
-	//   livre lui-même (circularité) — une fois rétréci il resterait bloqué
-	//   petit au ré-agrandissement de la fenêtre.
+	// • Desktop deux colonnes : la taille épouse la HAUTEUR dispo de la carte
+	//   .pf-bookshelf--hero (flex:1 dans .bs-hero__visual, qui s'étire lui-même
+	//   sur toute la hauteur de la grille — voir book-single.css). Cette carte
+	//   étant flex:1, sa propre offsetHeight ne dépend plus de son contenu (elle
+	//   est imposée par flexbox) → c'est une cible fiable. Le chrome fixe
+	//   (padding de la rangée + planche) est mesuré directement plutôt que
+	//   déduit par soustraction (bookshelf.offsetHeight - book.offsetHeight) :
+	//   cette soustraction ne mesurerait plus le chrome mais l'espace vide
+	//   qu'on cherche justement à combler (formule qui s'annule elle-même).
 	// • Empilé (mobile/tablette) : réduction seulement si le livre déborde, la
 	//   largeur de référence étant le conteneur .bs-hero (pleine largeur, stable)
-	//   et NON l'étagère fit-content — même raison anti-blocage.
+	//   et NON l'étagère fit-content — anti-blocage (idem raisonnement largeur).
 	// Périmètre strictement limité au cas hero : les autres étagères ne passent
 	// jamais ici (branche else de fitBookshelf, inchangée).
 	function heroFit(bookshelf, book, raw, footprint) {
@@ -191,12 +195,16 @@
 			heading.getBoundingClientRect().right <= visual.getBoundingClientRect().left + 1;
 
 		if (sideBySide && info) {
-			// Chrome vertical de l'étagère (paddings + planche), constant sous
-			// l'échelle : retranché pour que l'étagère entière — et non le seul
-			// livre — épouse la hauteur de la colonne de texte.
-			var chromeV  = bookshelf.offsetHeight - book.offsetHeight;
-			var textH    = heading.offsetHeight + info.offsetHeight;
-			var desiredH = Math.max(raw.bh, textH - chromeV); // jamais sous la taille naturelle
+			var shelf      = book.closest('.pf-shelf');
+			var shelfBooks = shelf && shelf.querySelector('.pf-shelf-books');
+			var plank      = shelf && shelf.querySelector('.pf-shelf-plank');
+			var padV = 0;
+			if (shelfBooks) {
+				var sbCS = getComputedStyle(shelfBooks);
+				padV = (parseFloat(sbCS.paddingTop) || 0) + (parseFloat(sbCS.paddingBottom) || 0);
+			}
+			var chromeV  = padV + (plank ? plank.offsetHeight : 0);
+			var desiredH = Math.max(raw.bh, bookshelf.offsetHeight - chromeV); // jamais sous la taille naturelle
 			return desiredH / raw.bh;
 		}
 
@@ -252,6 +260,12 @@
 			});
 			if (maxH) shelf.style.setProperty('--shelf-inner', (maxH + 20) + 'px');
 		});
+
+		// Révèle le(s) livre(s) hero une fois la bonne taille appliquée (voir
+		// le visibility:hidden de repli dans book-single.css).
+		if (isHero) {
+			bookshelf.classList.add('is-sized');
+		}
 	}
 
 	function relayoutAll() {

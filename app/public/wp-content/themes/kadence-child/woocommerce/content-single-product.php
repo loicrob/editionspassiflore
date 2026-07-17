@@ -125,6 +125,7 @@ if ( ! empty( $format_variants ) ) {
 $sous_titre      = get_field( 'sous-titre' );
 $lien_libraires  = get_field( 'lien_place_des_libraires' );
 $nouveaute       = get_field( 'nouveaute' );
+$description     = $product->get_description(); // même source que la section « Résumé » plus bas (inc/book-single-tabs.php)
 
 ?>
 
@@ -135,15 +136,10 @@ $nouveaute       = get_field( 'nouveaute' );
 		<!-- ═══ En-tête (auteurs + titre + sous-titre) ══════════════ -->
 		<div class="bs-hero__heading">
 
-			<?php if ( $nouveaute || $dispo ) : ?>
-			<div class="bs-dispo-line">
-				<?php if ( $nouveaute ) : ?>
-				<span class="pf-badge pf-badge--accent">Nouveauté</span>
-				<?php endif; ?>
-				<?php if ( $dispo ) : ?>
-				<span class="pf-badge <?= esc_attr( $dispo['class'] ) ?>"><?= esc_html( $dispo['label'] ) ?></span>
-				<?php endif; ?>
-			</div>
+			<h1 class="bs-hero__title pf-titre-1"><?= esc_html( $group_title ?: get_the_title() ) ?></h1>
+
+			<?php if ( $sous_titre ) : ?>
+			<p class="bs-hero__subtitle"><?= esc_html( $sous_titre ) ?></p>
 			<?php endif; ?>
 
 			<?php if ( $authors_by_type ) : ?>
@@ -169,62 +165,92 @@ $nouveaute       = get_field( 'nouveaute' );
 			</div>
 			<?php endif; ?>
 
-			<h1 class="bs-hero__title pf-titre-1"><?= esc_html( $group_title ?: get_the_title() ) ?></h1>
-
-			<?php if ( $sous_titre ) : ?>
-			<p class="bs-hero__subtitle"><?= esc_html( $sous_titre ) ?></p>
-			<?php endif; ?>
-
 		</div><!-- /.bs-hero__heading -->
 
 		<!-- ═══ Colonne info (prix, actions, formats…) ═══════════════ -->
 		<div class="bs-hero__info">
 
-			<?php woocommerce_template_single_price(); ?>
-
 			<div class="bs-hero__actions">
+
+				<!-- Bloc 1 : liste de lecture / feuilleter -->
 				<div class="bs-hero__secondary-row">
-					<?php if ( $pdf_id ) : ?>
-					<button type="button" class="pf-info__flip pf-btn pf-btn--outline pf-btn--block">Feuilleter l’extrait ➜</button>
-					<?php endif; ?>
 					<?php if ( class_exists( 'Passiflore_Reading_List' ) ) echo Passiflore_Reading_List::render_button( $id ); ?>
+					<?php if ( $pdf_id ) : ?>
+					<button type="button" class="pf-info__flip pf-btn pf-btn--outline pf-btn--icon">Feuilleter<svg class="pf-info__flip-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 -960 960 960" fill="currentColor" aria-hidden="true"><path d="M458.5-181q-10.5-3-19.5-8-41-25-86-38t-93-13q-42 0-82.5 11T100-198q-21 11-40.5-1T40-234v-482q0-11 5.5-21T62-752q46-24 96-36t102-12q58 0 113.5 15T480-740v484q51-32 107-48t113-16q36 0 70.5 6t69.5 18v-480q15 5 29.5 10.5T898-752q11 5 16.5 15t5.5 21v482q0 23-19.5 35t-40.5 1q-37-20-77.5-31T700-240q-48 0-93 13t-86 38q-9 5-19.5 8t-21.5 3q-11 0-21.5-3ZM593-390q-10 9-21.5 3.5T560-405v-327q0-4 1.5-7.5t4.5-6.5l160-160q10-10 22-5t12 19v343q0 5-2 8.5t-5 6.5L593-390Zm-193 95v-396q-33-14-68.5-21.5T260-720q-37 0-72 7t-68 21v397q35-13 69.5-19t70.5-6q36 0 70.5 6t69.5 19Zm0 0v-396 396Z"/></svg></button>
+					<?php endif; ?>
 				</div>
-				<?php if ( $product->is_purchasable() && $product->is_in_stock() ) : ?>
-				<a href="<?= esc_url( $product->add_to_cart_url() ) ?>"
-				   class="button bs-hero__cart add_to_cart_button ajax_add_to_cart"
-				   data-product_id="<?= esc_attr( $product->get_id() ) ?>"
-				   data-quantity="1"
-				   rel="nofollow">
-					<?= esc_html( $product->single_add_to_cart_text() ) ?>
-				</a>
+
+				<!-- Bloc 2 : résumé -->
+				<?php if ( $description ) : ?>
+				<div class="bs-hero__middle">
+					<div class="bs-hero__resume">
+						<div class="bs-hero__resume-text entry-content"><?php echo apply_filters( 'the_content', $description ); // phpcs:ignore WordPress.Security.EscapeOutput ?></div>
+						<a href="#resume" class="bs-hero__resume-more" hidden>Lire la suite</a>
+					</div>
+				</div>
 				<?php endif; ?>
-			</div>
 
-			<?php if ( $lien_libraires ) : ?>
-			<a class="bs-hero__libraires" href="<?= esc_url( $lien_libraires ) ?>" target="_blank" rel="noopener noreferrer">
-				Voir sur Place des libraires ➜
-			</a>
-			<?php endif; ?>
-
-			<?php if ( ! empty( $format_variants ) ) : ?>
-			<div class="bs-formats">
-				<span class="bs-formats__label">Formats :</span>
-				<?php foreach ( $format_variants as $v ) :
-					$cls = 'bs-format-btn pf-btn pf-btn--sm ' . ( $v['current'] ? 'pf-btn--primary bs-format-btn--active' : 'pf-btn--neutral' );
-					if ( $v['current'] ) : ?>
-						<span class="<?= esc_attr( $cls ) ?>" aria-current="true"><?= esc_html( $v['label'] ) ?></span>
-					<?php else : ?>
-						<a href="<?= esc_url( $v['url'] ) ?>" class="<?= esc_attr( $cls ) ?>"><?= esc_html( $v['label'] ) ?></a>
-					<?php endif;
-				endforeach; ?>
+				<!-- Bloc 3 : formats, prix et ajouter au panier -->
+				<div class="bs-hero__purchase">
+					<?php if ( ! empty( $format_variants ) ) : ?>
+					<div class="bs-formats">
+						<span class="bs-formats__label">Formats :</span>
+						<?php foreach ( $format_variants as $v ) :
+							$cls = 'bs-format-btn pf-btn pf-btn--xs ' . ( $v['current'] ? 'pf-btn--outline bs-format-btn--active' : 'pf-btn--neutral' );
+							if ( $v['current'] ) : ?>
+								<span class="<?= esc_attr( $cls ) ?>" aria-current="true"><?= esc_html( $v['label'] ) ?></span>
+							<?php else : ?>
+								<a href="<?= esc_url( $v['url'] ) ?>" class="<?= esc_attr( $cls ) ?>"><?= esc_html( $v['label'] ) ?></a>
+							<?php endif;
+						endforeach; ?>
+					</div>
+					<?php endif; ?>
+					<div class="bs-price-row">
+						<?php woocommerce_template_single_price(); ?>
+						<?php
+						if ( function_exists( 'pf_numerique_render_offer_checkbox' ) ) {
+							echo pf_numerique_render_offer_checkbox( $id ); // phpcs:ignore WordPress.Security.EscapeOutput
+						}
+						?>
+					</div>
+					<?php if ( $product->is_purchasable() && $product->is_in_stock() ) : ?>
+					<a href="<?= esc_url( $product->add_to_cart_url() ) ?>"
+					   class="button bs-hero__cart add_to_cart_button ajax_add_to_cart"
+					   data-product_id="<?= esc_attr( $product->get_id() ) ?>"
+					   data-quantity="1"
+					   rel="nofollow">
+						<?= esc_html( $product->single_add_to_cart_text() ) ?>
+					</a>
+					<?php endif; ?>
+				</div>
 			</div>
-			<?php endif; ?>
 
 		</div><!-- /.bs-hero__info -->
 
 		<!-- ═══ Colonne visuel (droite) ══════════════════════════════ -->
 		<div class="bs-hero__visual">
-			<?php echo do_shortcode( '[passiflore_etagere ids="' . $id . '" hero="true" nb_books_first_displayed="1" display-aparaitre="false"]' ); ?>
+			<?php
+			// libraires_url : rendu par Passiflore_Bookshelf dans .pf-shelf, sous la
+			// planche (mode hero uniquement) — rawurlencode() pour traverser le
+			// parseur de shortcode sans risque (guillemets/esperluettes de l'URL).
+			$etagere_shortcode = '[passiflore_etagere ids="' . $id . '" hero="true" nb_books_first_displayed="1" display-aparaitre="false"';
+			if ( $lien_libraires ) {
+				$etagere_shortcode .= ' libraires_url="' . rawurlencode( $lien_libraires ) . '"';
+			}
+			$etagere_shortcode .= ']';
+			echo do_shortcode( $etagere_shortcode );
+			?>
+			<noscript><style>.pf-bookshelf--hero .pf-book { visibility: visible; }</style></noscript>
+			<?php if ( $nouveaute || $dispo ) : ?>
+			<div class="bs-dispo-line">
+				<?php if ( $nouveaute ) : ?>
+				<span class="pf-badge pf-badge--accent">Nouveauté</span>
+				<?php endif; ?>
+				<?php if ( $dispo ) : ?>
+				<span class="pf-badge <?= esc_attr( $dispo['class'] ) ?>"><?= esc_html( $dispo['label'] ) ?></span>
+				<?php endif; ?>
+			</div>
+			<?php endif; ?>
 		</div><!-- /.bs-hero__visual -->
 
 	</div><!-- /.bs-hero -->

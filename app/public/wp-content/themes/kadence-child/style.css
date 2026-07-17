@@ -211,7 +211,7 @@ a.pf-value:hover, .pf-value-container a:hover, a.pf-value-highlight:hover, .pf-v
 .wp-block-button__link,
 .wp-element-button {
     padding: var(--pf-btn-pad);
-    border-radius: var(--pf-radius);
+    border-radius: var(--pf-radius-md);
     font-size: var(--pf-btn-font-size);
     font-weight: var(--pf-btn-weight);
     line-height: var(--pf-leading-tight);
@@ -262,7 +262,7 @@ a.pf-value:hover, .pf-value-container a:hover, a.pf-value-highlight:hover, .pf-v
 .pf-btn--neutral:active {
     background: var(--pf-surface);
     border-color: var(--pf-accent);
-    color: var(--pf-accent);
+    color: var(--pf-accent) !important;
     box-shadow: none;
 }
 /* Boutons « small » calqués sur les triggers de la barre principale du catalogue
@@ -276,6 +276,12 @@ a.pf-value:hover, .pf-value-container a:hover, a.pf-value-highlight:hover, .pf-v
     line-height: 1.2;
     border-radius: var(--pf-radius-md);           /* 6px, comme les déroulants/contrôles */
 }
+.pf-btn--xs {
+    padding: var(--pf-space-1) var(--pf-space-2);
+    font-size: 12px;
+    line-height: 1.2;
+    border-radius: var(--pf-radius);
+}
 /* Bouton « small » natif Kadence (ex. bouton compte du header) : garde le token
    historique --pf-btn-pad-sm, indépendant du calage ci-dessus sur les triggers.
    (0,2,0) = spécificité de Kadence, chargé après → gagne sans !important. */
@@ -285,6 +291,23 @@ a.pf-value:hover, .pf-value-container a:hover, a.pf-value-highlight:hover, .pf-v
 .pf-btn--block {
     display: block;
     width: 100%;
+}
+
+/* Bouton icône + texte : gère l'espacement icône/texte et la taille de
+   l'icône (svg enfant direct). Taille en em → suit la taille de police du
+   bouton (base, --sm, --xs…) sans réglage séparé. L'ordre visuel (icône avant
+   ou après le texte) reste libre : ordre du DOM, ou modificateur local
+   (ex. .bs-hero__readlist en row-reverse, book-single). */
+.pf-btn--icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5em;
+}
+.pf-btn--icon svg {
+    width: 1.4em;
+    height: 1.4em;
+    flex: none;
 }
 
 /* État visité — un bouton reste au repos une fois son lien visité (sinon un <a> bouton
@@ -343,6 +366,7 @@ h6 { font-family: var(--pf-font-body);    font-weight: var(--pf-weight-normal); 
    qui s'intensifie au survol). Le contenu interne (zoom image, titre qui rougit…)
    reste spécifique à chaque composant. */
 .pf-card {
+    position: relative; /* ancre .pf-card-link (lien étiré) quand la carte n'est pas elle-même le <a> */
     display: flex;
     flex-direction: column;
     background: var(--pf-surface);
@@ -354,7 +378,8 @@ h6 { font-family: var(--pf-font-body);    font-weight: var(--pf-weight-normal); 
     transition: box-shadow var(--pf-transition);
 }
 .pf-card:hover,
-.pf-card:focus {
+.pf-card:focus,
+.pf-card:focus-within {
     box-shadow: var(--pf-shadow-hover);
     color: inherit;
     opacity: 1 !important; /* annule l'opacité .8 des liens de contenu */
@@ -380,6 +405,16 @@ h6 { font-family: var(--pf-font-body);    font-weight: var(--pf-weight-normal); 
     transform: scale(1.05);
 }
 
+/* Lien étiré : un <a> vide couvre toute la carte quand celle-ci n'est pas elle-même
+   le <a> (le titre/les éléments internes restent alors non-cliquables individuellement,
+   pour ne pas imbriquer de liens). `.pf-card` fournit l'ancre position:relative. */
+.pf-card-link {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    outline: none;
+}
+
 /* Titre de carte — style global unifié (taille, graisse, couleur, interligne).
    Rougit au survol des cartes cliquables uniquement. Les composants ne
    redéfinissent que leurs écarts (ex. .pf-auteur-card : graisse normale +
@@ -393,7 +428,8 @@ h6 { font-family: var(--pf-font-body);    font-weight: var(--pf-weight-normal); 
     transition: color var(--pf-transition);
 }
 .pf-card:not(.pf-card--static):hover .pf-card-title,
-.pf-card:not(.pf-card--static):focus .pf-card-title {
+.pf-card:not(.pf-card--static):focus .pf-card-title,
+.pf-card:not(.pf-card--static):focus-within .pf-card-title {
     color: var(--pf-accent);
 }
 /* Corps interne paddé : occupe la hauteur restante. Le média (image) reste enfant
@@ -483,7 +519,7 @@ p a:not(.button):not(.wp-block-button__link):not(.wp-element-button):not(.pf-val
 span a:not(.button):not(.wp-block-button__link):not(.wp-element-button):not(.leaflet-control *):hover,
 .entry-content a:not(.button):not(.wp-block-button__link):not(.wp-element-button):not(.pf-card):not(.menu-item-link):not(.tribe-events-c-subscribe-dropdown__list-item-link):not(.leaflet-control *):not(.leaflet-popup-close-button):not(.tribe-events-calendar-month__day-date-link):not(.tribe-events-calendar-month__calendar-event-title-link):not(.tooltipstered):hover,
 .contact-info-footer:hover {
-    opacity: 0.8 !important;
+    color: var(--global-palette-highlight-alt) !important;
     text-decoration: underline !important;
     text-underline-offset: .15em !important;
 }
@@ -795,6 +831,87 @@ input[type="number"]:focus:not(:read-only), textarea:focus:not(:read-only), sele
    règle « vide » juste au-dessus (1,4,0). */
 .header-cart-empty-check.header-cart-is-empty-true ~ .header-cart-inner-wrap #cart-menu:hover .kadence-svg-iconset {
     color: var(--pf-accent);
+}
+
+/* Lignes du mini-panier (dropdown header) en petite carte cliquable — markup dans
+   woocommerce/cart/mini-cart.php (override du template WooCommerce, copié tel quel
+   sauf le <li> : lien étiré .pf-card-link vers la fiche livre, titre en .pf-card-title
+   qui rougit au survol via la règle globale ci-dessus). `display:block` conserve la
+   mise en page interne héritée de WooCommerce/Kadence (image flottante, `.quantity`
+   calée en padding-left) plutôt que le flex-column par défaut de .pf-card, non adapté
+   ici. Bordure fine : le dropdown a déjà un fond blanc (`--pf-surface`), la carte a
+   besoin d'un contour visible en plus de l'ombre pour se détacher. `!important` :
+   override du padding/bordure natifs WooCommerce (`.widget_shopping_cart .cart_list li`). */
+.woocommerce-mini-cart-item.pf-card {
+    display: block;
+    border: 1px solid var(--pf-border);
+    padding: var(--pf-space-2) 24px var(--pf-space-2) var(--pf-space-2) !important;
+    margin-bottom: var(--pf-space-2) !important;
+    border-bottom: none !important;
+}
+.woocommerce-mini-cart-item.pf-card img {
+    border-radius: var(--pf-radius);
+}
+.woocommerce-mini-cart-item.pf-card:last-child {
+    margin-bottom: 0 !important;
+}
+/* Titre en taille réduite ("petite" carte) — le reste (graisse, couleur, survol rouge)
+   vient de la règle .pf-card-title partagée. */
+.woocommerce-mini-cart-item.pf-card .pf-card-title {
+    font-size: var(--pf-text-sm);
+}
+/* Espace pour que l'ombre des cartes ne soit pas rognée : `ul.cart_list` (Kadence,
+   `.kadence-header-cart.header-navigation ul.cart_list`) a son propre overflow:auto
+   (nécessaire pour le scroll interne des paniers longs, cf. max-height) et un padding
+   natif de 0 — l'ombre des cartes, plus proche ancêtre à clipper, était donc rognée
+   pile à son bord. On retire en contrepartie le padding natif du <li> parent
+   (`.menu-item-kadence-cart-dropdown`, 1em) : les deux s'additionnaient (carte
+   doublement enfoncée par rapport à .total/.buttons, qui ne sont pas dans ul.cart_list
+   et ne recevaient que le padding du <li>) — cette seule marge de ul.cart_list sert
+   donc désormais de référence, reportée aussi (latéral + bas) sur .total/.buttons
+   ci-dessous pour un alignement cohérent. */
+.kadence-header-cart.header-navigation ul.cart_list {
+    padding: var(--pf-space-3) !important;
+}
+.kadence-header-cart.header-navigation .menu-item.menu-item-kadence-cart-dropdown {
+    padding: 0 !important;
+}
+.woocommerce-mini-cart__total.total,
+.woocommerce-mini-cart__buttons.buttons {
+    padding-left: var(--pf-space-3) !important;
+    padding-right: var(--pf-space-3) !important;
+    padding-bottom: var(--pf-space-3) !important;
+}
+/* Panier vide : ce message n'est pas dans ul.cart_list, il perd donc aussi son
+   entourage en même temps que le padding du <li> parent. */
+.woocommerce-mini-cart__empty-message {
+    padding: var(--pf-space-3) !important;
+}
+/* Le bouton × doit rester cliquable au-dessus du lien étiré (sinon le lien étiré,
+   peint après lui dans le DOM, intercepterait le clic). Couleur accent au repos,
+   fond accent au survol (texte en pf-surface pour rester lisible dessus). */
+.woocommerce-mini-cart-item.pf-card .remove_from_cart_button {
+    position: relative;
+    z-index: 2;
+    color: var(--pf-accent) !important;
+}
+.woocommerce-mini-cart-item.pf-card .remove_from_cart_button:hover {
+    background: var(--pf-accent) !important;
+    color: var(--pf-surface) !important;
+}
+.kadence-header-cart.header-navigation ul li a.remove.remove_from_cart_button {
+    margin-right: var(--pf-space-1);
+    margin-top: var(--pf-space-1);
+}
+
+/* Mini-panier (dropdown Kadence) — offre « version numérique » : prix régulier
+   barré accolé au prix promo sur la ligne compagnon (inc/numerique-offer.php,
+   pf_numerique_mini_cart_price). Ton atténué, discret à côté du prix courant. */
+.woocommerce-mini-cart-item .pf-mini-old-amount {
+    text-decoration: line-through;
+    color: var(--pf-muted);
+    margin-left: 0.4em;
+    font-size: 0.9em;
 }
 
 /* =========================================================

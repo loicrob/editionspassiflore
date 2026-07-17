@@ -131,10 +131,11 @@ function initCarousel() {
 }
 
 // ── Actualités : relocalisation responsive ─────────────────────────────────────
-// Rendu par défaut dans le hero (PHP). Sur petit écran (< 769px) on le descend
-// dans la section « En ce moment » au-dessus des événements. Une seule instance
-// Splide ; on appelle refresh() après déplacement pour qu'elle recalcule sa
-// largeur dans le nouveau conteneur.
+// Rendu par défaut dans le hero (PHP), qui le garde à partir de 769px (grand
+// écran). Sur mobile+tablette (< 769px) on le descend dans la section
+// « En ce moment » au-dessus des événements. Une seule instance Splide ; on
+// appelle refresh() après déplacement pour qu'elle recalcule sa largeur dans le
+// nouveau conteneur.
 
 function initRelocateActualites( splide ) {
     var node = document.querySelector( '.pf-en-ce-moment-actualites' );

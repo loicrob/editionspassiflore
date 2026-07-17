@@ -579,27 +579,36 @@ function pf_search_products_by_isbn( $query ) {
 }
 
 /**
- * Raccourci : IDs de produits matchant la requête, rangés titre puis complet.
+ * Raccourci : IDs de produits matchant la requête, rangés par pertinence
+ * cumulée (score titre + score texte complet, cf. pf_search_score_pool()).
+ * Un livre qui matche sur les deux index remonte au-dessus d'un match sur un
+ * seul des deux — mais un match faible (repli Levenshtein, score ≤ 40) ne
+ * passe plus systématiquement devant un match fort (sous-chaîne exacte,
+ * score ≥ 1000) du seul fait d'être dans le bucket titre : avant ce merge,
+ * les deux buckets étaient concaténés tels quels (titre entier, puis
+ * complet), ce qui faisait remonter un faux positif flou du titre (ex.
+ * "concours" ~ "goncourt", distance de Levenshtein 2) devant un vrai match
+ * exact ailleurs dans l'index complet (ex. "Prix Goncourt" en distinction).
  * Réutilisé par le catalogue, la recherche globale et la méta-box événements.
  */
 function pf_search_products_ranked( $query ) {
 	$isbn_ids = pf_search_products_by_isbn( $query );
 	if ( $isbn_ids !== null ) return $isbn_ids;
 
-	$title = pf_search_filter_pool( $query, pf_search_pool_posts( '_pf_search_title', 'product' ) );
-	$full  = pf_search_filter_pool( $query, pf_search_pool_posts( '_pf_search_index', 'product' ) );
+	$title_scores = pf_search_score_pool( $query, pf_search_pool_posts( '_pf_search_title', 'product' ) );
+	$full_scores  = pf_search_score_pool( $query, pf_search_pool_posts( '_pf_search_index', 'product' ) );
 
-	$seen    = [];
-	$ordered = [];
-	foreach ( [ $title, $full ] as $bucket ) {
-		foreach ( $bucket as $id ) {
-			if ( ! isset( $seen[ $id ] ) ) {
-				$seen[ $id ] = true;
-				$ordered[]   = $id;
-			}
-		}
+	$merged = $full_scores;
+	foreach ( $title_scores as $id => $s ) {
+		$merged[ $id ] = ( $merged[ $id ] ?? 0 ) + $s;
 	}
-	return $ordered;
+	if ( empty( $merged ) ) return [];
+
+	$ids = array_keys( $merged );
+	usort( $ids, function ( $a, $b ) use ( $merged ) {
+		return $merged[ $b ] <=> $merged[ $a ];
+	} );
+	return $ids;
 }
 
 /**

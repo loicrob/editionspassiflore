@@ -22,6 +22,8 @@ class Passiflore_Reading_List {
 	const NONCE         = 'pf_reading_list';
 	const FLUSH_OPTION  = 'pf_rl_endpoint_v';
 	const FLUSH_VERSION = '1';
+	const ICON_ADD_PATH    = 'm480-240-168 72q-40 17-76-6.5T200-241v-519q0-33 23.5-56.5T280-840h200q17 0 28.5 11.5T520-800q0 17-11.5 28.5T480-760H280v518l200-86 200 86v-238q0-17 11.5-28.5T720-520q17 0 28.5 11.5T760-480v239q0 43-36 66.5t-76 6.5l-168-72Zm0-520H280h240-40Zm200 80h-40q-17 0-28.5-11.5T600-720q0-17 11.5-28.5T640-760h40v-40q0-17 11.5-28.5T720-840q17 0 28.5 11.5T760-800v40h40q17 0 28.5 11.5T840-720q0 17-11.5 28.5T800-680h-40v40q0 17-11.5 28.5T720-600q-17 0-28.5-11.5T680-640v-40Z';
+	const ICON_REMOVE_PATH = 'M640-680q-17 0-28.5-11.5T600-720q0-17 11.5-28.5T640-760h160q17 0 28.5 11.5T840-720q0 17-11.5 28.5T800-680H640ZM480-240l-168 72q-40 17-76-6.5T200-241v-519q0-33 23.5-56.5T280-840h200q17 0 28.5 11.5T520-800q0 17-11.5 28.5T480-760H280v518l200-86 200 86v-238q0-17 11.5-28.5T720-520q17 0 28.5 11.5T760-480v239q0 43-36 66.5t-76 6.5l-168-72Zm0-520H280h240-40Z';
 
 	public function __construct() {
 		add_action( 'init', [ $this, 'add_endpoint' ] );
@@ -60,35 +62,44 @@ class Passiflore_Reading_List {
 	 */
 	public static function render_button( $product_id ) {
 		$product_id = absint( $product_id );
-		$label_add  = 'Ajouter à ma liste de lecture';
-		$label_in   = 'Retirer de ma liste de lecture';
+		$label_add  = 'Liste de lecture';
+		$label_in   = 'Retirer de la liste';
+		$title_add  = 'Ajouter à ma liste de lecture';
+		$title_in   = 'Retirer de ma liste de lecture';
 
 		if ( ! is_user_logged_in() ) {
 			return sprintf(
-				'<a class="bs-hero__readlist bs-hero__readlist--guest pf-btn pf-btn--outline" href="%s" title="%s">%s<span class="bs-hero__readlist-label">%s</span></a>',
+				'<a class="bs-hero__readlist bs-hero__readlist--guest pf-btn pf-btn--outline pf-btn--icon" href="%s" title="%s">%s<span class="bs-hero__readlist-label">%s</span></a>',
 				esc_url( wc_get_page_permalink( 'myaccount' ) ),
 				esc_attr( 'Connectez-vous pour enregistrer ce livre dans votre liste de lecture' ),
-				self::icon(),
+				self::icon( false ),
 				esc_html( $label_add )
 			);
 		}
 
 		$in = self::is_in_list( $product_id );
 		return sprintf(
-			'<button type="button" class="bs-hero__readlist pf-btn pf-btn--outline%s" data-product-id="%d" data-in-list="%s" data-label-add="%s" data-label-in="%s" aria-pressed="%s">%s<span class="bs-hero__readlist-label">%s</span></button>',
+			'<button type="button" class="bs-hero__readlist pf-btn pf-btn--outline pf-btn--icon%s" data-product-id="%d" data-in-list="%s" data-label-add="%s" data-label-in="%s" data-title-add="%s" data-title-in="%s" data-icon-add="%s" data-icon-in="%s" title="%s" aria-pressed="%s">%s<span class="bs-hero__readlist-label">%s</span></button>',
 			$in ? ' is-in-list' : '',
 			$product_id,
 			$in ? '1' : '0',
 			esc_attr( $label_add ),
 			esc_attr( $label_in ),
+			esc_attr( $title_add ),
+			esc_attr( $title_in ),
+			esc_attr( self::ICON_ADD_PATH ),
+			esc_attr( self::ICON_REMOVE_PATH ),
+			esc_attr( $in ? $title_in : $title_add ),
 			$in ? 'true' : 'false',
-			self::icon(),
+			self::icon( $in ),
 			esc_html( $in ? $label_in : $label_add )
 		);
 	}
 
-	private static function icon() {
-		return '<svg class="bs-hero__readlist-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>';
+	/** Icône bookmark_add (pas dans la liste) / bookmark_remove (déjà dans la liste). */
+	private static function icon( $in ) {
+		$path = $in ? self::ICON_REMOVE_PATH : self::ICON_ADD_PATH;
+		return '<svg class="bs-hero__readlist-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 -960 960 960" fill="currentColor" aria-hidden="true"><path d="' . esc_attr( $path ) . '"/></svg>';
 	}
 
 	/* ─── AJAX toggle ────────────────────────────────────────────── */

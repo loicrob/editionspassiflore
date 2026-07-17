@@ -140,3 +140,42 @@ html.pf-cart-redirecting .wp-block-woocommerce-empty-cart-block {
 		margin-top: 1.5rem;
 	}
 }
+
+/* ─── Encart de rappel « version numérique » (injecté au-dessus du bloc panier) ─── */
+.pf-numerique-nudge {
+	margin-bottom: var(--pf-space-6);
+}
+/* Sélecteur à 2 classes (0,2,0) : bat la règle Kadence parente
+   `.single-content p { margin-bottom: var(--global-md-spacing) }` (0,1,1) qui,
+   l'encart étant injecté dans .single-content, imposait sinon un gros écart
+   (2rem) sous le titre. */
+.pf-numerique-nudge .pf-numerique-nudge__title {
+	margin: 0 0 var(--pf-space-3);
+	font-weight: var(--pf-weight-semibold);
+	color: var(--pf-heading);
+}
+.pf-numerique-nudge__row {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--pf-space-4);
+	padding: var(--pf-space-2) 0;
+}
+.pf-numerique-nudge__row + .pf-numerique-nudge__row {
+	border-top: 1px solid var(--pf-border-light);
+}
+.pf-numerique-nudge__text {
+	min-width: 0;
+}
+.pf-numerique-nudge__text ins.pf-numerique-price {
+	text-decoration: none;
+	font-weight: var(--pf-weight-semibold);
+	color: var(--pf-accent);
+}
+.pf-numerique-nudge__text del.pf-numerique-price-old {
+	margin-left: 0.35em;
+	color: var(--pf-muted);
+}
+.pf-numerique-nudge__btn {
+	flex-shrink: 0;
+}

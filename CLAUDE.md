@@ -118,6 +118,30 @@ Remplace les anciens champs relationnels SCF par-fiche (onglet « Livres associ�
 
 ---
 
+### Offre « version numérique » à l'achat d'un livre papier (`inc/numerique-offer.php`)
+
+Incite à acheter la version **numérique** d'un ouvrage quand le client prend sa version **papier** (format *classique* ou *grands caractères*), à tarif réduit. Tout le back (option, logique, admin, hooks panier, endpoints AJAX, rendu case fiche) vit dans `inc/numerique-offer.php` ; deux JS front (`assets/js/numerique-offer.js`, `numerique-cart-nudge.js`).
+
+**Réglage** — écran admin **Boutique (WooCommerce) → « Offre version numérique »** (`add_submenu_page` sous le parent `woocommerce`, capability `manage_woocommerce`, sauvegarde nonce + PRG sur `load-{$hook}`, calquée sur `book-groups-admin.php`). Positionné **entre « Clients » et « Codes promo »** via `pf_numerique_reorder_submenu` (hook `admin_menu` prio 100, réinsère juste avant `coupons-moved`) — l'ordre d'un sous-menu WooCommerce dépend de l'ordre d'insertion, peu fiable, d'où le réordonnancement explicite plutôt que le paramètre `$position`. Option globale **`pf_numerique_offer`** (non-autoload) : **deux entrées** (`classique`, `grands-caracteres`), chacune `{ mode, value }` avec `mode ∈ {disabled, percent, fixed, free}`. **Dormant par défaut** : option absente → mode `disabled` → aucune UI, aucun impact panier.
+
+**Modèle** — le format source est lu sur `pa_format_particulier` (classique = **aucun** terme ; sinon slug `grands-caracteres`) ; le numérique compagnon = membre du même `format_groupe` avec `pa_format_particulier = numerique`. Helpers (point d'entrée unique **`pf_numerique_offer_for( $physical_id )`** → `{numerique_id, source, mode, value, regular, price}` ou `null`) : `pf_numerique_source_format()`, `pf_numerique_companion_id()`, `pf_numerique_price()` (parse la virgule décimale FR, clamp % à 100). `value` = % de réduction (mode `percent`) ou prix € (mode `fixed`) ; base = `get_regular_price()` du numérique.
+
+**Fiche livre** — `pf_numerique_render_offer_checkbox( $id )` echoée dans `woocommerce/content-single-product.php` juste après le prix (`.bs-hero__info`). La case pilote (via `numerique-offer.js`) l'attribut **`data-pf_add_numerique`** sur le bouton `.bs-hero__cart` : le JS cœur WooCommerce (`add-to-cart.js`) **recopie tous les `data-*` du bouton dans la requête AJAX d'ajout** → aucun endpoint custom. Côté serveur, `woocommerce_add_to_cart` (`pf_numerique_maybe_add_companion`) lit `$_REQUEST['pf_add_numerique']` et ajoute le numérique avec la cart-item meta **`pf_numerique_companion`** = ID du papier (garde anti-récursion sur cette meta). Amélioration progressive : sans JS, le papier s'ajoute normalement, l'offre n'est simplement pas appliquée.
+
+**Prix de la ligne numérique** — `woocommerce_before_calculate_totals` (`pf_numerique_apply_prices`) : tant que le papier référencé est au panier, `set_price( offer.price )` sur la ligne compagnon ; s'il est retiré → on ne touche à rien = **prix plein** (« repasse au prix plein »). Idempotent (recalcul depuis le prix régulier, jamais depuis un prix déjà modifié). Fonctionne en **panier/checkout blocs (Store API)**, qui respecte le prix de ligne serveur.
+
+**Encart de rappel — panier en blocs** — pas de hook PHP de rendu : `numerique-cart-nudge.js` (chargé sur `is_cart()`, dép. `wp-data`) interroge l'endpoint **`pf_numerique_cart_offers`** (livres papier au panier dont le numérique n'est pas encore ajouté) au chargement + à chaque variation du store `wc/store/cart`, injecte un encart `.pf-numerique-nudge` (`.pf-panel`) au-dessus du bloc panier ; « Ajouter » → **`pf_numerique_add_companion`** → `window.location.reload()`. Nonce `pf_numerique_cart`.
+
+**Mention « Offre »** — `woocommerce_get_item_data` (`pf_numerique_cart_item_data`) ajoute une ligne « Offre : version numérique liée à l'achat du livre papier » sous la ligne numérique (panier + checkout, classique **et** Store API — le Store API expose `item_data` via ce filtre). Masquée si le papier a été retiré.
+
+**Mini-panier Kadence (dropdown header)** — override `woocommerce/cart/mini-cart.php` (calqué sur le cœur WooCommerce 10.0.0, seul le `<li>` par article change : petite carte cliquable, voir plus bas). Là, on **ne montre pas** la « variation » (ligne Offre) : à la place, la ligne de prix affiche le **prix régulier barré** (`.pf-mini-old-amount`, style dans `style.css`) accolé au prix promo. Mécanisme : un drapeau global **`pf_in_mini_cart`** posé entre `woocommerce_before_mini_cart` / `woocommerce_after_mini_cart` cible ce seul contexte → `pf_numerique_cart_item_data` s'abstient, et `pf_numerique_mini_cart_price` (sur `woocommerce_cart_item_price`) **reconstruit** le prix depuis l'offre (`prix promo` + `<del>` régulier). ⚠️ On reconstruit plutôt que d'accoler au HTML reçu : selon le moment du rendu du mini-panier (ex. `?wc-ajax=get_refreshed_fragments`), l'objet produit ne porte pas encore le prix posé par `before_calculate_totals` → sans reconstruction, la ligne afficherait le prix plein. L'override préserve ces actions `before`/`after_mini_cart` à l'identique (seul point d'ancrage du mécanisme), donc rien à changer côté offre numérique.
+
+**Numérique = vendu à l'unité** — filtre `woocommerce_is_sold_individually` (`pf_numerique_sold_individually`) : tout produit `numerique` est `sold_individually` (indépendant de l'offre — remisé ou non). Effet : quantité verrouillée à 1 et **sélecteur de quantité retiré du panier/checkout en blocs** (le Store API expose alors `quantity_limits.editable = false`, `max = 1` → le composant `.wc-block-components-quantity-selector` n'est pas rendu). Acheter plusieurs fois le même fichier n'a pas de sens.
+
+**Articles du mini-panier en petites cartes cliquables** — chaque `<li class="woocommerce-mini-cart-item">` est une `.pf-card` (+ `.pf-card--static` si le produit n'a pas de permalien) : lien étiré `.pf-card-link` vers la fiche livre, titre en `.pf-card-title` (rougit au survol de la carte entière via la règle globale déjà utilisée par les cartes événement). `display:block` (override du `display:flex` par défaut de `.pf-card`, dans `style.css`) conserve la mise en page interne héritée de WooCommerce/Kadence (image flottante, `.quantity` en `padding-left`). Bordure fine ajoutée (le dropdown a déjà un fond blanc) ; le bouton **×** de suppression reste cliquable au-dessus du lien étiré via un `z-index` dédié. `.pf-card-link` (positionnement absolu) et `position: relative` sur `.pf-card` sont désormais des règles **partagées** dans `style.css` (auparavant dupliquées dans `events.css` pour les cartes événement, seul autre usage du lien étiré).
+
+---
+
 ### Events → `tribe_events` post type (The Events Calendar)
 
 SCF field group `group_69ea16cde9aef` ("Participants et événement marquant") — attached to `tribe_events`:
@@ -298,6 +322,7 @@ kadence-child/
 │   ├── section-nav.php              — Composant PARTAGÉ (fiche livre + fiche événement), DÉCOUPLÉ : pf_sectionnav_bar() (barre <nav> + primer, ≥3 sections) / pf_sectionnav_sections() (blocs .pf-section) / pf_render_sectionnav() (livre : combine dans .pf-body). + body.no-anchor-scroll
 │   ├── header-hooks.php             — Header customizations; [passiflore_account_btn] shortcode
 │   ├── modifier-produit.php         — Product edit screen: format_groupe single-term constraint. Product list screen: hides native « Trier » button + default sort by date_de_parution DESC then title ASC
+│   ├── numerique-offer.php          — Offre « version numérique en promo » à l'achat d'un livre papier : option globale pf_numerique_offer + admin (Boutique WooCommerce → Offre version numérique, entre Clients et Codes promo), helpers (pf_numerique_offer_for), ajout compagnon (woocommerce_add_to_cart + cart meta pf_numerique_companion), prix (before_calculate_totals), endpoints AJAX encart panier, rendu case fiche, prix barré mini-panier Kadence, numérique vendu à l'unité (sold_individually)
 │   └── pageflip.php                 — Enqueues pageflip assets on single product pages
 │
 ├── assets/
@@ -336,6 +361,8 @@ kadence-child/
 │       ├── event-venue-map.js       — Fiche événement : mini-carte Leaflet mono-lieu (section Lieu), coords lues sur #pf-event-venue-map[data-lat/lng], même pin .pf-map-pin que la vue carte
 │       ├── event-single-media.js    — Fiche événement (desktop ≥1024px) : largeur de la colonne de l'image collée = min(40%·conteneur, hauteurDispo·ratio, largeurNaturelle) → --pf-event-media-col ; inerte ≤1023px
 │       ├── pageflip.js              — Book page flip viewer
+│       ├── numerique-offer.js       — Fiche livre : case « ajouter la version numérique » → attribut data-pf_add_numerique sur le bouton d'ajout (transmis par le JS cœur WooCommerce)
+│       ├── numerique-cart-nudge.js  — Panier (blocs) : encart de rappel « ajoutez la version numérique » (endpoints pf_numerique_cart_offers / pf_numerique_add_companion, ré-évalué sur wc/store/cart)
 │       └── recherche-auteurs.js     — Author search AJAX
 │
 ├── redirections/
@@ -358,9 +385,13 @@ kadence-child/
 │
 └── woocommerce/
     ├── archive-product.php          — Overrides product archive to render [passiflore_catalogue]
-    └── content-single-product.php   — Single book page hero: pageflip viewer (cover + PDF), title, subtitle, price, authors
-                                       (sections sous le hero — résumé, caractéristiques, auteurs, presse, vidéos, podcasts,
-                                        avis, événements, livres associés — rendues par inc/book-single-tabs.php)
+    ├── content-single-product.php   — Single book page hero: pageflip viewer (cover + PDF), title, subtitle, price, authors
+    │                                  (+ case « offre version numérique » après le prix, via inc/numerique-offer.php ;
+    │                                   sections sous le hero — résumé, caractéristiques, auteurs, presse, vidéos, podcasts,
+    │                                   avis, événements, livres associés — rendues par inc/book-single-tabs.php)
+    └── cart/
+        └── mini-cart.php            — Mini-panier dropdown header (calqué sur le cœur WC 10.0.0) : <li> par article
+                                        en petite .pf-card cliquable (lien étiré vers la fiche livre, titre pf-card-title)
 ```
 
 ---

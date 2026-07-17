@@ -4,7 +4,9 @@
 
 /* ─── Titres de section ──────────────────────────────────────────── */
 
-.woocommerce-checkout h3,
+/* :not(...) exclut le nom de produit du récap en blocs (wc-block-components-product-name),
+   qui rend en <h3> mais ne doit pas prendre le style de titre de section. */
+.woocommerce-checkout h3:not(.wc-block-components-product-name),
 .woocommerce-checkout #order_review_heading {
 	color: var(--pf-heading);
 	border-bottom: 2px solid var(--pf-accent);
@@ -53,6 +55,73 @@
 .woocommerce-checkout .woocommerce-checkout-review-order-table .order-total .amount {
 	color: var(--pf-accent);
 	font-size: 1.15rem;
+}
+
+/* ─── Récapitulatif de commande (checkout par blocs / Store API) ─── */
+/* Équivalent du #order_review classique ci-dessus, mais rendu par le bloc
+   WooCommerce (markup non custom) → motif .pf-card appliqué sur son
+   sélecteur natif, comme #order_review reprend .pf-panel--alt. */
+.wc-block-checkout__sidebar.wp-block-woocommerce-checkout-totals-block {
+	background: var(--pf-surface);
+	border-radius: var(--pf-radius-card);
+	box-shadow: var(--pf-shadow);
+	overflow: hidden;
+	padding: var(--pf-space-2);
+	position: sticky;
+	top: calc(var(--pf-sticky-offset, 0px) + var(--pf-space-6));
+}
+
+/* Déjà encadré par la card ci-dessus : la bordure propre du bloc fait doublon. */
+.wc-block-checkout__sidebar .wp-block-woocommerce-checkout-order-summary-block {
+	border: none;
+}
+
+/* Pastille de quantité : même traitement que le compteur panier du header
+   (.header-cart-total.header-cart-is-empty-false, style.css) — rond plein
+   accent, texte cream, même typo/taille (font-size en rem — pas em — pour
+   rester fixe quel que soit le contexte d'imbrication ; width/height en em
+   restent relatifs à ce font-size, comme la source). */
+.wc-block-checkout .wc-block-components-order-summary-item__quantity {
+	background: var(--pf-accent);
+	border-color: var(--pf-surface);
+	box-shadow: none;
+	color: var(--pf-cream);
+	font-family: var(--pf-font-body);
+	font-weight: var(--pf-weight-semibold);
+	font-size: .65rem;
+	line-height: 1;
+	width: 2.1em;
+	height: 2.1em;
+	padding: 0;
+}
+
+/* Badge « Promo » du récap : pas pertinent ici (le prix affiché est déjà le
+   prix remisé). */
+.wc-block-checkout .wc-block-components-product-badge.wc-block-components-sale-badge {
+	display: none;
+}
+
+.wc-block-checkout .wc-block-components-product-metadata {
+	display: none;
+}
+
+/* L'attribut HTML width="48" height="48" force une boîte carrée. Même parti que
+   .pf-gsearch-item-img(-wrap) (recherche-globale.css) : hauteur fixe sur le
+   conteneur, largeur libre sur l'image (contain) — la couverture (non carrée)
+   s'affiche entière plutôt que d'être recadrée. */
+.wc-block-checkout .wc-block-components-order-summary-item__image {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.wc-block-checkout .wc-block-components-order-summary-item__image img {
+	width: auto;
+	height: auto;
+	max-width: 100%;
+	max-height: 100%;
+	object-fit: contain;
+	border-radius: var(--pf-radius);
 }
 
 /* ─── Encart de paiement ─────────────────────────────────────────── */

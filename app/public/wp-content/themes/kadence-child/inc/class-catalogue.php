@@ -282,7 +282,13 @@ class Passiflore_Catalogue {
 		$shortcode_atts = $this->to_bookshelf_atts( $atts );
 		$serialized = '';
 		foreach ( $shortcode_atts as $k => $v ) {
-			$serialized .= ' ' . $k . '="' . esc_attr( $v ) . '"';
+			// `search` est un texte libre qui traverse le parseur de shortcode en
+			// tant que chaîne : do_shortcode() ne décode jamais les entités HTML,
+			// donc esc_attr() y transformait une apostrophe droite en `&#039;`
+			// littéral, cassant la recherche. rawurlencode() (cf. libraires_url
+			// dans class-bookshelf.php) traverse le parseur sans perte.
+			$val = ( $k === 'search' ) ? rawurlencode( (string) $v ) : esc_attr( $v );
+			$serialized .= ' ' . $k . '="' . $val . '"';
 		}
 		return do_shortcode( '[passiflore_etagere' . $serialized . ']' );
 	}

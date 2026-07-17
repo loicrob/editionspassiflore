@@ -844,22 +844,13 @@
    image à droite) ; on bascule en colonne sur mobile (image en haut).
    ════════════════════════════════════════════════════════════════════ */
 
-/* Carte : ancre le lien étiré + espace intérieur. Fond/ombre/survol via .pf-card. */
+/* Carte : espace intérieur (position:relative + .pf-card-link viennent du composant
+   partagé dans style.css). Fond/ombre/survol via .pf-card. Le titre n'est plus un
+   lien : un <a> englobant imbriquerait les liens auteurs-participants (invalide) ;
+   il rougit au survol via la règle globale `.pf-card:hover .pf-card-title`. */
 .tribe-events-calendar-list__event-wrapper.pf-card {
-    position: relative;
     padding: var(--pf-space-5);
     margin-right: var(--global-content-edge-padding);
-}
-
-/* Lien étiré : un <a> vide couvre toute la carte → carte entièrement cliquable,
-   en HTML valide. (Le titre n'est plus un lien ; un <a> englobant imbriquerait
-   les liens auteurs-participants, ce qui est invalide.) Le titre, en .pf-card-title,
-   rougit au survol via la règle globale `.pf-card:hover .pf-card-title` (style.css). */
-.tribe-events-calendar-list__event-wrapper.pf-card .pf-card-link {
-    position: absolute;
-    inset: 0;
-    z-index: 1;
-    outline: none;
 }
 
 /* Titre = look « titre de carte » (pf-card-title). Spécificité supérieure à la règle
