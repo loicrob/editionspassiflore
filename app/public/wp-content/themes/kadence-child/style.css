@@ -349,6 +349,30 @@ a.wp-element-button[target="_blank"]::after {
     margin-left: 0.4em;
     transform: rotate(-45deg);
 }
+/* Carte cliquable ouvrant un nouvel onglet (lien étiré .pf-card-link, vide) : même
+   flèche, mais épinglée en haut à droite de la carte plutôt que collée au texte — le
+   lien n'a pas de contenu visible pour porter l'astuce ::after ci-dessus, d'où le
+   :has() posé sur .pf-card. Callée sur le padding de .pf-card-content pour s'aligner
+   avec le début du titre ; le titre réserve la même marge à droite pour ne pas passer
+   dessous. */
+.pf-card:has(> .pf-card-link[target="_blank"])::after {
+    content: "➜";
+    line-height: 1;
+    position: absolute;
+    top: var(--pf-space-5);
+    right: var(--pf-space-5);
+    color: var(--pf-heading);
+    transform: rotate(-45deg);
+    pointer-events: none;
+    transition: color var(--pf-transition);
+}
+.pf-card:has(> .pf-card-link[target="_blank"]):hover::after,
+.pf-card:has(> .pf-card-link[target="_blank"]):focus-within::after {
+    color: var(--pf-accent);
+}
+.pf-card:has(> .pf-card-link[target="_blank"]) .pf-card-title {
+    padding-right: var(--pf-space-5);
+}
 
 /* Défauts de titres — s'appliquent aussi au contenu créé par les admins (Gutenberg).
    h1 serif, h2–h6 sans. Les classes .pf-titre-* / .pf-label surchargent au besoin. */
@@ -490,7 +514,6 @@ h6 { font-family: var(--pf-font-body);    font-weight: var(--pf-weight-normal); 
    couleur atténuée + layout inline pour nom/prénom. Taille/interligne : global. */
 .pf-auteur-card .pf-card-title {
     font-weight: var(--pf-weight-normal);
-    color: var(--pf-text);
     display: inline-flex;
     flex-wrap: wrap;
     gap: var(--pf-space-1);

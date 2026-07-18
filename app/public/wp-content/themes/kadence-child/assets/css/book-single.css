@@ -621,8 +621,8 @@
 	display: none;
 }
 
-/* Dans le corps paddé (.pf-card-content), le dernier élément (figure média ou
-   lien) absorbe l'espace vertical restant → bas des cartes alignés. */
+/* Dans le corps paddé (.pf-card-content), le dernier élément (figure média)
+   absorbe l'espace vertical restant → bas des cartes alignés. */
 .bs-media-grid .pf-card-content > :last-child {
 	flex: 1;
 }
@@ -637,20 +637,9 @@
 	min-height: 0;
 }
 
-/* Titre média : entièrement géré par .pf-card-title (style.css).
-   Description via .pf-card-text. */
-
-.bs-media-link {
-	font-size: 0.85rem;
-	color: var(--pf-accent);
-	text-decoration: none;
-	font-weight: 600;
-	margin-top: auto;
-}
-
-.bs-media-link:hover {
-	text-decoration: underline;
-}
+/* Titre média : entièrement géré par .pf-card-title (style.css). La flèche « nouvel
+   onglet » des cartes cliquables (lien étiré) vient de la règle globale ::after
+   (style.css). Description via .pf-card-text. */
 
 .bs-media-embed {
 	width: 100%;

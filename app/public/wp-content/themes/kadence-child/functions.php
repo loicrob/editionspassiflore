@@ -219,6 +219,14 @@ function passiflore_enqueue_auteurs_styles() {
             filemtime( get_stylesheet_directory() . '/assets/js/checkout-note-placeholder.js' ),
             true
         );
+        // Force le recalcul de la livraison au changement de pays (bug blocs WC).
+        wp_enqueue_script(
+            'pf-checkout-shipping-country',
+            get_stylesheet_directory_uri() . '/assets/js/checkout-shipping-country.js',
+            [ 'wp-data' ],
+            filemtime( get_stylesheet_directory() . '/assets/js/checkout-shipping-country.js' ),
+            true
+        );
     }
     // Pages portant les blocs Cart/Checkout (Store API) : resynchronise le
     // compteur du panier dans le header, que les blocs ne rafraîchissent pas.
