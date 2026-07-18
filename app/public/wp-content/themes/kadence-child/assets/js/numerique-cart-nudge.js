@@ -48,6 +48,16 @@
 		return d.innerHTML;
 	}
 
+	// Même infobulle que la fiche livre (composant .pf-numerique-tip / pf-tooltip.js).
+	function tipMarkup( tipText, id ) {
+		if ( ! tipText ) {
+			return '';
+		}
+		return '<span class="pf-numerique-tip"><span class="pf-numerique-tip__trigger" tabindex="0" role="button" aria-label="Détails de l\'offre numérique" aria-describedby="' + id + '">' +
+			'<svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor" aria-hidden="true"><path d="M11 7h2v2h-2V7zm0 4h2v6h-2v-6zm1-9C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/></svg>' +
+			'</span><span class="pf-numerique-tip__bubble" id="' + id + '" role="tooltip">' + escapeHtml( tipText ) + '</span></span>';
+	}
+
 	function addCompanion( physicalId, btn ) {
 		btn.disabled = true;
 		ajax( 'pf_numerique_add_companion', { physical_id: physicalId } ).then( function ( res ) {
@@ -91,9 +101,10 @@
 
 			var text = document.createElement( 'div' );
 			text.className = 'pf-numerique-nudge__text';
-			// price_html est généré serveur (wc_price) → sûr ; titre échappé.
+			// price_html est généré serveur (wc_price) → sûr ; titre + infobulle échappés.
+			var tipId = 'pf-numerique-tip-bubble-' + o.physical_id;
 			text.innerHTML = 'Version numérique de <strong><em>' + escapeHtml( o.title ) +
-				'</em></strong> : ' + o.price_html;
+				'</em></strong> : ' + o.price_html + tipMarkup( o.tip, tipId );
 
 			var btn = document.createElement( 'button' );
 			btn.type = 'button';
@@ -112,6 +123,14 @@
 			existing.replaceWith( box );
 		} else {
 			anchor.parentNode.insertBefore( box, anchor );
+		}
+
+		// Câblage des infobulles (après insertion dans le DOM : closest('.site-container') OK).
+		if ( window.pfTooltip ) {
+			var tips = box.querySelectorAll( '.pf-numerique-tip' );
+			for ( var i = 0; i < tips.length; i++ ) {
+				window.pfTooltip.wire( tips[ i ] );
+			}
 		}
 	}
 

@@ -541,7 +541,7 @@ function passiflore_render_videos_section( array $items ): void {
 			echo '<strong class="pf-card-title">' . esc_html( $video['titre'] ) . '</strong>';
 		}
 		if ( ! empty( $video['description'] ) ) {
-			echo '<p class="pf-card-text">' . esc_html( $video['description'] ) . '</p>';
+			echo '<p class="pf-card-text">' . nl2br( esc_html( $video['description'] ) ) . '</p>';
 		}
 		if ( ( $video['type'] ?? '' ) === 'fichier-video' && ! empty( $video['fichier_video'] ) ) {
 			$url = wp_get_attachment_url( $video['fichier_video'] );
@@ -580,7 +580,7 @@ function passiflore_render_podcasts_section( array $items ): void {
 			echo '<strong class="pf-card-title">' . esc_html( $podcast['titre'] ) . '</strong>';
 		}
 		if ( ! empty( $podcast['description'] ) ) {
-			echo '<p class="pf-card-text">' . esc_html( $podcast['description'] ) . '</p>';
+			echo '<p class="pf-card-text">' . nl2br( esc_html( $podcast['description'] ) ) . '</p>';
 		}
 		if ( ( $podcast['type'] ?? '' ) === 'fichier-audio' && ! empty( $podcast['fichier_audio'] ) ) {
 			$url = wp_get_attachment_url( $podcast['fichier_audio'] );

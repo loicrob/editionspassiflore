@@ -199,6 +199,32 @@ function pf_numerique_price_html( array $offer ): string {
    ═══════════════════════════════════════════════════════════════ */
 
 /**
+ * Phrase descriptive de l'offre, pour l'infobulle de la fiche livre. Le format
+ * cité est celui du livre consulté (source de l'offre : « classique » ou
+ * « grands caractères » — jamais « numérique »).
+ * Ex. « Pour l'achat d'un format classique, la version numérique est à -70 %. »
+ */
+function pf_numerique_offer_sentence( array $offer ): string {
+	$format = ( 'grands-caracteres' === $offer['source'] ) ? 'grands caractères' : 'classique';
+
+	if ( 'free' === $offer['mode'] || $offer['price'] <= 0 ) {
+		$term = 'gratuite';
+	} elseif ( 'percent' === $offer['mode'] ) {
+		$pct     = min( 100.0, max( 0.0, pf_numerique_to_float( $offer['value'] ) ) );
+		$pct_str = rtrim( rtrim( number_format( $pct, 2, ',', ' ' ), '0' ), ',' );
+		$term    = 'à -' . $pct_str . ' %';
+	} else {
+		$term = 'à ' . html_entity_decode( wp_strip_all_tags( wc_price( $offer['price'] ) ), ENT_QUOTES, 'UTF-8' );
+	}
+
+	return sprintf(
+		"Pour l'achat d'un format %s, la version numérique est %s.",
+		$format,
+		$term
+	);
+}
+
+/**
  * Rend la case « ajouter aussi la version numérique » pour un produit papier,
  * ou une chaîne vide si aucune offre ne s'applique. Appelée depuis
  * woocommerce/content-single-product.php, juste après le prix.
@@ -211,18 +237,13 @@ function pf_numerique_render_offer_checkbox( int $physical_id ): string {
 
 	$is_free    = ( 'free' === $offer['mode'] || $offer['price'] <= 0 );
 	$price_html = pf_numerique_price_html( $offer );
+	$tip_text   = pf_numerique_offer_sentence( $offer );
 
 	ob_start();
 	?>
 	<label class="pf-numerique-offer">
 		<input type="checkbox" class="pf-numerique-offer__check">
-		<span class="pf-numerique-offer__text">
-			<?php if ( $is_free ) : ?>
-				Version numérique — <?php echo $price_html; // phpcs:ignore WordPress.Security.EscapeOutput ?>
-			<?php else : ?>
-				Version numérique pour <?php echo $price_html; // phpcs:ignore WordPress.Security.EscapeOutput ?>
-			<?php endif; ?>
-		</span>
+		<span class="pf-numerique-offer__text">Inclure la version numérique <?php if ( $is_free ) : ?>— <?php echo $price_html; // phpcs:ignore WordPress.Security.EscapeOutput ?><?php else : ?>pour <?php echo $price_html; // phpcs:ignore WordPress.Security.EscapeOutput ?><?php endif; ?><span class="pf-numerique-tip"><span class="pf-numerique-tip__trigger" tabindex="0" role="button" aria-label="Détails de l'offre numérique" aria-describedby="pf-numerique-tip-bubble"><svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor" aria-hidden="true"><path d="M11 7h2v2h-2V7zm0 4h2v6h-2v-6zm1-9C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/></svg></span><span class="pf-numerique-tip__bubble" id="pf-numerique-tip-bubble" role="tooltip"><?php echo esc_html( $tip_text ); ?></span></span></span>
 	</label>
 	<?php
 	return trim( (string) ob_get_clean() );
@@ -420,6 +441,7 @@ function pf_numerique_ajax_cart_offers() {
 				'physical_id' => $pid,
 				'title'       => get_the_title( $pid ),
 				'price_html'  => pf_numerique_price_html( $offer ),
+				'tip'         => pf_numerique_offer_sentence( $offer ),
 			];
 		}
 	}
@@ -464,20 +486,35 @@ function pf_numerique_ajax_add_companion() {
 
 add_action( 'wp_enqueue_scripts', 'pf_numerique_enqueue' );
 function pf_numerique_enqueue() {
-	if ( function_exists( 'is_product' ) && is_product() ) {
+	$is_product = function_exists( 'is_product' ) && is_product();
+	$is_cart    = function_exists( 'is_cart' ) && is_cart();
+	if ( ! $is_product && ! $is_cart ) {
+		return;
+	}
+
+	// Composant infobulle partagé (fiche + panier), dépendance des deux scripts.
+	wp_enqueue_script(
+		'pf-tooltip',
+		get_stylesheet_directory_uri() . '/assets/js/pf-tooltip.js',
+		[],
+		filemtime( get_stylesheet_directory() . '/assets/js/pf-tooltip.js' ),
+		true
+	);
+
+	if ( $is_product ) {
 		wp_enqueue_script(
 			'pf-numerique-offer',
 			get_stylesheet_directory_uri() . '/assets/js/numerique-offer.js',
-			[],
+			[ 'pf-tooltip' ],
 			filemtime( get_stylesheet_directory() . '/assets/js/numerique-offer.js' ),
 			true
 		);
 	}
-	if ( function_exists( 'is_cart' ) && is_cart() ) {
+	if ( $is_cart ) {
 		wp_enqueue_script(
 			'pf-numerique-cart-nudge',
 			get_stylesheet_directory_uri() . '/assets/js/numerique-cart-nudge.js',
-			[ 'wp-data' ],
+			[ 'wp-data', 'pf-tooltip' ],
 			filemtime( get_stylesheet_directory() . '/assets/js/numerique-cart-nudge.js' ),
 			true
 		);

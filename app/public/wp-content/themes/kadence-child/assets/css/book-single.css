@@ -1028,3 +1028,6 @@
 	margin-left: 0.35em;
 	color: var(--pf-muted);
 }
+
+/* Infobulle de l'offre numérique : composant partagé (fiche livre + encart
+   panier) → déplacé dans style.css (.pf-numerique-tip). */

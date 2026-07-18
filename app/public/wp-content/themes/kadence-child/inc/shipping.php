@@ -1,96 +1,93 @@
 <?php
 /**
  * Livraison : tarif réduit au-delà d'un montant de commande.
+ *
+ * Le seuil et le forfait réduit se configurent par méthode « Forfait » (flat rate),
+ * directement dans la popup « Configurer forfait » d'une zone d'expédition
+ * (WooCommerce > Réglages > Expédition > Zones d'expédition), et non plus dans un
+ * onglet global.
  */
 
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Nouvelle section dans Réglages > Livraison (WooCommerce > Réglages > Livraison > Tarif réduit)
- * pour rendre le seuil et les coûts réduits modifiables en admin.
+ * Ajoute deux champs à la popup « Configurer forfait » de chaque méthode « Forfait » :
+ * - le seuil de sous-total (TTC) à partir duquel un forfait réduit s'applique ;
+ * - le montant de ce forfait réduit.
+ *
+ * Insérés juste après le champ natif « Coût » pour regrouper la logique de tarif.
  */
-add_filter( 'woocommerce_get_sections_shipping', 'passiflore_shipping_seuil_section' );
-function passiflore_shipping_seuil_section( $sections ) {
-	$sections['passiflore_seuil'] = __( 'Tarif réduit', 'kadence-child' );
-	return $sections;
-}
-
-add_filter( 'woocommerce_get_settings_shipping', 'passiflore_shipping_seuil_settings', 10, 2 );
-function passiflore_shipping_seuil_settings( $settings, $current_section ) {
-	if ( 'passiflore_seuil' !== $current_section ) {
-		return $settings;
-	}
-
-	return array(
-		array(
-			'title' => __( 'Tarif de livraison réduit au-delà d’un montant de commande', 'kadence-child' ),
-			'type'  => 'title',
-			'desc'  => __( 'S’applique aux méthodes « Forfait » Point relais et Livraison à domicile de la zone National.', 'kadence-child' ),
-			'id'    => 'pf_shipping_seuil_options',
+add_filter( 'woocommerce_shipping_instance_form_fields_flat_rate', 'passiflore_flat_rate_seuil_fields' );
+function passiflore_flat_rate_seuil_fields( $fields ) {
+	$extra = array(
+		'pf_seuil'       => array(
+			'title'       => __( 'Seuil tarif réduit (€ TTC)', 'kadence-child' ),
+			'type'        => 'text',
+			'placeholder' => __( 'ex. 35', 'kadence-child' ),
+			'description' => __( 'Sous-total du panier (TTC, tel qu’affiché au client) à partir duquel le forfait réduit ci-dessous remplace le coût normal. Laisser vide pour ne pas appliquer de tarif réduit.', 'kadence-child' ),
+			'desc_tip'    => true,
+			'default'     => '',
 		),
-		array(
-			'title'    => __( 'Seuil (€ TTC)', 'kadence-child' ),
-			'desc'     => __( 'Sous-total du panier (TTC, tel qu’affiché au client) à partir duquel le tarif réduit s’applique.', 'kadence-child' ),
-			'id'       => 'pf_shipping_seuil',
-			'default'  => '35',
-			'type'     => 'text',
-			'desc_tip' => true,
-			'css'      => 'width:80px;',
-		),
-		array(
-			'title'    => __( 'Coût réduit — Point relais (€)', 'kadence-child' ),
-			'id'       => 'pf_shipping_cout_relais',
-			'default'  => '0.01',
-			'type'     => 'text',
-			'desc_tip' => true,
-			'css'      => 'width:80px;',
-		),
-		array(
-			'title'    => __( 'Coût réduit — Livraison à domicile (€)', 'kadence-child' ),
-			'id'       => 'pf_shipping_cout_domicile',
-			'default'  => '2.00',
-			'type'     => 'text',
-			'desc_tip' => true,
-			'css'      => 'width:80px;',
-		),
-		array(
-			'type' => 'sectionend',
-			'id'   => 'pf_shipping_seuil_options',
+		'pf_cout_reduit' => array(
+			'title'       => __( 'Forfait à partir du seuil (€)', 'kadence-child' ),
+			'type'        => 'text',
+			'placeholder' => '0',
+			'description' => __( 'Coût d’expédition appliqué une fois le seuil atteint. Laisser vide = gratuit.', 'kadence-child' ),
+			'desc_tip'    => true,
+			'default'     => '',
 		),
 	);
+
+	$out = array();
+	foreach ( $fields as $key => $field ) {
+		$out[ $key ] = $field;
+		if ( 'cost' === $key ) {
+			$out += $extra;
+		}
+	}
+	// Filet de sécurité si le champ « cost » venait à disparaître d'une future version.
+	$out += $extra;
+
+	return $out;
 }
 
 /**
- * Normalise une valeur numérique saisie en admin (accepte la virgule décimale française).
+ * Convertit une valeur numérique saisie en admin (accepte la virgule décimale française).
  */
-function passiflore_shipping_option_float( $option_name, $default ) {
-	return (float) str_replace( ',', '.', get_option( $option_name, $default ) );
+function passiflore_shipping_parse_float( $value ) {
+	return (float) str_replace( ',', '.', (string) $value );
 }
 
 /**
- * Seuil et coûts appliqués par méthode (Forfait) une fois le sous-total TTC du panier
- * (ce que le client voit) atteint ou dépassé. Les instance_id ci-dessous correspondent
- * aux méthodes "Forfait" (Point relais, 3 €) et "Livraison à domicile" (4 €) de la zone
- * de livraison "National" — à ajuster si ces méthodes sont supprimées/recréées.
+ * Applique le forfait réduit, par méthode « Forfait », lorsque le sous-total TTC du
+ * panier (ce que le client voit) atteint ou dépasse le seuil configuré pour cette
+ * méthode. Les réglages sont lus sur l'instance de méthode concernée (option
+ * « woocommerce_flat_rate_{instance_id}_settings »).
  */
 add_filter( 'woocommerce_package_rates', 'passiflore_shipping_rates_seuil', 100, 2 );
 function passiflore_shipping_rates_seuil( $rates, $package ) {
-	$seuil         = passiflore_shipping_option_float( 'pf_shipping_seuil', '35' );
-	$couts_reduits = array(
-		1 => passiflore_shipping_option_float( 'pf_shipping_cout_relais', '0.01' ),   // Point relais.
-		2 => passiflore_shipping_option_float( 'pf_shipping_cout_domicile', '2.00' ), // Livraison à domicile.
-	);
-
-	if ( ! WC()->cart || WC()->cart->get_displayed_subtotal() < $seuil ) {
+	if ( ! WC()->cart ) {
 		return $rates;
 	}
 
+	$subtotal = WC()->cart->get_displayed_subtotal();
+
 	foreach ( $rates as $rate ) {
-		if ( 'flat_rate' !== $rate->get_method_id() || ! isset( $couts_reduits[ $rate->get_instance_id() ] ) ) {
+		if ( 'flat_rate' !== $rate->get_method_id() ) {
 			continue;
 		}
 
-		$cost = $couts_reduits[ $rate->get_instance_id() ];
+		$settings = get_option( 'woocommerce_flat_rate_' . $rate->get_instance_id() . '_settings' );
+		if ( ! is_array( $settings ) || '' === trim( (string) ( $settings['pf_seuil'] ?? '' ) ) ) {
+			continue;
+		}
+
+		$seuil = passiflore_shipping_parse_float( $settings['pf_seuil'] );
+		if ( $seuil <= 0 || $subtotal < $seuil ) {
+			continue;
+		}
+
+		$cost = passiflore_shipping_parse_float( $settings['pf_cout_reduit'] ?? '0' );
 		$rate->set_cost( $cost );
 
 		if ( $rate->get_taxes() ) {
@@ -99,4 +96,41 @@ function passiflore_shipping_rates_seuil( $rates, $package ) {
 	}
 
 	return $rates;
+}
+
+/**
+ * Migration unique : reporte les valeurs effectives de l'ancien réglage global
+ * (onglet « Tarif réduit », supprimé) dans les réglages d'instance des deux méthodes
+ * « Forfait » de la zone National, pour préserver le comportement à l'identique et
+ * pré-remplir la popup. Sans valeur enregistrée, on retombe sur les défauts de l'ancien
+ * code (seuil 35 €, Point relais 0,01 €, Livraison à domicile 2,00 €).
+ */
+add_action( 'admin_init', 'passiflore_shipping_seuil_migrate' );
+function passiflore_shipping_seuil_migrate() {
+	if ( get_option( 'pf_shipping_seuil_migrated' ) ) {
+		return;
+	}
+
+	$seuil     = get_option( 'pf_shipping_seuil', '35' );
+	$anciennes = array(
+		1 => get_option( 'pf_shipping_cout_relais', '0.01' ),   // Point relais.
+		2 => get_option( 'pf_shipping_cout_domicile', '2.00' ), // Livraison à domicile.
+	);
+
+	foreach ( $anciennes as $instance_id => $cout ) {
+		$key      = 'woocommerce_flat_rate_' . $instance_id . '_settings';
+		$settings = get_option( $key );
+		if ( ! is_array( $settings ) ) {
+			continue;
+		}
+		if ( '' === (string) ( $settings['pf_seuil'] ?? '' ) ) {
+			$settings['pf_seuil'] = $seuil;
+		}
+		if ( '' === (string) ( $settings['pf_cout_reduit'] ?? '' ) ) {
+			$settings['pf_cout_reduit'] = $cout;
+		}
+		update_option( $key, $settings );
+	}
+
+	update_option( 'pf_shipping_seuil_migrated', 1 );
 }

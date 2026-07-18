@@ -14,18 +14,23 @@
 
 	var check = document.querySelector( '.pf-numerique-offer__check' );
 	var button = document.querySelector( '.bs-hero__cart' );
-	if ( ! check || ! button ) {
-		return;
+
+	if ( check && button ) {
+		var sync = function () {
+			if ( check.checked ) {
+				button.setAttribute( 'data-pf_add_numerique', '1' );
+			} else {
+				button.removeAttribute( 'data-pf_add_numerique' );
+			}
+		};
+		check.addEventListener( 'change', sync );
+		sync();
 	}
 
-	function sync() {
-		if ( check.checked ) {
-			button.setAttribute( 'data-pf_add_numerique', '1' );
-		} else {
-			button.removeAttribute( 'data-pf_add_numerique' );
-		}
+	// Infobulle de l'offre (composant partagé pf-tooltip.js). preventClick : l'icône
+	// vit dans le <label>, un clic dessus cocherait sinon la case.
+	var tip = document.querySelector( '.pf-numerique-tip' );
+	if ( tip && window.pfTooltip ) {
+		window.pfTooltip.wire( tip, { preventClick: true } );
 	}
-
-	check.addEventListener( 'change', sync );
-	sync();
 } )();

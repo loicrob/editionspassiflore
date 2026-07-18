@@ -1109,6 +1109,64 @@ body.admin-bar { --pf-adminbar: 32px; }
 }
 
 /* =========================================================
+   Infobulle « offre numérique » (.pf-numerique-tip) — composant partagé :
+   fiche livre (après le prix barré) + encart panier. Icône inline dans le texte ;
+   bulle en verre dépoli au survol/focus/tap. Ancrée à droite (l'icône est en bout
+   de ligne) → s'ouvre vers la gauche ; le recalage horizontal dans .site-container
+   est assuré par pf-tooltip.js. ========================================================= */
+.pf-numerique-tip {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    vertical-align: middle;
+    margin-left: 0.15em;
+    margin-bottom: 0.15em;
+}
+.pf-numerique-tip__trigger {
+    display: inline-flex;
+    color: var(--pf-muted);
+    cursor: help;
+    border-radius: 50%;
+}
+.pf-numerique-tip__trigger svg { display: block; }
+.pf-numerique-tip:hover .pf-numerique-tip__trigger,
+.pf-numerique-tip__trigger:focus-visible {
+    color: var(--pf-accent);
+}
+.pf-numerique-tip__bubble {
+    position: absolute;
+    bottom: calc(100% + 8px);
+    right: 0;
+    left: auto;
+    z-index: 20;
+    width: max-content;
+    max-width: 240px;
+    padding: var(--pf-space-2) var(--pf-space-3);
+    background: color-mix(in srgb, var(--pf-cream) 96%, transparent);
+    backdrop-filter: blur(var(--pf-aero-blur));
+    -webkit-backdrop-filter: blur(var(--pf-aero-blur));
+    color: var(--pf-text);
+    font-size: var(--pf-text-sm);
+    font-weight: 400;
+    line-height: 1.4;
+    text-align: left;
+    white-space: normal;
+    border-radius: var(--pf-radius);
+    box-shadow: var(--pf-shadow-float), inset 0 0 0 1px var(--pf-border-light);
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.18s ease, visibility 0.18s ease;
+    pointer-events: none;
+    cursor: default;
+}
+.pf-numerique-tip:hover .pf-numerique-tip__bubble,
+.pf-numerique-tip:focus-within .pf-numerique-tip__bubble,
+.pf-numerique-tip.is-open .pf-numerique-tip__bubble {
+    opacity: 1;
+    visibility: visible;
+}
+
+/* =========================================================
    Citation / encart à filet gauche — fond crème clair, filet 3px, coins
    arrondis côté droit. Couleur du filet via --pf-quote-rule (sable par défaut,
    accent pour la réponse de l'éditeur). Padding/margin contextuels. ========================================================= */

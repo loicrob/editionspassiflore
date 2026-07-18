@@ -427,7 +427,7 @@
                             },
                             {
                                 "name": "description",
-                                "type": "text"
+                                "type": "textarea"
                             },
                             {
                                 "key": "field_6a2e71460a5fe",
@@ -479,7 +479,7 @@
                             },
                             {
                                 "name": "description",
-                                "type": "text"
+                                "type": "textarea"
                             },
                             {
                                 "name": "type",
