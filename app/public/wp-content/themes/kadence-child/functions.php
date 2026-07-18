@@ -192,17 +192,6 @@ function passiflore_enqueue_auteurs_styles() {
             [],
             filemtime( get_stylesheet_directory() . '/assets/css/cart.css' )
         );
-        // Panier vidé → redirection vers le catalogue (= page boutique WooCommerce).
-        wp_enqueue_script(
-            'pf-cart-empty-redirect',
-            get_stylesheet_directory_uri() . '/assets/js/cart-empty-redirect.js',
-            [ 'wp-data' ],
-            filemtime( get_stylesheet_directory() . '/assets/js/cart-empty-redirect.js' ),
-            true
-        );
-        wp_localize_script( 'pf-cart-empty-redirect', 'pfCartEmptyRedirect', [
-            'catalogueUrl' => wc_get_page_permalink( 'shop' ),
-        ] );
     }
     if ( function_exists( 'is_checkout' ) && is_checkout() ) {
         wp_enqueue_style(
@@ -238,6 +227,17 @@ function passiflore_enqueue_auteurs_styles() {
             filemtime( get_stylesheet_directory() . '/assets/js/cart-count-sync.js' ),
             true
         );
+        // Panier vidé (panier ou validation de la commande) → redirection vers le catalogue.
+        wp_enqueue_script(
+            'pf-cart-empty-redirect',
+            get_stylesheet_directory_uri() . '/assets/js/cart-empty-redirect.js',
+            [ 'wp-data' ],
+            filemtime( get_stylesheet_directory() . '/assets/js/cart-empty-redirect.js' ),
+            true
+        );
+        wp_localize_script( 'pf-cart-empty-redirect', 'pfCartEmptyRedirect', [
+            'catalogueUrl' => wc_get_page_permalink( 'shop' ),
+        ] );
     }
 }
 add_action( 'wp_enqueue_scripts', 'passiflore_enqueue_auteurs_styles' );
@@ -257,14 +257,24 @@ remove_action( 'woocommerce_after_single_product_summary', 'woocommerce_output_r
 /**
  * Panier vide → catalogue.
  *
- * À l'arrivée sur la page panier alors qu'il est déjà vide, on redirige côté
- * serveur vers le catalogue (= page boutique WooCommerce), sans jamais afficher
- * l'écran « panier vide ». Le cas « on vide le panier en restant sur la page »
- * (pas de rechargement) est géré côté client par assets/js/cart-empty-redirect.js.
+ * À l'arrivée sur la page panier ou la page de validation de la commande alors
+ * que le panier est déjà vide, on redirige côté serveur vers le catalogue
+ * (= page boutique WooCommerce), sans jamais afficher l'écran « panier vide ».
+ * Le cas « on vide le panier en restant sur la page » (pas de rechargement)
+ * est géré côté client par assets/js/cart-empty-redirect.js.
  */
 add_action( 'template_redirect', 'passiflore_redirect_empty_cart' );
 function passiflore_redirect_empty_cart() {
-    if ( ! function_exists( 'is_cart' ) || ! is_cart() ) {
+    $is_cart_page = function_exists( 'is_cart' ) && is_cart();
+    $is_checkout_page = function_exists( 'is_checkout' ) && is_checkout();
+    if ( ! $is_cart_page && ! $is_checkout_page ) {
+        return;
+    }
+    // is_checkout() reste vrai sur les endpoints « order-received » (remerciement)
+    // et « order-pay » : le panier y est légitimement vide (commande déjà validée,
+    // ou paiement d'une commande existante) → ne pas rediriger dans ces cas.
+    if ( $is_checkout_page && function_exists( 'is_wc_endpoint_url' )
+        && ( is_wc_endpoint_url( 'order-received' ) || is_wc_endpoint_url( 'order-pay' ) ) ) {
         return;
     }
     if ( ! WC()->cart || ! WC()->cart->is_empty() ) {

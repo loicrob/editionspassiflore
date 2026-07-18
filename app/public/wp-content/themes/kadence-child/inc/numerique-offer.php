@@ -218,7 +218,7 @@ function pf_numerique_offer_sentence( array $offer ): string {
 	}
 
 	return sprintf(
-		"Pour l'achat d'un format %s, la version numérique est %s.",
+		"Pour l’achat d’un format %s, le format numérique est %s.\n➜ Vous pourrez le télécharger en ePub une fois la commande effectuée.",
 		$format,
 		$term
 	);
@@ -243,8 +243,26 @@ function pf_numerique_render_offer_checkbox( int $physical_id ): string {
 	?>
 	<label class="pf-numerique-offer">
 		<input type="checkbox" class="pf-numerique-offer__check">
-		<span class="pf-numerique-offer__text">Inclure la version numérique <?php if ( $is_free ) : ?>— <?php echo $price_html; // phpcs:ignore WordPress.Security.EscapeOutput ?><?php else : ?>pour <?php echo $price_html; // phpcs:ignore WordPress.Security.EscapeOutput ?><?php endif; ?><span class="pf-numerique-tip"><span class="pf-numerique-tip__trigger" tabindex="0" role="button" aria-label="Détails de l'offre numérique" aria-describedby="pf-numerique-tip-bubble"><svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor" aria-hidden="true"><path d="M11 7h2v2h-2V7zm0 4h2v6h-2v-6zm1-9C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/></svg></span><span class="pf-numerique-tip__bubble" id="pf-numerique-tip-bubble" role="tooltip"><?php echo esc_html( $tip_text ); ?></span></span></span>
+		<span class="pf-numerique-offer__text">Inclure le format numérique <?php if ( $is_free ) : ?>— <?php echo $price_html; // phpcs:ignore WordPress.Security.EscapeOutput ?><?php else : ?>pour <?php echo $price_html; // phpcs:ignore WordPress.Security.EscapeOutput ?><?php endif; ?><span class="pf-numerique-tip"><span class="pf-numerique-tip__trigger" tabindex="0" role="button" aria-label="Détails de l'offre numérique" aria-describedby="pf-numerique-tip-bubble"><svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor" aria-hidden="true"><path d="M11 7h2v2h-2V7zm0 4h2v6h-2v-6zm1-9C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/></svg></span><span class="pf-numerique-tip__bubble" id="pf-numerique-tip-bubble" role="tooltip"><?php echo esc_html( $tip_text ); ?></span></span></span>
 	</label>
+	<?php
+	return trim( (string) ob_get_clean() );
+}
+
+/**
+ * Rend l'infobulle « téléchargement » juste après le prix d'un produit qui
+ * est lui-même la version numérique (pas l'offre couplée à l'achat papier
+ * ci-dessus). Chaîne vide si le produit n'est pas au format numérique.
+ * Appelée depuis woocommerce/content-single-product.php.
+ */
+function pf_numerique_render_ebook_tip( int $id ): string {
+	if ( ! has_term( 'numerique', 'pa_format_particulier', $id ) ) {
+		return '';
+	}
+	$tip_id = 'pf-numerique-tip-bubble-ebook';
+	ob_start();
+	?>
+<span class="pf-numerique-tip"><span class="pf-numerique-tip__trigger" tabindex="0" role="button" aria-label="Précision sur le téléchargement" aria-describedby="<?php echo esc_attr( $tip_id ); ?>"><svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor" aria-hidden="true"><path d="M11 7h2v2h-2V7zm0 4h2v6h-2v-6zm1-9C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/></svg></span><span class="pf-numerique-tip__bubble" id="<?php echo esc_attr( $tip_id ); ?>" role="tooltip">Vous pourrez le télécharger en ePub une fois la commande effectuée.</span></span>
 	<?php
 	return trim( (string) ob_get_clean() );
 }
@@ -448,6 +466,28 @@ function pf_numerique_ajax_cart_offers() {
 	wp_send_json_success( [ 'offers' => $offers ] );
 }
 
+/**
+ * IDs des lignes du panier au format numérique — pour le tooltip « téléchargement »
+ * injecté en JS juste après leur prix (le panier en blocs ne peut pas être
+ * modifié via un hook PHP, cf. numerique-ebook-tip.js).
+ */
+add_action( 'wp_ajax_pf_numerique_ebook_ids', 'pf_numerique_ajax_ebook_ids' );
+add_action( 'wp_ajax_nopriv_pf_numerique_ebook_ids', 'pf_numerique_ajax_ebook_ids' );
+function pf_numerique_ajax_ebook_ids() {
+	check_ajax_referer( 'pf_numerique_cart', 'nonce' );
+
+	$ids = [];
+	if ( WC()->cart ) {
+		foreach ( WC()->cart->get_cart() as $item ) {
+			$pid = (int) $item['product_id'];
+			if ( has_term( 'numerique', 'pa_format_particulier', $pid ) ) {
+				$ids[] = $pid;
+			}
+		}
+	}
+	wp_send_json_success( [ 'ids' => array_values( array_unique( $ids ) ) ] );
+}
+
 add_action( 'wp_ajax_pf_numerique_add_companion', 'pf_numerique_ajax_add_companion' );
 add_action( 'wp_ajax_nopriv_pf_numerique_add_companion', 'pf_numerique_ajax_add_companion' );
 function pf_numerique_ajax_add_companion() {
@@ -524,6 +564,14 @@ function pf_numerique_enqueue() {
 			'heading'  => __( 'Pour continuer la lecture n’importe où…', 'kadence-child' ),
 			'addLabel' => __( 'Ajouter', 'kadence-child' ),
 		] );
+
+		wp_enqueue_script(
+			'pf-numerique-ebook-tip',
+			get_stylesheet_directory_uri() . '/assets/js/numerique-ebook-tip.js',
+			[ 'wp-data', 'pf-tooltip', 'pf-numerique-cart-nudge' ],
+			filemtime( get_stylesheet_directory() . '/assets/js/numerique-ebook-tip.js' ),
+			true
+		);
 	}
 }
 

@@ -211,6 +211,9 @@ $description     = $product->get_description(); // mÃªme source que la section Â
 						if ( function_exists( 'pf_numerique_render_offer_checkbox' ) ) {
 							echo pf_numerique_render_offer_checkbox( $id ); // phpcs:ignore WordPress.Security.EscapeOutput
 						}
+						if ( function_exists( 'pf_numerique_render_ebook_tip' ) ) {
+							echo pf_numerique_render_ebook_tip( $id ); // phpcs:ignore WordPress.Security.EscapeOutput
+						}
 						?>
 					</div>
 					<?php if ( $product->is_purchasable() && $product->is_in_stock() ) : ?>

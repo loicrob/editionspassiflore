@@ -27,10 +27,14 @@
 		sync();
 	}
 
-	// Infobulle de l'offre (composant partagé pf-tooltip.js). preventClick : l'icône
-	// vit dans le <label>, un clic dessus cocherait sinon la case.
-	var tip = document.querySelector( '.pf-numerique-tip' );
-	if ( tip && window.pfTooltip ) {
-		window.pfTooltip.wire( tip, { preventClick: true } );
+	// Infobulle(s) — composant partagé pf-tooltip.js. Deux contextes mutuellement
+	// exclusifs sur cette page : l'offre (icône dans le <label> de la case à
+	// cocher, preventClick pour ne pas la cocher au clic) et le tooltip
+	// « téléchargement » d'un produit numérique (icône hors label).
+	if ( window.pfTooltip ) {
+		document.querySelectorAll( '.pf-numerique-tip' ).forEach( function ( tip ) {
+			var inLabel = !! tip.closest( '.pf-numerique-offer' );
+			window.pfTooltip.wire( tip, inLabel ? { preventClick: true } : undefined );
+		} );
 	}
 } )();

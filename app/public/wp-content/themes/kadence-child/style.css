@@ -1173,7 +1173,7 @@ body.admin-bar { --pf-adminbar: 32px; }
     font-weight: 400;
     line-height: 1.4;
     text-align: left;
-    white-space: normal;
+    white-space: pre-line;
     border-radius: var(--pf-radius);
     box-shadow: var(--pf-shadow-float), inset 0 0 0 1px var(--pf-border-light);
     opacity: 0;
