@@ -1716,6 +1716,44 @@ body.admin-bar { --pf-adminbar: 32px; }
 }
 
 /* =========================================================
+   .pf-sectionnav--static — variante « menu de PAGES » (nav « Mon compte »).
+   Réutilise le look sectionnav (rail à pastilles desktop / pilules horizontales
+   sticky mobile) mais SANS scrollspy : l'item actif est la page courante (posée
+   côté serveur par WooCommerce, .is-active sur le <a>), la barre reste toujours
+   visible, et le rail n'a pas de ligne de progression (choix « pastilles sans
+   ligne »). Markup en <ul>/<li> (menu sémantique) au lieu des <a> à plat du
+   composant de base. ========================================================= */
+
+/* Reset liste — le composant de base a des <a> enfants directs du track. */
+.pf-sectionnav--static .pf-sectionnav__track { margin: 0; padding: 0; list-style: none; }
+.pf-sectionnav--static .pf-sectionnav__track li { margin: 0; }
+
+/* Pas de ligne verticale reliant les pastilles. */
+.pf-sectionnav--static::before { display: none; }
+
+/* « Déconnexion » (dernier item) : atténuée + sans pastille (détachée du rail). */
+.pf-sectionnav--static .woocommerce-MyAccount-navigation-link--customer-logout a { color: var(--pf-text-dim); }
+.pf-sectionnav--static .woocommerce-MyAccount-navigation-link--customer-logout a::before { display: none; }
+
+@media (min-width: 1024px) {
+	/* Chaque <a> est l'unique enfant de son <li> → le `a:first-child` du composant
+	   de base ciblerait TOUS les liens (aplatissement + pastille décalée vers le
+	   haut). On rétablit la géométrie normale (padding + pastille centrée) partout. */
+	.pf-sectionnav--static .pf-sectionnav__track a:first-child { padding-top: 0.6em; }
+	.pf-sectionnav--static .pf-sectionnav__track a:first-child::before { top: 50%; }
+
+	/* Écart de détachement au-dessus de « Déconnexion ». */
+	.pf-sectionnav--static .woocommerce-MyAccount-navigation-link--customer-logout { margin-top: var(--pf-space-4); }
+}
+
+/* Mobile + tablette : barre toujours visible (le composant de base s'auto-masque
+   via .is-visible, piloté par le scrollspy — inexistant sur un menu de pages).
+   Double classe (0,2,0) pour battre `.pf-sectionnav` et `.pf-sectionnav.is-visible`. */
+@media (max-width: 1023px) {
+	.pf-sectionnav.pf-sectionnav--static { transform: none; opacity: 1; pointer-events: auto; }
+}
+
+/* =========================================================
    Switch segmenté — conteneur bordé + segments ; actif = rouge translucide.
    Markup : catalogue (display/format/univers), événements (vue liste/mois).
    Variante --solid : segment actif en aplat rouge (sélecteur de vue TEC). ========================================================= */

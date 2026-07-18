@@ -184,6 +184,22 @@ function passiflore_enqueue_auteurs_styles() {
             filemtime( get_stylesheet_directory() . '/assets/js/account-reco.js' ),
             true
         );
+        // Nav du compte = composant .pf-sectionnav--static : ombres de bord du
+        // défilement horizontal (mobile) + recentrage de la pilule active.
+        wp_enqueue_script(
+            'pf-scroll-fade',
+            get_stylesheet_directory_uri() . '/assets/js/scroll-fade.js',
+            [],
+            filemtime( get_stylesheet_directory() . '/assets/js/scroll-fade.js' ),
+            true
+        );
+        wp_enqueue_script(
+            'pf-account-nav',
+            get_stylesheet_directory_uri() . '/assets/js/account-nav.js',
+            [],
+            filemtime( get_stylesheet_directory() . '/assets/js/account-nav.js' ),
+            true
+        );
     }
     if ( function_exists( 'is_cart' ) && is_cart() ) {
         wp_enqueue_style(
@@ -321,4 +337,5 @@ require_once get_stylesheet_directory() . '/inc/numerique-offer.php';
 require_once get_stylesheet_directory() . '/inc/checkout.php';
 require_once get_stylesheet_directory() . '/inc/mini-cart.php';
 require_once get_stylesheet_directory() . '/inc/shortcodes.php';
+require_once get_stylesheet_directory() . '/inc/beta-banner.php'; // TEMPORAIRE — bandeau phase bêta
 require_once get_stylesheet_directory() . '/inc/sticky-debug.php'; // DIAGNOSTIC TEMPORAIRE — header sticky

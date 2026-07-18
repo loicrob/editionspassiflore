@@ -14,7 +14,7 @@
 
 .woocommerce-account .woocommerce-MyAccount-navigation {
 	flex: 0 0 auto;
-	width: 240px;
+	width: 200px;
 }
 
 .woocommerce-account .woocommerce-MyAccount-content {
@@ -24,57 +24,16 @@
 }
 
 /* ─── Navigation latérale ────────────────────────────────────────── */
+/* Apparence + sticky entièrement fournis par le composant partagé
+   .pf-sectionnav--static (style.css) : rail à pastilles desktop, pilules
+   horizontales sticky mobile, item actif = page courante, « Déconnexion »
+   détachée. Ici : uniquement la largeur de colonne (ci-dessus).
 
-.woocommerce-MyAccount-navigation ul {
-	list-style: none;
-	margin: 0;
-	padding: 0;
-	border: 1px solid var(--pf-border-light);
-	border-radius: var(--pf-radius-lg);
-	overflow: hidden;
-	background: var(--pf-surface);
-}
-
-.woocommerce-MyAccount-navigation li {
-	margin: 0;
-	border-bottom: 1px solid var(--pf-border-light);
-}
-
-.woocommerce-MyAccount-navigation li:last-child {
-	border-bottom: 0;
-}
-
-.woocommerce-MyAccount-navigation li a {
-	display: block;
-	padding: 0.7em 1.1em;
-	color: var(--pf-text) !important;
-	text-decoration: none !important;
-	font-size: 0.95rem;
-	transition: background 0.15s, color 0.15s;
-	border-left: none !important;
-}
-
-.woocommerce-MyAccount-navigation li a:hover {
-	background: var(--pf-red-soft);
-	color: var(--pf-accent) !important;
-}
-
-.woocommerce-MyAccount-navigation li.is-active a {
-	background: var(--pf-accent);
-	color: var(--pf-cream) !important;
-	font-weight: var(--pf-weight-semibold);
-}
-
-.woocommerce-MyAccount-navigation li.woocommerce-MyAccount-navigation-link--customer-logout a {
-	color: var(--pf-text-dim);
-}
-
-/* Neutralise le filet vertical que Kadence (thème parent) pose sur le conteneur
-   de navigation en ≥768px. Spécificité (0,2,1) > règle parente (0,2,0) → gagne
-   quel que soit l'ordre de chargement des feuilles. */
-body.woocommerce-account .account-navigation-wrap {
-	border-left: 0;
-}
+   Le conteneur Kadence `.account-navigation-wrap` (et son CSS
+   `woocommerce-account.min.css` qui écrasait le composant) est supprimé côté
+   PHP — cf. pf_account_strip_kadence_nav_chrome() (inc/recommendations.php) :
+   la nav est donc un enfant flex direct de `.woocommerce`, ce qui suffit à
+   rendre son `position:sticky` opérant (parent = colonne contenu, haute). */
 
 /* ─── Tableau de bord : salutation ───────────────────────────────── */
 
@@ -263,23 +222,23 @@ body.woocommerce-account .account-navigation-wrap {
 	color: var(--pf-surface);
 }
 
-/* ─── Navigation latérale sticky (desktop) ───────────────────────── */
+/* ─── Responsive ─────────────────────────────────────────────────── */
 
-@media (min-width: 769px) {
-	.woocommerce-account .woocommerce-MyAccount-navigation {
-		position: sticky;
-		top: calc(var(--pf-sticky-offset, 0px) + 1rem);
-		align-self: flex-start;
+/* Shim anti-Kadence : à ≤768px, `woocommerce.min.css` force la nav en
+   `width:100%` (spécificité 0,2,0), ce qui écrase le `width:100vw` full-bleed
+   du composant (0,1,0) → la barre sticky restait rognée à la largeur de la
+   colonne au lieu de couvrir le viewport (les marges négatives du composant,
+   elles, s'appliquent déjà correctement). On ré-impose la largeur full-bleed
+   avec une spécificité (0,3,0) qui bat Kadence, sur tout le range ≤1023px où le
+   composant est en barre horizontale. Une nav plus large que sa ligne flex
+   prend d'elle-même sa propre rangée (contenu dessous), pas besoin de 100%. */
+@media (max-width: 1023px) {
+	.woocommerce-account .woocommerce-MyAccount-navigation.pf-sectionnav {
+		width: calc(100vw - var(--scrollbar-offset, 0px));
 	}
 }
 
-/* ─── Responsive ─────────────────────────────────────────────────── */
-
 @media (max-width: 768px) {
-	.woocommerce-account .woocommerce-MyAccount-navigation {
-		width: 100%;
-	}
-
 	.woocommerce #customer_login.col2-set {
 		grid-template-columns: 1fr;
 	}

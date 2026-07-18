@@ -321,12 +321,18 @@ function pf_account_menu_reorder( $items ) {
 }
 
 /**
- * Retire l'avatar Kadence (« kadence-account-avatar ») en tête de la navigation
- * du compte — inutile ici. Kadence l'attache dans son composant WooCommerce ;
- * on le détache sur le même hook/priorité, une fois le composant instancié.
+ * Retire le « chrome » que Kadence greffe autour de la navigation du compte :
+ *  - l'avatar (« kadence-account-avatar ») en tête de nav — inutile ici ;
+ *  - le conteneur `.account-navigation-wrap` (hooks wrap_start/wrap_end) — sa
+ *    feuille `woocommerce-account.min.css` stylise `.account-navigation-wrap li a`
+ *    (bord gauche 5px, padding, couleur) et impose un layout flottant 30/70 % :
+ *    tout cela écrasait notre composant `.pf-sectionnav--static` (spécificité
+ *    supérieure). En supprimant le wrap, ces règles ne matchent plus notre nav,
+ *    qui devient un enfant flex direct de `.woocommerce` (layout + sticky gérés
+ *    par account.css / style.css). Détaché une fois le composant WC instancié.
  */
-add_action( 'init', 'pf_account_remove_kadence_avatar' );
-function pf_account_remove_kadence_avatar() {
+add_action( 'init', 'pf_account_strip_kadence_nav_chrome' );
+function pf_account_strip_kadence_nav_chrome() {
 	if ( ! class_exists( '\Kadence\Theme' ) ) {
 		return;
 	}
@@ -334,11 +340,10 @@ function pf_account_remove_kadence_avatar() {
 	if ( empty( $kadence->components['woocommerce'] ) ) {
 		return;
 	}
-	remove_action(
-		'woocommerce_before_account_navigation',
-		[ $kadence->components['woocommerce'], 'myaccount_nav_avatar' ],
-		20
-	);
+	$wc = $kadence->components['woocommerce'];
+	remove_action( 'woocommerce_before_account_navigation', [ $wc, 'myaccount_nav_avatar' ], 20 );
+	remove_action( 'woocommerce_before_account_navigation', [ $wc, 'myaccount_nav_wrap_start' ], 2 );
+	remove_action( 'woocommerce_after_account_navigation', [ $wc, 'myaccount_nav_wrap_end' ], 50 );
 }
 
 /**
