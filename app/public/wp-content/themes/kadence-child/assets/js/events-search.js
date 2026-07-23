@@ -164,7 +164,6 @@
 
 			var fd = new FormData();
 			fd.append('action', 'pf_events_search');
-			fd.append('nonce', cfg.nonce);
 			fd.append('search', query);
 			fd.append('offset', isNewSearch ? 0 : offset);
 

@@ -94,7 +94,6 @@ class Passiflore_Recherche_Globale {
 
 		$config = [
 			'ajax_url'     => admin_url( 'admin-ajax.php' ),
-			'nonce'        => wp_create_nonce( 'pf_global_search' ),
 			'placeholders' => $placeholders,
 		];
 
@@ -151,7 +150,10 @@ class Passiflore_Recherche_Globale {
 	/* ─── AJAX ───────────────────────────────────────────────────── */
 
 	public function ajax_search() {
-		check_ajax_referer( 'pf_global_search', 'nonce' );
+		// Pas de nonce : endpoint public, en lecture seule, renvoyant des
+		// données publiques (aucun enjeu CSRF). Un nonce n'apporterait rien ici
+		// et provoquerait un 403 sur un onglet resté ouvert au-delà de sa durée
+		// de vie (12–24 h) — voir la recherche auteurs, mêmes raisons.
 
 		$search = isset( $_POST['search'] ) ? sanitize_text_field( wp_unslash( $_POST['search'] ) ) : '';
 		$type   = isset( $_POST['type'] )   ? sanitize_key( wp_unslash( $_POST['type'] ) )          : 'all';

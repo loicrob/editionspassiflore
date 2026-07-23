@@ -554,7 +554,7 @@ function pf_numerique_enqueue() {
 		wp_enqueue_script(
 			'pf-numerique-cart-nudge',
 			get_stylesheet_directory_uri() . '/assets/js/numerique-cart-nudge.js',
-			[ 'wp-data', 'pf-tooltip' ],
+			[ 'wp-data', 'pf-tooltip', 'pf-session-toast' ],
 			filemtime( get_stylesheet_directory() . '/assets/js/numerique-cart-nudge.js' ),
 			true
 		);

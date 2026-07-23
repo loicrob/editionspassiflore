@@ -362,6 +362,8 @@ kadence-child/
 │       ├── event-single-media.js    — Fiche événement (desktop ≥1024px) : largeur de la colonne de l'image collée = min(40%·conteneur, hauteurDispo·ratio, largeurNaturelle) → --pf-event-media-col ; inerte ≤1023px
 │       ├── pageflip.js              — Book page flip viewer
 │       ├── pf-tooltip.js            — Composant PARTAGÉ infobulle .pf-numerique-tip (window.pfTooltip.wire) : tap/clavier + recalage horizontal dans .site-container ; utilisé fiche livre + encart panier
+│       ├── pf-toast.js              — Composant PARTAGÉ toast (window.pfToast) : file en bas à droite, opts duration/actions/onClose(reason)/closeLabel, pause au survol/focus, barre de progression ; DOM 100 % JS (aucun HTML serveur). Utilisé par les signets d'étagère et par pf-session-toast.js
+│       ├── pf-session-toast.js      — Composant PARTAGÉ « session expirée » (window.pfSessionExpired), au-dessus de pf-toast : rattrape un 403 de nonce sur les endpoints AJAX à état. Deux modes — 'reload' (compte à rebours + rechargement, « Annuler » l'annule ; actions pures : panier, suppressions) et 'confirm' (reste affiché, bouton « Actualiser », JAMAIS d'auto-reload ; contextes avec saisie ou navigation : avis, newsletter, liste de lecture, signets). Idempotent. Enregistré dans functions.php, tiré par dépendance de script
 │       ├── numerique-offer.js       — Fiche livre : case « ajouter la version numérique » → attribut data-pf_add_numerique sur le bouton d'ajout (transmis par le JS cœur WooCommerce) ; câble l'infobulle (pfTooltip.wire, preventClick)
 │       ├── numerique-cart-nudge.js  — Panier (blocs) : encart de rappel « ajoutez la version numérique » (endpoints pf_numerique_cart_offers / pf_numerique_add_companion, ré-évalué sur wc/store/cart) ; chaque ligne porte l'infobulle (pfTooltip.wire)
 │       └── recherche-auteurs.js     — Author search AJAX
@@ -607,6 +609,14 @@ Vérifier ensuite que les U+2019 légitimes (apostrophes françaises dans du con
 ## Gotcha — ne jamais tuer Chrome globalement pendant les tests visuels
 
 Les vérifications visuelles lancent des instances **Chrome headless** (CDP / `--screenshot`). **Ne JAMAIS** faire `pkill`/`killall` sur « Google Chrome » (ni aucun motif large) : le **navigateur GUI de l'utilisateur** — où il regarde le site en local — tourne sous le même nom et serait tué, l'obligeant à tout relancer. Chaque instance de test doit utiliser un `--user-data-dir` **et** un `--remote-debugging-port` **uniques**, et n'être arrêtée que par son propre lanceur (le script node tue le seul process enfant qu'il a spawné, par son PID). Pas de nettoyage « au nom » ; les instances headless se terminent d'elles-mêmes (kill ciblé du PID par le lanceur, ou `--virtual-time-budget`). Un `--user-data-dir` unique par run suffit à éviter tout conflit de profil/port, donc aucun `pkill` préalable n'est nécessaire.
+
+---
+
+## Sécurité AJAX — politique de nonce
+
+**Endpoints publics en lecture seule = pas de nonce** (choix acté). Un nonce WordPress n'a de valeur que pour la protection CSRF d'une action **qui modifie un état au nom d'un utilisateur connecté** ; sur un endpoint `nopriv` qui ne fait que **lire des données publiques**, il n'apporte aucune sécurité (pour un visiteur déconnecté, `wp_create_nonce` produit même un jeton partagé tournant toutes les 12 h) et provoque un **403 sur un onglet resté ouvert au-delà de la durée de vie du nonce** (12–24 h). Ces endpoints n'appellent donc **pas** `check_ajax_referer` et n'émettent pas de nonce : `pf_global_search`, `pf_recherche_auteurs`, `pf_catalogue(_filter)`, `pf_events_feed`, `pf_events_search`, `pf_events_map_search`. **Ne pas “réparer” en re-ajoutant un nonce.**
+
+**Endpoints à état = nonce conservé + dégradation gracieuse.** Ceux qui écrivent (panier `pf_numerique_*`, newsletter, avis `pf_avis_*`, liste de lecture / signets `pf_reading_list_toggle`, suppressions, sauvegardes admin) **gardent** leur nonce. Pour éviter l'échec silencieux d'un 403, leur JS détecte `response.status === 403` **avant** `.json()` et appelle `window.pfSessionExpired({ mode })` (voir `assets/js/pf-session-toast.js`) : mode `'reload'` pour les actions pures (panier, suppressions), `'confirm'` là où un auto-reload perdrait une saisie ou une position de navigation (avis, newsletter, liste de lecture, signets). Le sondage de fond du panier, lui, avale le 403 silencieusement (pas d'action utilisateur → pas de toast).
 
 ---
 

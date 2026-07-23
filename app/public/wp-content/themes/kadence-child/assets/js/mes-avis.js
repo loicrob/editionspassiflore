@@ -42,7 +42,7 @@
 
 		setBusy(card, true);
 
-		post('pf_avis_edit', { comment_id: card.dataset.commentId, content: content })
+		post('pf_avis_edit', { comment_id: card.dataset.commentId, content: content }, 'confirm')
 			.then(payload => {
 				if (!payload || !payload.success) return;
 				const text = card.querySelector('[data-role="text"]');
@@ -62,7 +62,7 @@
 
 		setBusy(card, true);
 
-		post('pf_avis_delete', { comment_id: card.dataset.commentId })
+		post('pf_avis_delete', { comment_id: card.dataset.commentId }, 'reload')
 			.then(payload => {
 				if (!payload || !payload.success) return;
 				card.remove();
@@ -79,12 +79,19 @@
 		card.className = 'pf-avis-card pf-avis-card--' + data.status;
 	}
 
-	function post(action, fields) {
+	function post(action, fields, mode) {
 		const fd = new FormData();
 		fd.append('action', action);
 		fd.append('nonce', pfAvis.nonce);
 		Object.keys(fields).forEach(k => fd.append(k, fields[k]));
-		return fetch(pfAvis.ajax_url, { method: 'POST', body: fd }).then(r => r.json());
+		return fetch(pfAvis.ajax_url, { method: 'POST', body: fd }).then(r => {
+			// Nonce périmé (onglet ancien) → toast de session ; mode selon le contexte.
+			if (r.status === 403) {
+				if (window.pfSessionExpired) window.pfSessionExpired({ mode: mode });
+				return null;
+			}
+			return r.json();
+		});
 	}
 
 	function setBusy(card, busy) {

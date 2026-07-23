@@ -38,8 +38,15 @@
 			credentials: 'same-origin',
 			body: data
 		} )
-			.then( function ( r ) { return r.json(); } )
+			.then( function ( r ) {
+				if ( r.status === 403 ) {
+					if ( window.pfSessionExpired ) { window.pfSessionExpired( { mode: 'confirm' } ); }
+					return null;
+				}
+				return r.json();
+			} )
 			.then( function ( res ) {
+				if ( ! res ) { return; } // 403 : géré par le toast de session
 				var ok = res && res.success;
 				var text = ( res && res.data && res.data.message ) ||
 					( ok ? 'Inscription enregistrée.' : 'Une erreur est survenue.' );
@@ -83,7 +90,13 @@
 			credentials: 'same-origin',
 			body: data
 		} )
-			.then( function ( r ) { return r.json(); } )
+			.then( function ( r ) {
+				if ( r.status === 403 ) {
+					if ( window.pfSessionExpired ) { window.pfSessionExpired(); }
+					return null;
+				}
+				return r.json();
+			} )
 			.then( function ( res ) {
 				if ( ! res || ! res.success || ! res.data || ! res.data.html ) {
 					btn.disabled = false;

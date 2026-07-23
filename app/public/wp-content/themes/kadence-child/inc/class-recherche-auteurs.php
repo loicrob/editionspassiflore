@@ -72,7 +72,6 @@ class Passiflore_Recherche_Auteurs {
 
 		$config = [
 			'ajax_url' => admin_url( 'admin-ajax.php' ),
-			'nonce'    => wp_create_nonce( 'pf_recherche_auteurs' ),
 			'search'   => $search,
 		];
 
@@ -97,7 +96,8 @@ class Passiflore_Recherche_Auteurs {
 	/* ─── AJAX ───────────────────────────────────────────────────── */
 
 	public function ajax_search() {
-		check_ajax_referer( 'pf_recherche_auteurs', 'nonce' );
+		// Endpoint public en lecture seule : pas de nonce (aucun enjeu CSRF, et
+		// un nonce provoquerait un 403 sur un onglet ancien). Cf. recherche globale.
 		$search = isset( $_POST['search'] ) ? sanitize_text_field( wp_unslash( $_POST['search'] ) ) : '';
 		wp_send_json_success( [ 'html' => $this->render_grid( $search ) ] );
 	}

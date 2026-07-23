@@ -39,7 +39,16 @@
 			credentials: 'same-origin',
 			headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
 			body: body.toString()
-		} ).then( function ( r ) { return r.json(); } );
+		} ).then( function ( r ) {
+			// 403 = nonce périmé : on le remonte en rejet. Seule l'action utilisateur
+			// (addCompanion) affiche un toast ; le sondage de fond l'ignore (.catch vide).
+			if ( r.status === 403 ) {
+				var e = new Error( 'session' );
+				e.pfSession = true;
+				throw e;
+			}
+			return r.json();
+		} );
 	}
 
 	function escapeHtml( s ) {
@@ -66,8 +75,11 @@
 			} else {
 				btn.disabled = false;
 			}
-		} ).catch( function () {
+		} ).catch( function ( err ) {
 			btn.disabled = false;
+			if ( err && err.pfSession && window.pfSessionExpired ) {
+				window.pfSessionExpired(); // action panier → mode reload (défaut)
+			}
 		} );
 	}
 

@@ -233,7 +233,6 @@
 
 			const fd = new FormData();
 			fd.append('action', 'pf_global_search');
-			fd.append('nonce',  config.nonce);
 			fd.append('search', q);
 			fd.append('type',   typeEl ? typeEl.value : 'all');
 

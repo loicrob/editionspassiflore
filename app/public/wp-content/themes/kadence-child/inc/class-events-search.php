@@ -62,7 +62,6 @@ class Passiflore_Events_Search {
 		);
 		wp_localize_script( 'pf-events-search', 'PassifloreEventsSearch', [
 			'ajax_url'           => admin_url( 'admin-ajax.php' ),
-			'nonce'              => wp_create_nonce( 'pf_events_search' ),
 			'placeholder_mobile' => __( 'Événement', 'kadence-child' ),
 		] );
 	}
@@ -96,7 +95,8 @@ class Passiflore_Events_Search {
 	/* ─── AJAX ───────────────────────────────────────────────────── */
 
 	public function ajax_search() {
-		check_ajax_referer( 'pf_events_search', 'nonce' );
+		// Endpoint public en lecture seule : pas de nonce (aucun enjeu CSRF, et
+		// un nonce provoquerait un 403 sur un onglet ancien). Cf. recherche globale.
 
 		$search = isset( $_POST['search'] ) ? sanitize_text_field( wp_unslash( $_POST['search'] ) ) : '';
 		$offset = isset( $_POST['offset'] ) ? max( 0, (int) $_POST['offset'] ) : 0;

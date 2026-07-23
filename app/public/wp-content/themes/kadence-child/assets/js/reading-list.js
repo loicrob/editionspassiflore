@@ -22,7 +22,15 @@
 			fd.append('product_id', btn.dataset.productId);
 
 			fetch(pfRL.ajax_url, { method: 'POST', body: fd })
-				.then(r => r.json())
+				.then(r => {
+					// Nonce périmé (onglet ancien) → toast de session (mode confirm :
+					// pas d'auto-reload, on ne yanke pas une page en cours de lecture).
+					if (r.status === 403) {
+						if (window.pfSessionExpired) window.pfSessionExpired({ mode: 'confirm' });
+						return null;
+					}
+					return r.json();
+				})
 				.then(payload => {
 					if (!payload || !payload.success) return;
 					const inList = !!payload.data.in_list;

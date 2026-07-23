@@ -2,6 +2,7 @@ document.addEventListener( 'DOMContentLoaded', function () {
     var typingDone = initTypingAnimation();
     var carousel = initCarousel();
     initRelocateActualites( carousel );
+    initActualiteFit( carousel );
     initScrollCarets();
     initStickyHeaderShadow();
     initBookshelfIntro();
@@ -207,6 +208,158 @@ function initRelocateActualites( splide ) {
 
     apply();
     mql.addEventListener( 'change', apply );
+}
+
+// ── Actualités (hero) : ajuste la carte du carousel à la hauteur disponible ────
+// Sur grand écran (≥769px), l'encart actualités occupe la colonne droite du hero,
+// de hauteur fixe (100svh − header). Deux problèmes, tous deux réglés ici car
+// insolubles en CSS pur (circularité de hauteur + effondrement des hauteurs en %
+// dès qu'on retire les flex:1 de la chaîne .pf-actualites-carousel/.splide__track,
+// bug WebKit déjà documenté plus bas dans accueil.css) :
+//
+//   1. Colonne trop COURTE : image + légende dépassent → le polaroïd
+//      (max-height:100% + overflow:hidden) rognait le bas (le bouton). On pose
+//      une largeur/hauteur explicites sur l'image (fit-content de la carte +
+//      min-width:100% de la légende suivent), l'image rétrécit sur ses deux axes.
+//      La largeur ne peut pas dériver en CSS car fit-content se cale sur la
+//      largeur INTRINSÈQUE de l'image, pas sur sa largeur contrainte-en-hauteur.
+//
+//   2. Colonne trop HAUTE : le carousel (flex:1) remplissait toute la colonne,
+//      carte centrée dedans mais flèches/pagination collées en bas (bottom:0)
+//      → grand vide sous la carte. On réduit la boîte du carousel à la plus haute
+//      carte + la réserve des contrôles ; justify-content:center (CSS) la recentre.
+//      On prend la plus haute carte (pas la courante) → boîte stable entre diapos.
+//
+// Sur petit écran l'encart est relocalisé dans une colonne à hauteur libre
+// (image plafonnée en CSS, pas de rognage) → on efface tous les overrides et sort.
+
+function initActualiteFit( splide ) {
+    var carousel = document.querySelector( '.pf-actualites-carousel' );
+    if ( ! carousel ) return;
+
+    var slot = document.querySelector( '.pf-hero-actualites-slot' );
+    var mql  = window.matchMedia( '(min-width: 769px)' );
+    var MIN_IMG_H = 60; // px — plancher si la légende est démesurée (évite l'effondrement)
+
+    // Hauteur intérieure du slot (colonne droite) : hauteur dispo pour l'encart,
+    // STABLE (ne dépend que du viewport, pas de la taille de la carte ni de la
+    // boîte réduite du carousel) → base de mesure fiable, sans boucle de feedback.
+    function colHeight() {
+        if ( ! slot ) return 0;
+        var cs = getComputedStyle( slot );
+        return slot.clientHeight
+            - parseFloat( cs.paddingTop ) - parseFloat( cs.paddingBottom );
+    }
+
+    function clearAll() {
+        carousel.style.flex = '';
+        carousel.style.height = '';
+        carousel.querySelectorAll( '.pf-polaroid' ).forEach( function ( p ) {
+            p.style.width = '';
+            var ib = p.querySelector( '.pf-actualite-image' );
+            if ( ib ) { ib.style.width = ''; ib.style.height = ''; }
+        } );
+    }
+
+    // Ajuste UNE carte pour qu'image + légende tiennent dans cardMaxH.
+    function fitOne( polaroid, cardMaxH ) {
+        var imgBox  = polaroid.querySelector( '.pf-actualite-image' );
+        var img     = imgBox && imgBox.querySelector( 'img' );
+        var caption = polaroid.querySelector( '.pf-actualite-contenu' );
+
+        polaroid.style.width = '';
+        if ( imgBox ) { imgBox.style.width = ''; imgBox.style.height = ''; }
+        if ( ! imgBox || ! img ) return;
+
+        var nw = img.naturalWidth, nh = img.naturalHeight;
+        if ( ! nw || ! nh ) return;                  // image pas encore chargée
+        var ratio = nw / nh;                         // largeur / hauteur
+
+        // Largeur naturelle de l'image (déjà bornée par max-width du polaroïd/slot).
+        var maxImgW = imgBox.getBoundingClientRect().width;
+        if ( maxImgW <= 0 ) return;
+        var naturalImgH = maxImgW / ratio;
+
+        for ( var pass = 0; pass < 2; pass++ ) {
+            var capH    = caption ? caption.getBoundingClientRect().height : 0;
+            var budgetH = cardMaxH - capH;
+
+            if ( budgetH >= naturalImgH ) {          // tient à taille naturelle → pas d'override
+                polaroid.style.width = '';
+                imgBox.style.width   = '';
+                imgBox.style.height  = '';
+                return;
+            }
+
+            var imgH = Math.max( MIN_IMG_H, budgetH );
+            var imgW = imgH * ratio;
+            if ( imgW > maxImgW ) { imgW = maxImgW; imgH = imgW / ratio; }
+
+            imgBox.style.width   = imgW + 'px';
+            imgBox.style.height  = imgH + 'px';
+            polaroid.style.width = imgW + 'px';
+        }
+    }
+
+    function fitAll() {
+        // Reset la boîte du carousel AVANT de mesurer : sinon max-height:100% la
+        // plafonnerait à la boîte réduite précédente et on ne « verrait » jamais la
+        // hauteur naturelle plus grande quand le viewport s'agrandit (boîte figée).
+        carousel.style.flex = '';
+        carousel.style.height = '';
+
+        if ( ! mql.matches ) { clearAll(); return; }  // petit écran : hauteur libre
+
+        var polaroids = carousel.querySelectorAll( '.pf-polaroid' );
+        if ( ! polaroids.length ) return;
+
+        var colH = colHeight();
+        if ( colH <= 0 ) return;
+
+        var firstSlide = carousel.querySelector( '.pf-actualite-slide' );
+        if ( ! firstSlide ) return;
+        var scs = getComputedStyle( firstSlide );
+        var padTop = parseFloat( scs.paddingTop );
+        var padBot = parseFloat( scs.paddingBottom ); // réserve flèches/pagination
+
+        // 1) Ajuste chaque carte à la hauteur max (place des contrôles réservée).
+        var cardMaxH = colH - padTop - padBot;
+        polaroids.forEach( function ( p ) { fitOne( p, cardMaxH ); } );
+
+        // 2) Réduit la boîte du carousel à la plus haute carte (+ réserve) pour que
+        //    les flèches suivent la carte au lieu de rester collées au bas de la
+        //    colonne. Fallback flex:1 (pleine colonne) tant qu'aucune image n'est
+        //    chargée : on recalculera à leur chargement.
+        var maxCard = 0, loaded = false;
+        polaroids.forEach( function ( p ) {
+            var img = p.querySelector( '.pf-actualite-image img' );
+            if ( img && img.naturalWidth ) loaded = true;
+            maxCard = Math.max( maxCard, p.offsetHeight );
+        } );
+        if ( ! loaded || maxCard <= 0 ) return;
+
+        var boxH = Math.min( colH, maxCard + padTop + padBot );
+        carousel.style.flex   = '0 0 auto';   // sinon flex:1 (basis 0%) ignore la hauteur
+        carousel.style.height = boxH + 'px';
+    }
+
+    fitAll();
+    window.addEventListener( 'load', fitAll );
+    carousel.querySelectorAll( '.pf-actualite-image img' ).forEach( function ( img ) {
+        if ( ! img.complete ) img.addEventListener( 'load', fitAll );
+    } );
+    mql.addEventListener( 'change', fitAll );
+
+    if ( splide ) {
+        splide.on( 'resized', fitAll );
+        splide.on( 'refresh', fitAll );
+    }
+
+    var resizeTimer = null;
+    window.addEventListener( 'resize', function () {
+        clearTimeout( resizeTimer );
+        resizeTimer = setTimeout( fitAll, 120 );
+    } );
 }
 
 // ── Sticky header shadow ──────────────────────────────────────────────────────

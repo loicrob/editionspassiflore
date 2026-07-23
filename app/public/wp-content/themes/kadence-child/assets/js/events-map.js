@@ -408,7 +408,6 @@
 				headers:     { 'Content-Type': 'application/x-www-form-urlencoded' },
 				credentials: 'same-origin',
 				body:        'action=pf_events_map_search'
-					+ '&nonce=' + encodeURIComponent( cfg.searchNonce || '' )
 					+ '&search=' + encodeURIComponent( q )
 			} ).then( function ( r ) {
 				return r.json();

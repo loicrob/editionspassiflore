@@ -24,16 +24,9 @@ $has_slides = ! empty( $slides );
 // Upcoming events
 $events = function_exists( 'passiflore_get_upcoming_events' ) ? passiflore_get_upcoming_events() : [];
 
-// Contact page content (rendered via the_content filters so CF7 shortcodes fire)
-$contact_page    = get_page_by_path( 'contact' );
-$contact_content = $contact_page
-    ? apply_filters( 'the_content', $contact_page->post_content )
-    : '';
-
 // Section title links
 $catalogue_url  = function_exists( 'wc_get_page_permalink' ) ? wc_get_page_permalink( 'shop' ) : get_post_type_archive_link( 'product' );
 $events_url     = function_exists( 'tribe_get_events_link' ) ? tribe_get_events_link() : get_post_type_archive_link( 'tribe_events' );
-$contact_url    = $contact_page ? get_permalink( $contact_page ) : '';
 
 // Hero category links (product_cat archives → filtered catalogue)
 $litterature_link = get_term_link( 'litterature', 'product_cat' );
@@ -44,9 +37,9 @@ $culture_url      = is_wp_error( $culture_link ) ? '' : $culture_link;
 
 <?php /*
  Primer --pf-sticky-offset : posé AVANT le premier paint du hero.
- Le hero fait `calc(100dvh - var(--pf-sticky-offset))`. Sans ce primer, la
+ Le hero fait `calc(100svh - var(--pf-sticky-offset))`. Sans ce primer, la
  variable vaut 0 au premier rendu (recherche-globale.js est un script externe
- en footer, exécuté trop tard) → le hero démarre à 100dvh puis rétrécit quand
+ en footer, exécuté trop tard) → le hero démarre à 100svh puis rétrécit quand
  la variable passe à la hauteur du header → .pf-hero-categories saute vers le
  haut. Ce script inline est placé entre le header (déjà dans le DOM) et le hero
  (pas encore parsé) : il mesure le header et fixe la variable juste à temps.

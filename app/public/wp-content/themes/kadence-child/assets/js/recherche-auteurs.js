@@ -45,7 +45,6 @@
 
 			const fd = new FormData();
 			fd.append('action', 'pf_recherche_auteurs');
-			fd.append('nonce', config.nonce);
 			fd.append('search', input.value);
 
 			fetch(config.ajax_url, { method: 'POST', body: fd, signal: abortCtrl.signal })

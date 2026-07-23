@@ -186,7 +186,6 @@ class Passiflore_Events_Map {
 			'emptyText'         => __( 'Aucun événement géolocalisé à afficher pour le moment.', 'passiflore' ),
 			'searchEmptyText'   => __( 'Aucun événement ne correspond à votre recherche.', 'passiflore' ),
 			'ajaxUrl'           => admin_url( 'admin-ajax.php' ),
-			'searchNonce'       => wp_create_nonce( 'pf_events_map_search' ),
 			'placeholderMobile' => __( 'Événement', 'kadence-child' ), // même placeholder mobile que la recherche liste.
 			'markers'           => $this->build_markers(),
 		] );
@@ -366,7 +365,8 @@ class Passiflore_Events_Map {
 	 * filtre ses marqueurs sur cet ensemble (pas de rendu HTML côté serveur).
 	 */
 	public function ajax_search() {
-		check_ajax_referer( 'pf_events_map_search', 'nonce' );
+		// Endpoint public en lecture seule : pas de nonce (aucun enjeu CSRF, et
+		// un nonce provoquerait un 403 sur un onglet ancien). Cf. recherche globale.
 
 		$search = isset( $_POST['search'] ) ? sanitize_text_field( wp_unslash( $_POST['search'] ) ) : '';
 		if ( mb_strlen( trim( $search ) ) < 2 || ! function_exists( 'pf_search_events_ranked' ) ) {

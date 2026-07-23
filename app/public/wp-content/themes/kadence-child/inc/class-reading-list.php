@@ -296,7 +296,7 @@ class Passiflore_Reading_List {
 			wp_enqueue_script(
 				'pf-reading-list',
 				$uri . '/assets/js/reading-list.js',
-				[],
+				[ 'pf-session-toast' ],
 				filemtime( $dir . '/assets/js/reading-list.js' ),
 				true
 			);

@@ -224,7 +224,6 @@ class Passiflore_Catalogue {
 	private function js_config( $atts, $counts ) {
 		return [
 			'ajax_url'         => admin_url( 'admin-ajax.php' ),
-			'nonce'            => wp_create_nonce( 'pf_catalogue' ),
 			'state'            => $this->state_from_atts( $atts ),
 			'counts'           => $counts,
 			'defaults'         => [ 'orderby' => 'date', 'order' => 'DESC', 'display' => 'covers', 'format' => '' ],
@@ -251,7 +250,8 @@ class Passiflore_Catalogue {
 	/* ─── AJAX endpoint ──────────────────────────────────────────── */
 
 	public function ajax_filter() {
-		check_ajax_referer( 'pf_catalogue', 'nonce' );
+		// Endpoint public en lecture seule : pas de nonce (aucun enjeu CSRF, et
+		// un nonce provoquerait un 403 sur un onglet ancien). Cf. recherche globale.
 
 		$atts = $this->default_atts();
 		foreach ( $this->state_from_atts( $atts ) as $k => $_ ) {

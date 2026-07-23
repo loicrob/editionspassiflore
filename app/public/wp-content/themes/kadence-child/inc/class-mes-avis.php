@@ -326,7 +326,7 @@ class Passiflore_Mes_Avis {
 		wp_enqueue_script(
 			'pf-mes-avis',
 			$uri . '/assets/js/mes-avis.js',
-			[],
+			[ 'pf-session-toast' ],
 			filemtime( $dir . '/assets/js/mes-avis.js' ),
 			true
 		);

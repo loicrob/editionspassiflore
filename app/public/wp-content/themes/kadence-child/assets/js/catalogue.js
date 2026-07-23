@@ -636,7 +636,6 @@
 
 			const fd = new FormData();
 			fd.append('action', 'pf_catalogue_filter');
-			fd.append('nonce',  config.nonce);
 			Object.entries(state).forEach(([k, v]) => fd.append(k, v == null ? '' : v));
 
 			fetch(config.ajax_url, { method: 'POST', body: fd, signal: abortCtrl.signal })

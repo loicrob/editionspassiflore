@@ -120,7 +120,7 @@ class Passiflore_Bookshelf {
 		wp_register_script(
 			'pf-shelf-bookmarks',
 			$theme_uri . '/assets/js/shelf-bookmarks.js',
-			[ 'pf-toast' ],
+			[ 'pf-toast', 'pf-session-toast' ],
 			filemtime( $theme_dir . '/assets/js/shelf-bookmarks.js' ),
 			true
 		);
@@ -194,9 +194,7 @@ class Passiflore_Bookshelf {
 		// date, most recent first.
 		if ( sanitize_key( $atts['orderby'] ) === 'hauteur' ) {
 			foreach ( $books as &$b ) {
-				$b['parution'] = function_exists( 'get_field' )
-					? (string) get_field( 'date_de_parution', $b['id'] )
-					: '';
+				$b['parution'] = (string) get_post_meta( $b['id'], 'date_de_parution', true );
 			}
 			unset( $b );
 			usort( $books, static function ( $a, $b ) {
@@ -646,21 +644,75 @@ class Passiflore_Bookshelf {
 			] ],
 		] );
 
-		// One representative per format_groupe.
-		$groupes       = get_terms( [
-			'taxonomy'   => 'format_groupe',
-			'hide_empty' => true,
-			'fields'     => 'ids',
-		] );
-		$representants = [];
-		if ( ! is_wp_error( $groupes ) ) {
-			foreach ( $groupes as $term_id ) {
-				$rep = self::get_group_representative( $term_id );
-				if ( $rep ) $representants[] = $rep;
+		// One representative per format_groupe — résolus en UNE requête
+		// (get_group_representatives_batch) au lieu d'un get_group_representative()
+		// par terme (jusqu'à 5 get_posts chacun). Même règle de sélection.
+		$representants = $this->get_group_representatives_batch();
+
+		return $cache = array_merge( $sans_groupe, $representants );
+	}
+
+	/**
+	 * Représentant de CHAQUE terme format_groupe, calculé en une seule requête,
+	 * en remplacement d'un appel get_group_representative() par terme. Réplique
+	 * exactement sa règle : édition classique (aucun terme pa_format_particulier)
+	 * d'abord, sinon par priorité grands-caracteres → poche → numerique → audio ;
+	 * à égalité, l'édition la plus récente (post_date DESC, comme le get_posts par
+	 * défaut). Un groupe sans représentant publié éligible est ignoré (identique
+	 * à l'ancien `if ( $rep )`).
+	 */
+	private function get_group_representatives_batch() {
+		global $wpdb;
+
+		// Toutes les appartenances format_groupe des produits publiés, avec le
+		// slug pa_format_particulier de chaque édition (NULL = classique).
+		$rows = $wpdb->get_results(
+			"SELECT gtt.term_id AS group_id, p.ID AS product_id, ft.slug AS format_slug
+			 FROM {$wpdb->term_relationships} gtr
+			 INNER JOIN {$wpdb->term_taxonomy} gtt
+				 ON gtt.term_taxonomy_id = gtr.term_taxonomy_id AND gtt.taxonomy = 'format_groupe'
+			 INNER JOIN {$wpdb->posts} p
+				 ON p.ID = gtr.object_id AND p.post_type = 'product' AND p.post_status = 'publish'
+			 LEFT JOIN {$wpdb->term_relationships} ftr
+				 ON ftr.object_id = p.ID
+			 LEFT JOIN {$wpdb->term_taxonomy} ftt
+				 ON ftt.term_taxonomy_id = ftr.term_taxonomy_id AND ftt.taxonomy = 'pa_format_particulier'
+			 LEFT JOIN {$wpdb->terms} ft
+				 ON ft.term_id = ftt.term_id
+			 ORDER BY p.post_date DESC, p.ID DESC"
+		);
+
+		// group_id => [ product_id => format_slug|'' ], ordre = post_date DESC.
+		$groups = [];
+		foreach ( $rows as $r ) {
+			$gid  = (int) $r->group_id;
+			$pid  = (int) $r->product_id;
+			$slug = (string) ( $r->format_slug ?? '' );
+			if ( ! isset( $groups[ $gid ][ $pid ] ) || ( $groups[ $gid ][ $pid ] === '' && $slug !== '' ) ) {
+				$groups[ $gid ][ $pid ] = $slug;
 			}
 		}
 
-		return $cache = array_merge( $sans_groupe, $representants );
+		$priority = [ 'grands-caracteres', 'poche', 'numerique', 'audio' ];
+		$reps     = [];
+		foreach ( $groups as $members ) {
+			$rep = 0;
+			// 1. Édition classique : aucun terme pa_format_particulier (slug vide).
+			foreach ( $members as $pid => $slug ) {
+				if ( $slug === '' ) { $rep = $pid; break; }
+			}
+			// 2. Sinon, par ordre de priorité de format.
+			if ( ! $rep ) {
+				foreach ( $priority as $want ) {
+					foreach ( $members as $pid => $slug ) {
+						if ( $slug === $want ) { $rep = $pid; break 2; }
+					}
+				}
+			}
+			if ( $rep ) $reps[] = (int) $rep;
+		}
+
+		return $reps;
 	}
 
 	/**
@@ -863,13 +915,39 @@ class Passiflore_Bookshelf {
 		$cover_size   = ( $is_hero || $display === 'spines' ) ? 'medium_large' : self::SHELF_COVER_SIZE;
 		$tranche_size = $is_hero ? 'large' : self::SHELF_SPINE_SIZE;
 
+		// Amorçage groupé des attachments (couvertures + tranches). Sans ça, les
+		// wp_get_attachment_image_url/_src de la boucle déclenchent 1-2 requêtes
+		// par image (les vignettes ne sont pas dans le cache de la requête
+		// produits) → N+1. Un seul _prime_post_caches charge posts + métas d'un
+		// coup ; les IDs eux-mêmes se lisent en cache (méta produit déjà amorcée).
+		$att_ids = [];
+		foreach ( $products as $post ) {
+			$tid = get_post_thumbnail_id( $post->ID );
+			if ( $tid ) $att_ids[] = (int) $tid;
+			$tranche = (int) get_post_meta( $post->ID, 'tranche', true );
+			if ( $tranche ) $att_ids[] = $tranche;
+		}
+		$att_ids = array_values( array_unique( $att_ids ) );
+		if ( $att_ids ) {
+			_prime_post_caches( $att_ids, false, true );
+		}
+
 		foreach ( $products as $post ) {
 			$product = wc_get_product( $post->ID );
 			if ( ! $product ) continue;
 
 			$thumb_id   = get_post_thumbnail_id( $post->ID );
-			$is_ereader = has_term( 'numerique', 'pa_format_particulier', $post->ID );
-			$is_cd      = has_term( 'audio', 'pa_format_particulier', $post->ID );
+
+			// Termes de format lus une seule fois, réutilisés pour is_ereader /
+			// is_cd ET le libellé de format plus bas (au lieu de 2 has_term +
+			// 1 get_the_terms). Le cache de termes des produits est déjà amorcé
+			// par la requête d'étagère (update_post_term_cache).
+			$format_terms = get_the_terms( $post->ID, 'pa_format_particulier' );
+			$format_slugs = ( ! empty( $format_terms ) && ! is_wp_error( $format_terms ) )
+				? wp_list_pluck( $format_terms, 'slug' )
+				: [];
+			$is_ereader = in_array( 'numerique', $format_slugs, true );
+			$is_cd      = in_array( 'audio', $format_slugs, true );
 
 			if ( $is_ereader ) {
 				// Liseuse : hauteur d'appareil fixe, pas de tranche papier ni
@@ -914,8 +992,11 @@ class Passiflore_Bookshelf {
 				$height_mm = max( self::MIN_HEIGHT_MM, min( self::MAX_HEIGHT_MM, $height_mm ) );
 				$width_mm  = max( self::MIN_WIDTH_MM,  min( self::MAX_WIDTH_MM,  $width_mm ) );
 
-				$tranche_id = function_exists( 'get_field' ) ? (int) get_field( 'tranche', $post->ID ) : 0;
-				$pages      = function_exists( 'get_field' ) ? absint( get_field( 'nombre_de_pages', $post->ID ) ) : 0;
+				// Lecture directe en post meta : `tranche` (return_format=id) et
+				// `nombre_de_pages` stockent une valeur brute, le formatage SCF de
+				// get_field() est inutile ici (méta déjà en cache via la requête).
+				$tranche_id = (int) get_post_meta( $post->ID, 'tranche', true );
+				$pages      = absint( get_post_meta( $post->ID, 'nombre_de_pages', true ) );
 
 				$spine_mm    = 0;
 				$from_image  = false;
@@ -967,7 +1048,7 @@ class Passiflore_Bookshelf {
 			$is_aparaitre = ( 'a-paraitre' === get_post_meta( $post->ID, 'disponibilite', true ) );
 			$is_nouveaute = ( '1' === (string) get_post_meta( $post->ID, 'nouveaute', true ) );
 
-			$format_terms = get_the_terms( $post->ID, 'pa_format_particulier' );
+			// $format_terms déjà résolu en tête de boucle (cf. is_ereader/is_cd).
 			$format_label = ( ! empty( $format_terms ) && ! is_wp_error( $format_terms ) ) ? $format_terms[0]->name : 'Classique';
 
 			// Prix : on supprime les centimes quand ils valent zéro (12,00 € → 12 €).

@@ -24,11 +24,24 @@ add_action( 'wp_enqueue_scripts', 'child_theme_configurator_css', 10 );
 // END ENQUEUE PARENT ACTION
 
 function passiflore_enqueue_auteurs_styles() {
+    // Helper « session expirée » (toast de reprise après un 403 de nonce),
+    // au-dessus du composant toast global pf-toast (enregistré site-wide par
+    // Passiflore_Bookshelf). Enregistré ici, tiré à la demande par les scripts
+    // des endpoints à nonce qui le déclarent en dépendance (newsletter, panier,
+    // mes-avis).
+    wp_register_script(
+        'pf-session-toast',
+        get_stylesheet_directory_uri() . '/assets/js/pf-session-toast.js',
+        [ 'pf-toast' ],
+        filemtime( get_stylesheet_directory() . '/assets/js/pf-session-toast.js' ),
+        true
+    );
+
     // Newsletter : CSS fusionné dans style.css (site-wide) — seul le JS reste dédié.
     wp_enqueue_script(
         'pf-newsletter',
         get_stylesheet_directory_uri() . '/assets/js/newsletter.js',
-        [],
+        [ 'pf-session-toast' ],
         filemtime( get_stylesheet_directory() . '/assets/js/newsletter.js' ),
         true
     );

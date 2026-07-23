@@ -13,7 +13,7 @@
     position: relative;
     display: flex;
     flex-direction: column;
-    min-height: max(520px, calc(100dvh - var(--pf-sticky-offset, 0px)));
+    min-height: max(520px, calc(100svh - var(--pf-sticky-offset, 0px)));
     overflow: hidden;
 }
 
@@ -400,7 +400,7 @@
 
 @media ( min-width: 769px ) {
     .pf-hero {
-        height: calc(100dvh - var(--pf-sticky-offset, 0px));
+        height: calc(100svh - var(--pf-sticky-offset, 0px));
         min-height: 520px;
     }
 
@@ -413,7 +413,7 @@
            container gère déjà les bords extérieurs. Valeur = somme des deux
            anciens paddings latéraux (2.5rem + 2.5rem), pour un espacement
            visuel inchangé. */
-        gap: var(--pf-space-20);
+        gap: var(--pf-space-5);
     }
 
     .pf-hero-haut {
@@ -452,6 +452,12 @@
         /* height: 100%; */
         min-height: 0;
         overflow: hidden;
+        /* Sur écran très haut, accueil.js (initActualiteFit) réduit la boîte du
+           carousel à la hauteur de la carte (+ réserve des flèches/pagination) au
+           lieu de la laisser remplir toute la colonne : justify-content:center
+           recentre alors cette boîte plus courte au milieu de la colonne, pour que
+           les flèches suivent la carte au lieu d'être collées tout en bas. */
+        justify-content: center;
     }
 }
 
@@ -969,23 +975,6 @@ Workaround: stack two pseudo-elements. ::before is the base gradient (always vis
 }
 .pf-bookshelf-intro.pf-bookshelf--covers .pf-book--ereader .pf-book-cover {
     animation: none;
-}
-
-/* ── 4. Contact ─────────────────────────────────────────────────────────────── */
-
-.pf-contact-section {
-    background: var(--pf-cream-dark);
-    padding-bottom: 4rem;
-    min-height: calc(100dvh - var(--pf-sticky-offset, 0px));
-}
-
-.pf-contact-contenu {
-    max-width: 760px;
-    margin: 0 auto;
-    padding: 1.5rem 2rem 0;
-    font-size: 0.95rem;
-    line-height: 1.75;
-    color: var(--pf-text);
 }
 
 /* ── 6. Responsive ──────────────────────────────────────────────────────────── */

@@ -68,7 +68,6 @@ class Passiflore_Events_Feed {
 		);
 		wp_localize_script( 'pf-events-infinite', 'PassifloreEventsFeed', [
 			'ajax_url' => admin_url( 'admin-ajax.php' ),
-			'nonce'    => wp_create_nonce( 'pf_events_feed' ),
 		] );
 		wp_enqueue_script(
 			'pf-events-month',
@@ -110,7 +109,8 @@ class Passiflore_Events_Feed {
 	/* ─── Endpoint AJAX ──────────────────────────────────────────── */
 
 	public function ajax_feed() {
-		check_ajax_referer( 'pf_events_feed', 'nonce' );
+		// Endpoint public en lecture seule : pas de nonce (aucun enjeu CSRF, et
+		// un nonce provoquerait un 403 sur un onglet ancien). Cf. recherche globale.
 
 		$url       = isset( $_POST['url'] ) ? esc_url_raw( wp_unslash( $_POST['url'] ) ) : '';
 		$direction = ( ( $_POST['direction'] ?? 'next' ) === 'prev' ) ? 'prev' : 'next';

@@ -77,7 +77,15 @@
 			fd.append( 'with_shelf', '1' );
 		}
 		return fetch( pfBookmarks.ajax_url, { method: 'POST', body: fd, credentials: 'same-origin' } )
-			.then( function ( r ) { return r.json(); } )
+			.then( function ( r ) {
+				// 403 = nonce périmé : on le marque pour que commit() lève le toast.
+				if ( r.status === 403 ) {
+					var e = new Error( 'session' );
+					e.pfSession = true;
+					throw e;
+				}
+				return r.json();
+			} )
 			.then( function ( payload ) {
 				if ( ! payload || ! payload.success ) {
 					throw new Error( 'toggle failed' );
@@ -153,11 +161,16 @@
 				if ( rebuild && pending === 0 && typeof data.shelf_html === 'string' ) {
 					applyShelf( data.shelf_html );
 				}
-			}, function () {
+			}, function ( err ) {
 				if ( ! st( id ).pendingRemove ) {
 					setIcon( id, ! intended ); // revert au dernier état connu
 				}
 				pending--;
+				// Nonce périmé : toast de session (mode confirm : pas d'auto-reload,
+				// on ne yanke pas une page d'étagère en cours de navigation).
+				if ( err && err.pfSession && window.pfSessionExpired ) {
+					window.pfSessionExpired( { mode: 'confirm' } );
+				}
 			} ).then( function () { s.inFlight = false; } );
 		} );
 	}

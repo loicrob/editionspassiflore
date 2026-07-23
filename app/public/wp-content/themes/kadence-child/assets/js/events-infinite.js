@@ -163,7 +163,6 @@
 			var st = direction === 'prev' ? up : down;
 			var fd = new FormData();
 			fd.append('action', 'pf_events_feed');
-			fd.append('nonce', cfg.nonce);
 			fd.append('direction', direction);
 			fd.append('url', st.cursor);
 
