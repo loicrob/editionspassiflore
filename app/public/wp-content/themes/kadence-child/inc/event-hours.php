@@ -315,7 +315,7 @@ add_action( 'admin_enqueue_scripts', function ( $hook ) {
 		'pf-event-hours',
 		get_stylesheet_directory_uri() . '/assets/js/event-hours.js',
 		[ 'jquery' ],
-		'1.0.0',
+		filemtime( get_stylesheet_directory() . '/assets/js/event-hours.js' ),
 		true
 	);
 	wp_localize_script( 'pf-event-hours', 'pfEH', [

@@ -79,6 +79,21 @@ function pf_date_icon_svg() {
 }
 
 /**
+ * date_i18n() avec le jour du mois en ordinal ("1er", "er" en exposant HTML) quand le
+ * 1er du mois tombe sur $timestamp. $format doit contenir un jeton "j" isolé (jour sans
+ * zéro) ; les autres jetons sont traités normalement par date_i18n(). Retourne du HTML
+ * (échappé en interne) — l'appelant ne doit pas ré-échapper la valeur retournée.
+ */
+function pf_date_i18n_ordinal( string $format, int $timestamp ): string {
+    if ( (int) date( 'j', $timestamp ) !== 1 || strpos( $format, 'j' ) === false ) {
+        return esc_html( date_i18n( $format, $timestamp ) );
+    }
+    $placeholder = "\x1F";
+    $formatted   = date_i18n( str_replace( 'j', $placeholder, $format ), $timestamp );
+    return str_replace( $placeholder, '1<sup>er</sup>', esc_html( $formatted ) );
+}
+
+/**
  * Nom + ville (+ département entre parenthèses) du lieu d'un événement, pour la ligne
  * meta "Lieu" partagée par les tiles (liste/recherche) et les cards événement.
  */
@@ -105,7 +120,7 @@ function pf_get_event_venue_parts( int $event_id ): array {
  * avec l'icône. Partagée par les cards événement (Passiflore_Event_Tiles) et le bloc
  * meta des tiles liste/recherche (passiflore_render_event_card_meta).
  */
-function pf_render_meta_row( string $icon_svg, string $main, string $sub = '', string $modifier = '' ): string {
+function pf_render_meta_row( string $icon_svg, string $main, string $sub = '', string $modifier = '', bool $main_is_raw_html = false ): string {
     if ( $main === '' && $sub === '' ) return '';
     $row_class = 'pf-event-card-meta-row pf-event-card-meta-row--nolabel'
         . ( $modifier !== '' ? ' pf-event-card-meta-row--' . $modifier : '' );
@@ -114,7 +129,7 @@ function pf_render_meta_row( string $icon_svg, string $main, string $sub = '', s
     <p class="<?php echo esc_attr( $row_class ); ?>">
         <span class="pf-event-card-meta-icon"><?php echo $icon_svg; // phpcs:ignore WordPress.Security.EscapeOutput — SVG interne de confiance ?></span>
         <span class="pf-card-text">
-            <span class="pf-event-card-meta-name"><?php echo esc_html( $main ); ?></span>
+            <span class="pf-event-card-meta-name"><?php echo $main_is_raw_html ? $main : esc_html( $main ); // phpcs:ignore WordPress.Security.EscapeOutput — pré-échappé par l'appelant (pf_date_i18n_ordinal) quand $main_is_raw_html ?></span>
             <?php if ( $sub !== '' ) : ?>
             <span class="pf-event-card-meta-sub"><?php echo esc_html( $sub ); ?></span>
             <?php endif; ?>
@@ -319,11 +334,11 @@ function passiflore_render_event_hours( $event_id ) {
 	echo '<div class="pf-event-horaires">';
 	echo '<ul class="pf-event-horaires-liste">';
 	foreach ( $hours as $ymd => $h ) {
-		$label = ucfirst( date_i18n( 'l j F', (int) strtotime( (string) $ymd ) ) );
+		$label = ucfirst( pf_date_i18n_ordinal( 'l j F', (int) strtotime( (string) $ymd ) ) ); // déjà échappé (avec <sup> brut pour "1er")
 		$slot  = ! empty( $h['closed'] ) ? 'Fermé' : pf_event_day_slot_label( $h );
 		if ( '' === $slot ) $slot = '—';
 		$closed_cls = ! empty( $h['closed'] ) ? ' is-closed' : '';
-		echo '<li class="pf-event-horaire' . $closed_cls . '"><span class="pf-eh-jour">' . esc_html( $label ) . '</span><span class="pf-eh-creneau">' . esc_html( $slot ) . '</span></li>';
+		echo '<li class="pf-event-horaire' . $closed_cls . '"><span class="pf-eh-jour">' . $label . '</span><span class="pf-eh-creneau">' . esc_html( $slot ) . '</span></li>'; // phpcs:ignore WordPress.Security.EscapeOutput — $label pré-échappé
 	}
 	echo '</ul>';
 	echo '</div>';
@@ -358,15 +373,15 @@ add_filter( 'tribe_events_event_schedule_details', function ( $schedule, $event_
 	$annee_debut = (int) date( 'Y', $start_ts );
 
 	if ( ! $multi_jour ) {
-		$str = ucfirst( date_i18n( 'l j F', $start_ts ) ) . ( $annee_debut !== $cur_annee ? ' ' . $annee_debut : '' );
+		$str = ucfirst( pf_date_i18n_ordinal( 'l j F', $start_ts ) ) . ( $annee_debut !== $cur_annee ? ' ' . $annee_debut : '' );
 	} else {
 		$annee_fin = (int) date( 'Y', $eff_end_ts );
 		if ( $annee_debut !== $annee_fin ) {
-			$str = 'Du ' . date_i18n( 'j F Y', $start_ts ) . ' au ' . date_i18n( 'j F Y', $eff_end_ts );
+			$str = 'Du ' . pf_date_i18n_ordinal( 'j F Y', $start_ts ) . ' au ' . pf_date_i18n_ordinal( 'j F Y', $eff_end_ts );
 		} elseif ( date( 'm', $start_ts ) !== date( 'm', $eff_end_ts ) ) {
-			$str = 'Du ' . date_i18n( 'j F', $start_ts ) . ' au ' . date_i18n( 'j F', $eff_end_ts ) . ( $annee_debut !== $cur_annee ? ' ' . $annee_debut : '' );
+			$str = 'Du ' . pf_date_i18n_ordinal( 'j F', $start_ts ) . ' au ' . pf_date_i18n_ordinal( 'j F', $eff_end_ts ) . ( $annee_debut !== $cur_annee ? ' ' . $annee_debut : '' );
 		} else {
-			$str = 'Du ' . date_i18n( 'j', $start_ts ) . ' au ' . date_i18n( 'j F', $eff_end_ts ) . ( $annee_debut !== $cur_annee ? ' ' . $annee_debut : '' );
+			$str = 'Du ' . pf_date_i18n_ordinal( 'j', $start_ts ) . ' au ' . pf_date_i18n_ordinal( 'j F', $eff_end_ts ) . ( $annee_debut !== $cur_annee ? ' ' . $annee_debut : '' );
 		}
 	}
 
@@ -389,7 +404,9 @@ add_filter( 'tribe_events_event_schedule_details', function ( $schedule, $event_
 		}
 	}
 
-	return $before . '<span class="tribe-event-date-start">' . esc_html( $str ) . '</span>' . $after;
+	// $str est déjà sûr : segments date pré-échappés par pf_date_i18n_ordinal() (avec <sup> brut
+	// pour "1er"), reste = chaînes FR en dur + nombres → pas de ré-échappement (écraserait le <sup>).
+	return $before . '<span class="tribe-event-date-start">' . $str . '</span>' . $after;
 }, 10, 4 );
 
 /**
@@ -658,15 +675,15 @@ class Passiflore_Event_Tiles {
         $annee_debut = $ts ? (int) date( 'Y', $ts ) : 0;
 
         if ( ! $multi_jour ) {
-            $date_txt = $ts ? date_i18n( 'j F', $ts ) . ( $annee_debut !== $cur_annee ? ' ' . $annee_debut : '' ) : '';
+            $date_txt = $ts ? pf_date_i18n_ordinal( 'j F', $ts ) . ( $annee_debut !== $cur_annee ? ' ' . $annee_debut : '' ) : '';
         } else {
             $annee_fin = (int) date( 'Y', $eff_end_ts );
             if ( $annee_debut !== $annee_fin ) {
-                $date_txt = date_i18n( 'j F Y', $ts ) . ' - ' . date_i18n( 'j F Y', $eff_end_ts );
+                $date_txt = pf_date_i18n_ordinal( 'j F Y', $ts ) . ' - ' . pf_date_i18n_ordinal( 'j F Y', $eff_end_ts );
             } elseif ( date( 'm', $ts ) !== date( 'm', $eff_end_ts ) ) {
-                $date_txt = date_i18n( 'j F', $ts ) . ' - ' . date_i18n( 'j F', $eff_end_ts ) . ( $annee_debut !== $cur_annee ? ' ' . $annee_debut : '' );
+                $date_txt = pf_date_i18n_ordinal( 'j F', $ts ) . ' - ' . pf_date_i18n_ordinal( 'j F', $eff_end_ts ) . ( $annee_debut !== $cur_annee ? ' ' . $annee_debut : '' );
             } else {
-                $date_txt = date_i18n( 'j', $ts ) . '-' . date_i18n( 'j F', $eff_end_ts ) . ( $annee_debut !== $cur_annee ? ' ' . $annee_debut : '' );
+                $date_txt = pf_date_i18n_ordinal( 'j', $ts ) . '-' . pf_date_i18n_ordinal( 'j F', $eff_end_ts ) . ( $annee_debut !== $cur_annee ? ' ' . $annee_debut : '' );
             }
         }
 
@@ -690,7 +707,7 @@ class Passiflore_Event_Tiles {
             $heure_line = 'journée entière';
         }
 
-        $date_row = $ts ? pf_render_meta_row( pf_date_icon_svg(), $date_txt, $heure_line ) : '';
+        $date_row = $ts ? pf_render_meta_row( pf_date_icon_svg(), $date_txt, $heure_line, '', true ) : '';
 
         ob_start();
         ?>

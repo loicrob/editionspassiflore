@@ -338,6 +338,11 @@
 	// droite). Près d'un bord — typiquement le scroll horizontal — on le
 	// rentre via --hover-dx / --hover-dy pour que rien ne soit coupé.
 	function setupHoverShift(book) {
+		// Idempotent : init() peut être rappelée après une reconstruction
+		// partielle (ex. étagère « Ma liste de lecture » du compte) et
+		// balaie tous les .pf-book, y compris ceux déjà câblés.
+		if (book._pfHoverWired) return;
+		book._pfHoverWired = true;
 		book.addEventListener('mouseenter', function () {
 			var shelf = book.closest('.pf-shelf');
 			if (!shelf) return;
@@ -377,6 +382,8 @@
 	/* ─── Reveal spines ───────────────────────────────────────────── */
 
 	function setupSpineBook(book) {
+		if (book._pfSpineWired) return;   // idempotent (cf. setupHoverShift)
+		book._pfSpineWired = true;
 		var coverReady  = false;   // image has loaded (or failed)
 		var loadStarted = false;   // we've already triggered the fetch
 		var hoverActive = false;   // pointer/focus currently on the book
@@ -384,6 +391,7 @@
 		var loadTimer   = null;    // pending fetch-start setTimeout id
 		var revealTimer = null;    // pending reveal setTimeout id
 		var touchIntent = false;   // last interaction began with a touch
+		var overReco    = false;   // pointer currently on the reco badge/explanation
 
 		function clearLoad() {
 			if (loadTimer !== null) {
@@ -405,7 +413,7 @@
 		// the user leaves before the timer fires) nothing happens.
 		function attemptReveal() {
 			clearReveal();
-			if (!hoverActive || !coverReady) return;
+			if (!hoverActive || !coverReady || overReco) return;
 			var elapsed   = Date.now() - hoverStart;
 			var remaining = Math.max(0, REVEAL_DELAY_MS - elapsed);
 			revealTimer = setTimeout(function () {
@@ -457,6 +465,7 @@
 
 		function onLeave() {
 			hoverActive = false;
+			overReco    = false;
 			// Cancel any pending fetch that hasn't fired yet — the user
 			// moved off before committing. Once `startCoverLoad` has
 			// actually set `img.src`, browsers can't reliably abort the
@@ -473,6 +482,26 @@
 		book.addEventListener('focusin',    onEnter);
 		book.addEventListener('mouseleave', onLeave);
 		book.addEventListener('focusout',   onLeave);
+
+		// Le badge de recommandation (« ? ») flotte au-dessus du dos mais reste un
+		// descendant du livre → sans ça, s'en approcher révélerait la couverture
+		// (et le fondu du badge le rendrait alors incliquable). On suspend la
+		// révélation tant que le pointeur est sur le badge/l'explication, et on la
+		// reprend dès qu'il revient sur le dos. `mouseover` bubble et précède
+		// `mouseenter`, donc overReco est posé avant qu'onEnter ne tente de révéler.
+		book.addEventListener('mouseover', function (e) {
+			var onReco = !! (e.target.closest && e.target.closest('.pf-book-reco'));
+			if (onReco === overReco) return;
+			overReco = onReco;
+			if (overReco) {
+				clearReveal();
+				book.classList.remove('pf-book--cover-revealed');
+			} else if (hoverActive) {
+				hoverStart = Date.now();
+				scheduleCoverLoad();
+				attemptReveal();
+			}
+		});
 
 		// Tactile : le 1er tap saisit le livre (et annule la navigation),
 		// le 2e tap — livre déjà ouvert — suit le lien.
@@ -507,8 +536,10 @@
 	// mode only once the cover has been revealed (so the angle doesn't
 	// jump around during the initial pull-out).
 	function setupCursorReveal(book) {
+		if (book._pfCursorWired) return;   // idempotent (cf. setupHoverShift)
 		var cover = book.querySelector('.pf-book-cover');
 		if (!cover) return;
+		book._pfCursorWired = true;
 
 		function onMove(e) {
 			var rect = cover.getBoundingClientRect();

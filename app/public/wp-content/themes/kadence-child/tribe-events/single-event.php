@@ -49,7 +49,7 @@ $event_id = Tribe__Events__Main::postIdHelper( get_the_ID() );
 					</div>
 				</div>
 
-				<?php $thumb = get_the_post_thumbnail( $event_id, 'large', [ 'class' => 'pf-event-hero__img', 'alt' => '' ] ); ?>
+				<?php $thumb = get_the_post_thumbnail( $event_id, 'large', [ 'class' => 'pf-event-hero__img', 'alt' => '', 'sizes' => '(max-width: 1023px) 100vw, 40vw' ] ); ?>
 				<?php if ( $thumb ) : ?>
 					<div class="pf-event-hero__media"><div class="pf-event-hero__media-inner"><?php echo $thumb; // phpcs:ignore WordPress.Security.EscapeOutput ?></div></div>
 				<?php endif; ?>

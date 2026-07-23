@@ -42,18 +42,13 @@ function pf_beta_bugs_connus() {
 	return [
 		'Temps de chargement parfois assez longs',
 		'Si le menu du haut (celui avec le logo Passiflore) ne reste pas collé au haut de l’écran, merci de m’envoyer un SMS, c’est déjà arrivé et je n’ai pas réussi à reproduire le bug',
-		'Accueil : alignements et interactions logo rond, "Editions Passiflore" et "En toute indépendance…"',
-		'Accueil : bordures latérales slides actualités',
 		'Accueil : titres "En ce moment…", "Événements à venir" etc. un peu moches',
 		'Sur mobile, pour les étagères en général, pas assez d’espaces autour des livres au sein des étagères',
 		'Événements : bordure rouge quand on clique sur un événement',
-		'"Mon compte" : design pas top pour afficher les explications de pourquoi les livres sont suggérés (dans Liste de lecture) ; cf. "Choses prévues"',
 		'"Mon compte" : design pas top des adresses',
 		'Sur mobile, design pas top des "petits" sous-menus dans la page d’un livre, d’un événement et de "Mon compte"',
 		'Design pas top pages de connexion, de panier, commande et commande passée',
 		'Il peut y avoir des marges blanches en haut et en bas de couverture des formats numériques',
-		'Zoom quand on clique sur une zone de texte sur mobile',
-		'Marges latérales page d’un auteur sur mobile',
 	];
 }
 
@@ -65,10 +60,29 @@ function pf_beta_bugs_connus() {
  */
 function pf_beta_choses_prevues() {
 	return [
-		'"Mon compte" : enlever le tableau de bord, arrivée directement sur "Liste de lecture"',
-		'"Mon compte" : expliquer suggestions (dans Liste de lecture) -> par défaut livres du plus récent au plus ancien, infos croisées de livres dans liste de lecture et/ou commandés remontent d’autres livres en rapport ; il est prévu d’ajouter les suggestions dans le sous-menu de "Découvrir" de la page Catalogue',
 		'CGU/CGV/Politique confidentialité/Mentions légales',
 		'Adapter les claviers mobiles et tablettes en fonction des champs textes'
+	];
+}
+
+/**
+ * Journal des mises à jour (textes temporaires — à modifier librement).
+ * Un bloc par date : 'date' (affichée au-dessus) + 'items' (liste des changements).
+ * Le HTML simple (<strong>, <em>, <a>) est autorisé dans les items.
+ * L'ordre d'affichage suit l'ordre du tableau (mettre la date la plus récente en premier).
+ *
+ * @return array<int, array{date:string, items:string[]}>
+ */
+function pf_beta_mises_a_jour() {
+	return [
+		[
+			'date'  => '23 juillet 2026 - 16h',
+			'items' => [
+				'"Mon compte" : suggestions en page d’accueil, possibilité d’ajouter directement des livres dans la liste de lecture, affichage du catalogue sous la liste de lecture',
+				'Amélioration de l’affichage du haut de la page d’accueil',
+				'Optimisation des images, devrait donner un gain de vitesse de chargement des pages',
+			],
+		],
 	];
 }
 
@@ -122,6 +136,24 @@ function pf_beta_banner_render() {
 		$planned .= '<li>' . wp_kses( $plan, [ 'strong' => [], 'em' => [], 'b' => [], 'i' => [], 'a' => [ 'href' => [], 'target' => [], 'rel' => [] ] ] ) . '</li>';
 	}
 
+	// Mises à jour → blocs « date + liste » (HTML simple autorisé dans les items).
+	$updates = '';
+	foreach ( pf_beta_mises_a_jour() as $maj ) {
+		$date  = isset( $maj['date'] ) ? trim( $maj['date'] ) : '';
+		$items = ( isset( $maj['items'] ) && is_array( $maj['items'] ) ) ? $maj['items'] : [];
+		if ( '' === $date && ! $items ) {
+			continue;
+		}
+		if ( '' !== $date ) {
+			$updates .= '<p class="pf-beta-bugs-intro pf-beta-date">' . esc_html( $date ) . '</p>';
+		}
+		$updates .= '<ul class="pf-beta-bugs">';
+		foreach ( $items as $it ) {
+			$updates .= '<li>' . wp_kses( $it, [ 'strong' => [], 'em' => [], 'b' => [], 'i' => [], 'a' => [ 'href' => [], 'target' => [], 'rel' => [] ] ] ) . '</li>';
+		}
+		$updates .= '</ul>';
+	}
+
 	// Bandeau sticky (état déplié).
 	echo <<<'HTML'
 <div class="pf-beta-banner" role="region" aria-label="Version bêta du site">
@@ -138,6 +170,7 @@ HTML;
 	<div class="pf-beta-tabs" role="tablist" aria-label="Sections">
 		<button type="button" class="pf-beta-tab is-active" id="pf-beta-tab-welcome" role="tab" aria-selected="true" aria-controls="pf-beta-panel-welcome" data-tab="welcome">Bienvenue</button>
 		<button type="button" class="pf-beta-tab" id="pf-beta-tab-bugs" role="tab" aria-selected="false" aria-controls="pf-beta-panel-bugs" data-tab="bugs">Problèmes connus</button>
+		<button type="button" class="pf-beta-tab" id="pf-beta-tab-updates" role="tab" aria-selected="false" aria-controls="pf-beta-panel-updates" data-tab="updates">Mises à jour</button>
 	</div>
 	<div class="pf-beta-scroll">
 	<div class="pf-beta-tabpanel is-active" id="pf-beta-panel-welcome" role="tabpanel" aria-labelledby="pf-beta-tab-welcome" data-panel="welcome">
@@ -153,6 +186,9 @@ HTML;
 		<ul class="pf-beta-bugs">$bugs</ul>
 		<p class="pf-beta-bugs-intro">Choses prévues :</p>
 		<ul class="pf-beta-bugs">$planned</ul>
+	</div>
+	<div class="pf-beta-tabpanel" id="pf-beta-panel-updates" role="tabpanel" aria-labelledby="pf-beta-tab-updates" data-panel="updates" hidden>
+		$updates
 	</div>
 	</div><!-- /.pf-beta-scroll -->
 </div><!-- /.pf-beta-pop -->

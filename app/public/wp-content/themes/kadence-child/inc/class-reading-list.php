@@ -7,8 +7,8 @@ if ( ! defined( 'ABSPATH' ) ) exit;
  * Permet à un client connecté d'enregistrer des livres pour plus tard.
  *
  * - Bouton toggle sur la fiche livre (rendu par render_button()).
- * - Section dédiée dans « Mon compte » (endpoint /liste-lecture), affichée
- *   via l'étagère 3D [passiflore_etagere].
+ * - Endpoint « Mon compte » /liste-de-lecture : étagère 3D « Ma liste de
+ *   lecture » (render_shelf(), masquée si vide) puis une étagère « Catalogue ».
  *
  * Stockage : user meta `_pf_reading_list` = tableau d'IDs produit.
  * Réservé aux utilisateurs connectés (pas de variante invité).
@@ -18,21 +18,26 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 class Passiflore_Reading_List {
 
 	const META_KEY      = '_pf_reading_list';
-	const ENDPOINT      = 'liste-lecture';
 	const NONCE         = 'pf_reading_list';
+	const ENDPOINT      = 'liste-de-lecture';
 	const FLUSH_OPTION  = 'pf_rl_endpoint_v';
-	const FLUSH_VERSION = '1';
+	const FLUSH_VERSION = '3';
 	const ICON_ADD_PATH    = 'm480-240-168 72q-40 17-76-6.5T200-241v-519q0-33 23.5-56.5T280-840h200q17 0 28.5 11.5T520-800q0 17-11.5 28.5T480-760H280v518l200-86 200 86v-238q0-17 11.5-28.5T720-520q17 0 28.5 11.5T760-480v239q0 43-36 66.5t-76 6.5l-168-72Zm0-520H280h240-40Zm200 80h-40q-17 0-28.5-11.5T600-720q0-17 11.5-28.5T640-760h40v-40q0-17 11.5-28.5T720-840q17 0 28.5 11.5T760-800v40h40q17 0 28.5 11.5T840-720q0 17-11.5 28.5T800-680h-40v40q0 17-11.5 28.5T720-600q-17 0-28.5-11.5T680-640v-40Z';
 	const ICON_REMOVE_PATH = 'M640-680q-17 0-28.5-11.5T600-720q0-17 11.5-28.5T640-760h160q17 0 28.5 11.5T840-720q0 17-11.5 28.5T800-680H640ZM480-240l-168 72q-40 17-76-6.5T200-241v-519q0-33 23.5-56.5T280-840h200q17 0 28.5 11.5T520-800q0 17-11.5 28.5T480-760H280v518l200-86 200 86v-238q0-17 11.5-28.5T720-520q17 0 28.5 11.5T760-480v239q0 43-36 66.5t-76 6.5l-168-72Zm0-520H280h240-40Z';
 
 	public function __construct() {
-		add_action( 'init', [ $this, 'add_endpoint' ] );
 		add_action( 'init', [ $this, 'maybe_flush' ], 99 );
-		add_filter( 'query_vars', [ $this, 'add_query_var' ], 0 );
-		add_filter( 'woocommerce_account_menu_items', [ $this, 'add_menu_item' ] );
-		add_action( 'woocommerce_account_' . self::ENDPOINT . '_endpoint', [ $this, 'render_account' ] );
 		add_action( 'wp_ajax_pf_reading_list_toggle', [ $this, 'ajax_toggle' ] );
 		add_action( 'wp_enqueue_scripts', [ $this, 'enqueue_assets' ] );
+
+		// Endpoint « Mon compte » /liste-de-lecture. En passant par le filtre WC
+		// `woocommerce_get_query_vars`, WooCommerce enregistre lui-même la règle
+		// de réécriture (add_rewrite_endpoint) ET reconnaît l'endpoint pour la
+		// détection de l'onglet actif (is_wc_endpoint_url /
+		// wc_is_current_account_menu_item) — indispensable à la nav .pf-sectionnav.
+		add_filter( 'woocommerce_get_query_vars', [ $this, 'add_query_var' ] );
+		add_filter( 'woocommerce_account_menu_items', [ $this, 'add_menu_item' ] );
+		add_action( 'woocommerce_account_' . self::ENDPOINT . '_endpoint', [ $this, 'render_account' ] );
 	}
 
 	/* ─── Stockage ───────────────────────────────────────────────── */
@@ -117,8 +122,19 @@ class Passiflore_Reading_List {
 		}
 
 		$user_id = get_current_user_id();
-		$ids     = self::get_ids( $user_id );
-		$pos     = array_search( $product_id, $ids, true );
+
+		// Verrou consultatif MySQL : sérialise le read-modify-write de la meta
+		// pour un même utilisateur. Le front sérialise déjà ses requêtes ; ce
+		// verrou protège en plus des accès concurrents (multi-onglets) qui
+		// s'écraseraient sinon (lost update). Vidage du cache meta pour lire
+		// sous verrou la valeur fraîche laissée par une requête précédente.
+		global $wpdb;
+		$lock = 'pf_rl_' . $user_id;
+		$got  = (int) $wpdb->get_var( $wpdb->prepare( 'SELECT GET_LOCK(%s, %d)', $lock, 5 ) );
+
+		wp_cache_delete( $user_id, 'user_meta' );
+		$ids = self::get_ids( $user_id );
+		$pos = array_search( $product_id, $ids, true );
 
 		if ( $pos !== false ) {
 			unset( $ids[ $pos ] );
@@ -131,64 +147,125 @@ class Passiflore_Reading_List {
 
 		update_user_meta( $user_id, self::META_KEY, $ids );
 
-		wp_send_json_success( [ 'in_list' => $in, 'count' => count( $ids ) ] );
-	}
-
-	/* ─── Section « Mon compte » ─────────────────────────────────── */
-
-	public function render_account() {
-		$ids = array_values( array_filter( self::get_ids(), function ( $id ) {
-			$product = wc_get_product( $id );
-			return $product && $product->get_status() === 'publish';
-		} ) );
-
-		if ( empty( $ids ) ) {
-			printf(
-				'<div class="pf-readlist-empty"><p>%s</p><a class="button" href="%s">%s</a></div>',
-				esc_html( 'Votre liste de lecture est vide.' ),
-				esc_url( wc_get_page_permalink( 'shop' ) ),
-				esc_html( 'Parcourir le catalogue' )
-			);
-			if ( function_exists( 'pf_reco_render' ) ) {
-				echo '<section class="pf-reco"><h2 class="pf-titre-2">Nos suggestions pour vous</h2>' . pf_reco_render() . '</section>';
-			}
-			return;
+		if ( $got ) {
+			$wpdb->query( $wpdb->prepare( 'SELECT RELEASE_LOCK(%s)', $lock ) );
 		}
 
-		echo do_shortcode( '[passiflore_etagere ids="' . implode( ',', $ids ) . '" mode="scroll" show_price="true"]' );
+		$payload = [ 'in_list' => $in, 'count' => count( $ids ) ];
 
-		if ( function_exists( 'pf_reco_render' ) ) {
-			echo '<section class="pf-reco"><h2 class="pf-titre-2">Vous aimerez aussi</h2>' . pf_reco_render() . '</section>';
+		// La page /liste-de-lecture demande le HTML frais de la section « Ma liste
+		// de lecture » pour la reconstruire côté client (rendu depuis la meta déjà
+		// mise à jour → pas de course toggle→rebuild). Toujours non vide (étagère
+		// ou message d'état vide) → permutation par simple remplacement.
+		if ( ! empty( $_POST['with_shelf'] ) ) {
+			$payload['shelf_html'] = self::render_shelf();
 		}
+
+		wp_send_json_success( $payload );
 	}
 
-	/* ─── Endpoint + menu compte ─────────────────────────────────── */
+	/* ─── Endpoint « Mon compte » /liste-de-lecture ──────────────── */
 
-	public function add_endpoint() {
-		add_rewrite_endpoint( self::ENDPOINT, EP_ROOT | EP_PAGES );
-	}
-
+	/** Déclare la query var de l'endpoint via le mécanisme natif WooCommerce. */
 	public function add_query_var( $vars ) {
-		$vars[] = self::ENDPOINT;
+		$vars[ self::ENDPOINT ] = self::ENDPOINT;
 		return $vars;
 	}
 
-	/** Insère « Ma liste de lecture » juste après le tableau de bord. */
+	/**
+	 * Ajoute l'item « Liste de lecture » au menu du compte. Son positionnement
+	 * (juste sous « Accueil ») est fixé par pf_account_menu_reorder().
+	 */
 	public function add_menu_item( $items ) {
-		$new = [];
-		foreach ( $items as $key => $label ) {
-			$new[ $key ] = $label;
-			if ( 'dashboard' === $key ) {
-				$new[ self::ENDPOINT ] = 'Ma liste de lecture';
-			}
-		}
-		if ( ! isset( $new[ self::ENDPOINT ] ) ) {
-			$new = [ self::ENDPOINT => 'Ma liste de lecture' ] + $new;
-		}
-		return $new;
+		$items[ self::ENDPOINT ] = 'Liste de lecture';
+		return $items;
 	}
 
-	/** Flush des règles de réécriture une seule fois après l'ajout de l'endpoint. */
+	/**
+	 * Contenu de l'endpoint : l'étagère « Ma liste de lecture » (masquée si la
+	 * liste est vide) puis une étagère « Catalogue » (tout le catalogue, tri par
+	 * défaut, signets actifs) pour enrichir la liste sans quitter la page.
+	 */
+	public function render_account() {
+		$cat_display = function_exists( 'pf_shelf_display_pref' ) ? pf_shelf_display_pref( 'catalogue' ) : 'covers';
+		$switch      = function_exists( 'pf_shelf_display_switch' ) ? pf_shelf_display_switch( 'catalogue', $cat_display ) : '';
+		echo '<div class="pf-liste-lecture">';
+		echo self::render_shelf(); // phpcs:ignore WordPress.Security.EscapeOutput
+		echo '<section class="pf-reco pf-account-catalogue">'
+			. '<div class="pf-shelf-head"><h2 class="pf-titre-3">Catalogue</h2>' . $switch . '</div>'
+			. '<div class="pf-shelf-slot" data-pf-shelf-slot="catalogue">'
+			. do_shortcode( '[passiflore_etagere mode="shelves" display="' . $cat_display . '" show_price="true" show-bookmarks="true"]' )
+			. '</div>'
+			. '</section>'; // phpcs:ignore WordPress.Security.EscapeOutput
+		echo '</div>';
+	}
+
+	/**
+	 * Section « Ma liste de lecture », rendue en tête de l'endpoint
+	 * /liste-de-lecture. Liste vide (ou aucun livre publié) → message d'état
+	 * vide invitant à ajouter des signets ; sinon l'étagère 3D précédée du switch
+	 * d'affichage Couvertures | Dos (uniquement quand il y a une étagère). La
+	 * section porte TOUJOURS la classe .pf-account-reco--readlist (jamais de
+	 * chaîne vide) pour que shelf-bookmarks.js puisse permuter message ⇄ étagère
+	 * par simple remplacement après un toggle de signet (ajax_toggle + with_shelf).
+	 */
+	public static function render_shelf( $display = null ) {
+		// Sans affichage explicite (rendu initial de la page, reconstruction après
+		// un toggle de signet) → préférence mémorisée de l'utilisateur.
+		if ( null === $display ) {
+			$display = function_exists( 'pf_shelf_display_pref' ) ? pf_shelf_display_pref( 'readlist' ) : 'covers';
+		}
+		$ids     = self::published_list_ids();
+		$has     = ! empty( $ids );
+		$display = ( 'spines' === $display ) ? 'spines' : 'covers';
+
+		$inner  = $has ? self::shelf_shortcode( $ids, $display ) : self::empty_notice();
+		$switch = ( $has && function_exists( 'pf_shelf_display_switch' ) )
+			? pf_shelf_display_switch( 'readlist', $display )
+			: '';
+
+		return '<section class="pf-account-reco pf-reco pf-account-reco--readlist">'
+			. '<div class="pf-shelf-head"><h2 class="pf-titre-3">Ma liste de lecture</h2>' . $switch . '</div>'
+			. '<div class="pf-shelf-slot" data-pf-shelf-slot="readlist">' . $inner . '</div>'
+			. '</section>';
+	}
+
+	/**
+	 * Intérieur de la section (étagère ou message d'état vide), pour le re-rendu
+	 * AJAX du switch d'affichage (pf_shelf_display → recommendations.php).
+	 */
+	public static function render_shelf_inner( $display = 'covers' ) {
+		$ids     = self::published_list_ids();
+		$display = ( 'spines' === $display ) ? 'spines' : 'covers';
+		return empty( $ids ) ? self::empty_notice() : self::shelf_shortcode( $ids, $display );
+	}
+
+	/** IDs produit de la liste de lecture, filtrés aux produits publiés. */
+	private static function published_list_ids() {
+		return array_values( array_filter( self::get_ids(), function ( $id ) {
+			$product = wc_get_product( $id );
+			return $product && $product->get_status() === 'publish';
+		} ) );
+	}
+
+	/** Étagère 3D de la liste de lecture (couvertures ou dos). */
+	private static function shelf_shortcode( array $ids, $display ) {
+		return do_shortcode( '[passiflore_etagere ids="' . implode( ',', $ids ) . '" mode="shelves" display="' . $display . '" show_price="true" show-bookmarks="true"]' );
+	}
+
+	/** Message d'état vide (à la place de l'étagère). */
+	private static function empty_notice() {
+		return '<p class="pf-liste-lecture-empty">Votre liste de lecture est vide actuellement.<br>Vous pouvez <strong>mettre des marque-pages</strong> aux livres ci-dessous pour <strong>commencer à la remplir</strong>&nbsp;!</p>';
+	}
+
+	/* ─── Réécriture ─────────────────────────────────────────────── */
+
+	/**
+	 * Flush unique des règles de réécriture après (ré)enregistrement de
+	 * l'endpoint /liste-de-lecture. WooCommerce ajoute sa règle sur `init` ;
+	 * WordPress ne relit pas les règles ajoutées à chaud tant que le cache en
+	 * base existe → bumper FLUSH_VERSION force une régénération unique.
+	 */
 	public function maybe_flush() {
 		if ( get_option( self::FLUSH_OPTION ) !== self::FLUSH_VERSION ) {
 			flush_rewrite_rules( false );
@@ -199,9 +276,9 @@ class Passiflore_Reading_List {
 	/* ─── Assets ─────────────────────────────────────────────────── */
 
 	public function enqueue_assets() {
-		$is_product = is_product();
-		$is_account = function_exists( 'is_account_page' ) && is_account_page();
-		if ( ! $is_product && ! $is_account ) {
+		// Le bouton « Liste de lecture » ne vit que sur la fiche livre ;
+		// l'étagère de l'accueil du compte s'appuie sur bookshelf.css/account.css.
+		if ( ! is_product() ) {
 			return;
 		}
 
@@ -215,7 +292,7 @@ class Passiflore_Reading_List {
 			filemtime( $dir . '/assets/css/reading-list.css' )
 		);
 
-		if ( $is_product && is_user_logged_in() ) {
+		if ( is_user_logged_in() ) {
 			wp_enqueue_script(
 				'pf-reading-list',
 				$uri . '/assets/js/reading-list.js',

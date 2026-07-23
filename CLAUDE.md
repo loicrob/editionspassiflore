@@ -379,7 +379,8 @@ kadence-child/
 │       ├── list/event.php            — Vue liste : copie du cœur + classe `pf-card` + lien étiré `.pf-card-link` (carte cliquable)
 │       ├── list/event/date-tag.php   — Vue liste : date (jour complet + heures + planning par jour)
 │       ├── list/event/title.php      — Vue liste : titre non-lien + classe `pf-card-title`
-│       └── list/event/description.php — Vue liste : excerpt (a11y-hidden) + participants en texte simple (mode 'text')
+│       ├── list/event/description.php — Vue liste : excerpt (a11y-hidden) + participants en texte simple (mode 'text')
+│       └── list/event/featured-image.php — Vue liste : copie fidèle du core (@6.14.2) + SEUL AJOUT `sizes` (perf : sans lui, srcset défaut 100vw → plein format pour une image ≤360px)
 │
 ├── tribe-events/                    — TEC override CLASSIQUE (chemin distinct de tribe/events/v2/)
 │   └── single-event.php             — Fiche événement (single) : hero + sections via pf_render_sectionnav (inc/event-single.php) ; prev/next retirés, bloc meta natif (modules/meta) remplacé par nos sections
@@ -465,6 +466,15 @@ A 3D book-on-shelf display system.
 
 **Variable CSS globale partagée :**
 - `--pf-sticky-offset` — hauteur cumulée du ou des headers sticky Kadence + barre d'admin, en pixels. Calculée et tenue à jour (scroll + resize) par `assets/js/recherche-globale.js` (chargé sur toutes les pages). Les autres scripts (`catalogue.js`, `recherche-auteurs.js`, `accueil.js`) et les CSS (`catalogue.css`, `recherche-auteurs.css`, `accueil.css`) la consomment sans la recalculer. Valeur par défaut CSS : `0px`.
+
+**Tailles d'image servies (perf) :** l'étagère **générique** (catalogue ~300 livres, accueil, livres associés…) sert deux sous-tailles dédiées, **non-crop** (ratio préservé), enregistrées par `register_image_sizes()` (`add_image_size`, hook `after_setup_theme`) et choisies dans `prepare_books()` selon `$is_hero` :
+
+| Contexte | Couverture | Tranche |
+|---|---|---|
+| Étagère générique | `pf-shelf-cover` (400×600) | `pf-shelf-spine` (300×760) |
+| **Mode héros** (fiche livre, livre affiché bien plus grand) | `medium_large` (768) | `large` (1024) |
+
+Les tranches étant très étroites et hautes, c'est la **hauteur** qui contraint (760), la largeur suit le ratio (~30-90px) → poids minimal. Gain mesuré : couvertures d'étagère ≈ **17 % du poids** de `medium_large` (l'ancien `medium_large` retombait même sur l'original plein format quand l'upload faisait < 768px de large). ⚠️ **Gotcha** : `wp_get_attachment_image_url()` sur une sous-taille **non encore générée** retombe silencieusement sur l'**original plein format** (régression) → toute image déjà en médiathèque doit être régénérée après enregistrement d'une nouvelle taille (`wp_update_image_subsizes()` par pièce jointe, ou `wp media regenerate`). Les futurs imports les génèrent d'office. Le rendu (dimensions `width`/`height` dérivées des mm) est inchangé — seule la résolution source baisse.
 
 The bookshelf design is functional but not final — further visual refinement is planned.
 
@@ -591,6 +601,12 @@ open(path, 'wb').write(data)
 Vérifier ensuite que les U+2019 légitimes (apostrophes françaises dans du contenu de chaîne, ex. `l'événement`) ne sont pas touchés.
 
 **Règle :** après chaque Edit sur un fichier PHP, faire un `php -l` systématique.
+
+---
+
+## Gotcha — ne jamais tuer Chrome globalement pendant les tests visuels
+
+Les vérifications visuelles lancent des instances **Chrome headless** (CDP / `--screenshot`). **Ne JAMAIS** faire `pkill`/`killall` sur « Google Chrome » (ni aucun motif large) : le **navigateur GUI de l'utilisateur** — où il regarde le site en local — tourne sous le même nom et serait tué, l'obligeant à tout relancer. Chaque instance de test doit utiliser un `--user-data-dir` **et** un `--remote-debugging-port` **uniques**, et n'être arrêtée que par son propre lanceur (le script node tue le seul process enfant qu'il a spawné, par son PID). Pas de nettoyage « au nom » ; les instances headless se terminent d'elles-mêmes (kill ciblé du PID par le lanceur, ou `--virtual-time-budget`). Un `--user-data-dir` unique par run suffit à éviter tout conflit de profil/port, donc aucun `pkill` préalable n'est nécessaire.
 
 ---
 

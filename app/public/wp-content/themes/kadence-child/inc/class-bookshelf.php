@@ -17,6 +17,17 @@ class Passiflore_Bookshelf {
 	const MAX_WIDTH_MM      = 350;
 	const PASSIFLORE_RED    = '#c62836';
 	const COLOR_META_KEY    = '_pf_cover_color';
+	// Tailles d'image dédiées à l'étagère GÉNÉRIQUE (les ~300 livres du
+	// catalogue, servis × chaque visite / chaque filtre) à la place de
+	// medium_large (768) / large (1024) surdimensionnés. Non-crop → le ratio
+	// est préservé : indispensable pour les tranches, images très étroites et
+	// hautes (la hauteur est la dimension contraignante, la largeur suit).
+	// Calées sur le rendu réel : couverture ≤ ~420px de large / ~480px de haut
+	// (mode covers) ; tranche ≤ ~108px de large / ~720px de haut (mode spines).
+	// Le mode HÉROS (fiche livre, livre affiché bien plus grand) conserve
+	// medium_large / large — cf. prepare_books().
+	const SHELF_COVER_SIZE  = 'pf-shelf-cover'; // 400 × 600 (boîte englobante)
+	const SHELF_SPINE_SIZE  = 'pf-shelf-spine'; // 300 × 760 (boîte englobante)
 	// Les livres numériques sont rendus comme une liseuse posée sur
 	// l'étagère : hauteur d'appareil fixe, largeur dérivée du ratio de la
 	// couverture pour que l'écran l'affiche en entier, sans letterbox.
@@ -30,6 +41,14 @@ class Passiflore_Bookshelf {
 	const CD_HEIGHT_MM      = 125;
 	const CD_WIDTH_MM       = 142;
 	const CD_SPINE_MM       = 10;
+	// Icône « signet étoilé » (version sharp, coins droits) posée sur les
+	// couvertures quand show-bookmarks est actif (toggle « liste de lecture »).
+	// Tracés authorés en viewBox 0 -960 960 960 ; deux tracés superposés pour un
+	// signet PLEIN : silhouette (remplie + contour) puis étoile (couleur contrastée).
+	// Le SVG (bookmark_html()) recadre sur la bounding box du tracé (200 -840 560 720)
+	// ÉLARGIE d'une marge pour ne pas rogner le contour (stroke) qui déborde du path.
+	const BOOKMARK_BODY_PATH = 'M200-120v-720h560v720L480-240 200-120Z';
+	const BOOKMARK_STAR_PATH = 'm389-400 91-55 91 55-24-104 80-69-105-9-42-98-42 98-105 9 80 69-24 104Z';
 
 	/**
 	 * Annotations de recommandation, posées par pf_reco_render() le temps d'un
@@ -52,6 +71,20 @@ class Passiflore_Bookshelf {
 	public function __construct() {
 		add_shortcode( 'passiflore_etagere', [ $this, 'render_shortcode' ] );
 		add_action( 'wp_enqueue_scripts', [ $this, 'register_assets' ] );
+		add_action( 'after_setup_theme', [ $this, 'register_image_sizes' ] );
+	}
+
+	/**
+	 * Sous-tailles dédiées à l'étagère générique (cf. constantes SHELF_*_SIZE).
+	 * Non-crop : le ratio est préservé — pour une tranche (étroite et haute)
+	 * c'est la hauteur qui contraint, la largeur suit le ratio.
+	 * ⚠️ Les images déjà en médiathèque doivent être régénérées pour que ces
+	 * sous-tailles existent ; sinon wp_get_attachment_image_url() retombe sur
+	 * l'original PLEIN format (régression). Les futurs imports les génèrent.
+	 */
+	public function register_image_sizes() {
+		add_image_size( self::SHELF_COVER_SIZE, 400, 600, false );
+		add_image_size( self::SHELF_SPINE_SIZE, 300, 760, false );
 	}
 
 	/* ─── Frontend: Assets ───────────────────────────────────────── */
@@ -74,6 +107,57 @@ class Passiflore_Bookshelf {
 			filemtime( $theme_dir . '/assets/js/bookshelf.js' ),
 			true
 		);
+
+		// Composant Toast global + interaction des signets « liste de lecture ».
+		// Enregistrés ici, enqueués à la demande par enqueue_bookmark_assets().
+		wp_register_script(
+			'pf-toast',
+			$theme_uri . '/assets/js/pf-toast.js',
+			[],
+			filemtime( $theme_dir . '/assets/js/pf-toast.js' ),
+			true
+		);
+		wp_register_script(
+			'pf-shelf-bookmarks',
+			$theme_uri . '/assets/js/shelf-bookmarks.js',
+			[ 'pf-toast' ],
+			filemtime( $theme_dir . '/assets/js/shelf-bookmarks.js' ),
+			true
+		);
+	}
+
+	/**
+	 * Enqueue (une seule fois) le JS des signets sur couverture + le composant
+	 * toast, et localise `pfBookmarks`. Réutilise le nonce de Passiflore_Reading_List
+	 * (même endpoint pf_reading_list_toggle). Le CSS du signet vit dans bookshelf.css
+	 * (déjà enqueué) et celui du toast dans style.css (toujours chargé).
+	 */
+	private function enqueue_bookmark_assets() {
+		static $done = false;
+		if ( $done ) {
+			return;
+		}
+		$done = true;
+
+		wp_enqueue_script( 'pf-shelf-bookmarks' );
+		wp_localize_script( 'pf-shelf-bookmarks', 'pfBookmarks', [
+			'ajax_url'      => admin_url( 'admin-ajax.php' ),
+			'nonce'         => wp_create_nonce( Passiflore_Reading_List::NONCE ),
+			'toggle_action' => 'pf_reading_list_toggle',
+			// Vrai sur la page « Mon compte → Liste de lecture » : c'est là que se
+			// trouve l'étagère « Ma liste de lecture » à reconstruire après un toggle.
+			'rebuild_readlist' => (bool) ( function_exists( 'is_wc_endpoint_url' ) && class_exists( 'Passiflore_Reading_List' ) && is_wc_endpoint_url( Passiflore_Reading_List::ENDPOINT ) ),
+			'strings'       => [
+				'tip_add'    => 'Ajouter à ma liste de lecture',
+				'tip_remove' => 'Retirer de ma liste de lecture',
+				/* translators: %s = titre du livre (déjà mis en forme). */
+				'added'      => '%s ajouté à votre liste de lecture.',
+				/* translators: %s = titre du livre (déjà mis en forme). */
+				'removed'    => '%s retiré de votre liste de lecture.',
+				'undo'       => 'Annuler',
+				'close'      => 'Fermer',
+			],
+		] );
 	}
 
 	/* ─── Frontend: Shortcode ────────────────────────────────────── */
@@ -97,7 +181,8 @@ class Passiflore_Bookshelf {
 
 		$show_formats = filter_var( $atts['display_formats'], FILTER_VALIDATE_BOOLEAN );
 
-		$books        = $this->prepare_books( $products, $display );
+		$is_hero      = filter_var( $atts['hero'], FILTER_VALIDATE_BOOLEAN );
+		$books        = $this->prepare_books( $products, $display, $is_hero );
 		self::$last_total = count( $books );
 
 		// Opt-in: arrange the books tallest → shortest. Enabled per shelf via
@@ -128,8 +213,18 @@ class Passiflore_Bookshelf {
 		$mode         = sanitize_key( $atts['mode'] );
 		$per_shelf    = absint( $atts['per_shelf'] );
 		$nb_first     = absint( $atts['nb_books_first_displayed'] );
-		$is_hero      = filter_var( $atts['hero'], FILTER_VALIDATE_BOOLEAN );
 		$libraires_url = ( $is_hero && $atts['libraires_url'] ) ? esc_url( rawurldecode( $atts['libraires_url'] ) ) : '';
+
+		// Signets « liste de lecture » posés sur la couverture : hors mode héros,
+		// pour un utilisateur connecté (le back Passiflore_Reading_List ne gère pas
+		// les invités). En mode « dos », la couverture — donc le signet posé
+		// dessus — n'apparaît qu'au survol, quand le livre pivote pour la révéler.
+		$show_bookmarks = filter_var( $atts['show-bookmarks'], FILTER_VALIDATE_BOOLEAN )
+			&& ! $is_hero
+			&& is_user_logged_in() && class_exists( 'Passiflore_Reading_List' );
+		if ( $show_bookmarks ) {
+			$this->enqueue_bookmark_assets();
+		}
 
 		// Étiquettes « À paraître » / « Nouveauté » : actives par défaut.
 		// Si l'une ou l'autre est désactivée, on neutralise le drapeau correspondant.
@@ -152,10 +247,10 @@ class Passiflore_Bookshelf {
 		$cat_theme = $this->resolve_category_theme( $atts );
 
 		if ( $mode === 'scroll' ) {
-			return $this->render_scroll( $books, $display, $show_price, $shelf_inner, $nb_first, $is_hero, $cat_theme, $show_formats, $libraires_url );
+			return $this->render_scroll( $books, $display, $show_price, $shelf_inner, $nb_first, $is_hero, $cat_theme, $show_formats, $libraires_url, $show_bookmarks );
 		}
 
-		return $this->render_shelves( $books, $display, $show_price, $shelf_inner, $per_shelf, $nb_first, $is_hero, $cat_theme, $show_formats, $libraires_url );
+		return $this->render_shelves( $books, $display, $show_price, $shelf_inner, $per_shelf, $nb_first, $is_hero, $cat_theme, $show_formats, $libraires_url, $show_bookmarks );
 	}
 
 	private function default_atts() {
@@ -184,6 +279,7 @@ class Passiflore_Bookshelf {
 			'nb_books_first_displayed' => 12,
 			'hero'                     => 'false',    // true = mode héros fiche livre (non cliquable, sans hover)
 			'display_formats'          => 'false',    // true — affiche le format (pa_format_particulier) dans le chevalet
+			'show-bookmarks'           => 'false',    // true — icône signet « liste de lecture » sur chaque couverture (utilisateur connecté)
 			'libraires_url'            => '',          // mode hero uniquement : lien « Voir sur Place des libraires », rendu dans .pf-shelf sous la planche. rawurlencode() côté appelant (l'URL traverse le parseur de shortcode en tant que chaîne).
 		];
 	}
@@ -745,7 +841,7 @@ class Passiflore_Bookshelf {
 		return $this->scf_choices_cached( $field_name );
 	}
 
-	private function prepare_books( $products, $display = 'covers' ) {
+	private function prepare_books( $products, $display = 'covers', $is_hero = false ) {
 		$books = [];
 		// Spines mode renders titles vertically, so we scale everything up
 		// to keep them legible. 1.5× gives roughly readable type at typical
@@ -753,6 +849,19 @@ class Passiflore_Bookshelf {
 		$mode_scale = ( $display === 'spines' ) ? 1.5 : 1.0;
 		$scale      = self::SCALE * $mode_scale;
 		$unit       = get_option( 'woocommerce_dimension_unit', 'cm' );
+
+		// Le mode héros (fiche livre) affiche UN livre bien plus grand → images
+		// plus définies (medium_large / large). L'étagère générique (catalogue,
+		// accueil…) sert les sous-tailles allégées dédiées. En mode spines, la
+		// couverture n'est révélée qu'au survol (chargement en data-src, cf.
+		// bookshelf.js) et affichée ~1.5× plus grande que son équivalent en
+		// covers (mode_scale) : pf-shelf-cover (400×600) y serait insuffisante
+		// et rendrait un agrandissement flou. On réutilise medium_large (déjà
+		// générée pour toute la médiathèque, contrairement à une sous-taille
+		// dédiée) sans coût perf, la couverture n'étant chargée que pour le
+		// livre réellement survolé.
+		$cover_size   = ( $is_hero || $display === 'spines' ) ? 'medium_large' : self::SHELF_COVER_SIZE;
+		$tranche_size = $is_hero ? 'large' : self::SHELF_SPINE_SIZE;
 
 		foreach ( $products as $post ) {
 			$product = wc_get_product( $post->ID );
@@ -849,8 +958,8 @@ class Passiflore_Bookshelf {
 				$cover_w_px = (int) round( $screen_h * $ratio ) + 2 * self::EREADER_BEZEL_PX;
 			}
 
-			$thumb_url   = $thumb_id ? wp_get_attachment_image_url( $thumb_id, 'medium_large' ) : '';
-			$tranche_url = $tranche_id ? wp_get_attachment_image_url( $tranche_id, 'large' ) : '';
+			$thumb_url   = $thumb_id ? wp_get_attachment_image_url( $thumb_id, $cover_size ) : '';
+			$tranche_url = $tranche_id ? wp_get_attachment_image_url( $tranche_id, $tranche_size ) : '';
 			$spine_color = ( $tranche_id || $is_ereader ) ? '' : $this->extract_cover_color( $thumb_id );
 
 			// « À paraître » = valeur brute du champ SCF `disponibilite`
@@ -1012,7 +1121,7 @@ class Passiflore_Bookshelf {
 
 	/* ─── Render Modes ───────────────────────────────────────────── */
 
-	private function render_scroll( $books, $display, $show_price, $shelf_inner, $nb_first = 12, $is_hero = false, $cat_theme = '', $show_formats = false, $libraires_url = '' ) {
+	private function render_scroll( $books, $display, $show_price, $shelf_inner, $nb_first = 12, $is_hero = false, $cat_theme = '', $show_formats = false, $libraires_url = '', $show_bookmarks = false ) {
 		// En spines le chevalet n'apparaît qu'au survol (superposé) :
 		// seule la grille covers réserve de la hauteur pour lui.
 		$has_chevalet = $display === 'covers' && $show_price;
@@ -1028,7 +1137,7 @@ class Passiflore_Bookshelf {
 
 		$index = 0;
 		foreach ( $books as $b ) {
-			$html .= $this->render_book( $b, $display, $show_price, $index, $nb_first, $is_hero, $show_formats );
+			$html .= $this->render_book( $b, $display, $show_price, $index, $nb_first, $is_hero, $show_formats, $show_bookmarks );
 			$index++;
 		}
 
@@ -1045,7 +1154,7 @@ class Passiflore_Bookshelf {
 		return '<a class="bs-hero__libraires" href="' . esc_url( $libraires_url ) . '" target="_blank" rel="noopener noreferrer">Voir sur Place des libraires</a>';
 	}
 
-	private function render_shelves( $books, $display, $show_price, $shelf_inner, $per_shelf, $nb_first = 12, $is_hero = false, $cat_theme = '', $show_formats = false, $libraires_url = '' ) {
+	private function render_shelves( $books, $display, $show_price, $shelf_inner, $per_shelf, $nb_first = 12, $is_hero = false, $cat_theme = '', $show_formats = false, $libraires_url = '', $show_bookmarks = false ) {
 		$has_chevalet = $display === 'covers' && $show_price;
 		$chevalet_h  = $has_chevalet ? 32 : 0;
 		$hero_class  = $is_hero ? ' pf-bookshelf--hero' : '';
@@ -1096,7 +1205,7 @@ class Passiflore_Bookshelf {
 			$html .= '<div class="pf-shelf" style="--shelf-inner:' . $this_shelf_h . 'px;">';
 			$html .= '<div class="pf-shelf-books">';
 			foreach ( $shelf_books as $b ) {
-				$html .= $this->render_book( $b, $display, $show_price, $index, $nb_first, $is_hero, $show_formats );
+				$html .= $this->render_book( $b, $display, $show_price, $index, $nb_first, $is_hero, $show_formats, $show_bookmarks );
 				$index++;
 			}
 			$html .= '</div><div class="pf-shelf-plank"></div>' . $this->render_libraires_link( $libraires_url ) . '</div>';
@@ -1110,7 +1219,7 @@ class Passiflore_Bookshelf {
 	 * Unified renderer. Same DOM in both display modes; CSS handles the
 	 * mode-specific positioning of each face (cover, spine, pages, inside).
 	 */
-	private function render_book( $b, $display, $show_price, $index = 0, $nb_first = 12, $is_hero = false, $show_formats = false ) {
+	private function render_book( $b, $display, $show_price, $index = 0, $nb_first = 12, $is_hero = false, $show_formats = false, $show_bookmarks = false ) {
 		// Frozen reference values used by the hover transition:
 		//   --spine-w-base / --cover-w-base / --book-h-base  → originals
 		//   --book-total-w                                   → cover+spine
@@ -1232,11 +1341,22 @@ class Passiflore_Bookshelf {
 		} else {
 			$html .= '<div class="pf-book-nocover"></div>';
 		}
+		// Signet « liste de lecture » — posé sur la COUVERTURE. Pour une liseuse,
+		// la couverture est l'image dans .pf-ereader-screen (pas le cadre device)
+		// → on l'émet AVANT la fermeture de l'écran ; pour un livre normal il
+		// reste dans .pf-book-cover, juste après l'image. Tourne avec la couverture
+		// au survol ; l'infobulle est un flottant JS global (shelf-bookmarks.js).
+		// Rendu seulement si demandé (déjà borné covers + non-héros + connecté).
+		if ( $show_bookmarks ) {
+			$html .= $this->bookmark_html( $b );
+		}
+
 		if ( $is_ereader ) {
 			$html .= '</div>'; // .pf-ereader-screen
 			// Pastille de marque dans le menton de la liseuse.
 			$html .= '<span class="pf-ereader-brand">' . $this->spine_icon_html() . '</span>';
 		}
+
 		$html .= '</div>';
 
 		// Top face: page edges. CSS gives it a 3D rotation in spines mode
@@ -1278,28 +1398,59 @@ class Passiflore_Bookshelf {
 			}
 		}
 
-		// Badge + explication de recommandation (espace compte). Enfant de
-		// .pf-book (ne tourne pas avec la couverture) ; l'explication s'affiche
-		// en overlay borné à la couverture → jamais rognée par le conteneur de
-		// défilement. Seul le badge est interactif.
-		if ( $display === 'covers' && isset( self::$reco_annotations[ $b['id'] ] ) ) {
+		// Badge + explication de recommandation (espace compte). Enfant de .pf-book
+		// (hors couverture) : le badge flotte AU-DESSUS du livre — il ne suit ni le
+		// scale ni la rotation. En dos, il est simplement plus petit et centré sur
+		// le dos (bookshelf.css), et l'explication s'affiche en carte flottante.
+		// L'explication s'ouvre au clic (le « ? » devient une croix) et se referme
+		// au clic (croix / explication / extérieur) — assets/js/account-reco.js.
+		if ( isset( self::$reco_annotations[ $b['id'] ] ) ) {
 			$ann    = self::$reco_annotations[ $b['id'] ];
 			$why    = isset( $ann['why'] ) ? (string) $ann['why'] : '';
 			$tip_id = 'pf-reco-tip-' . (int) $b['id'];
 			$html  .= '<div class="pf-book-reco" data-score="' . esc_attr( $ann['score'] ?? '' ) . '">';
-			$html  .= '<span class="pf-book-reco-badge" tabindex="0"'
+			$html  .= '<span class="pf-book-reco-badge pf-roundbtn pf-roundbtn--secondary" tabindex="0"'
 				. ( $why ? ' aria-describedby="' . esc_attr( $tip_id ) . '"' : '' )
 				. ' aria-label="' . esc_attr__( 'Pourquoi cette suggestion ?', 'kadence-child' ) . '">'
-				. '<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="M12 2l2.2 5.8L20 10l-5.8 2.2L12 18l-2.2-5.8L4 10l5.8-2.2z"/></svg>'
+				. '<span class="pf-book-reco-badge__q" aria-hidden="true">?</span>'
+				. '<svg class="pf-book-reco-badge__close" viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>'
 				. '</span>';
 			if ( $why ) {
-				$html .= '<span class="pf-book-reco-tip" id="' . esc_attr( $tip_id ) . '" role="tooltip">' . esc_html( $why ) . '</span>';
+				// $why (pf_reco_explanation) contient <strong>/<em> avec titres déjà esc_html'és.
+				// Enveloppé dans un seul enfant : la bulle est en flex (centrage vertical) et
+				// aurait sinon fait de chaque <strong>/nœud texte un item flex distinct.
+				$html .= '<span class="pf-book-reco-tip" id="' . esc_attr( $tip_id ) . '" role="tooltip"><span class="pf-book-reco-tip__text">' . wp_kses( $why, [ 'strong' => [], 'em' => [] ] ) . '</span></span>';
 			}
 			$html .= '</div>';
 		}
 
 		$html .= $is_hero ? '</div>' : '</a>';
 		return $html;
+	}
+
+	/**
+	 * Signet « liste de lecture » posé sur une couverture. `role="button"`
+	 * (pas <button>) pour ne pas imbriquer un contrôle dans le <a> du livre —
+	 * la navigation est neutralisée en JS (assets/js/shelf-bookmarks.js), qui
+	 * porte aussi l'infobulle flottante et le toggle AJAX.
+	 */
+	private function bookmark_html( $b ) {
+		$id    = (int) $b['id'];
+		$in    = Passiflore_Reading_List::is_in_list( $id );
+		$label = $in ? 'Retirer de ma liste de lecture' : 'Ajouter à ma liste de lecture';
+		return sprintf(
+			'<span class="pf-book-bookmark%s" role="button" tabindex="0" aria-pressed="%s" aria-label="%s" data-product-id="%d" data-title="%s" data-in-list="%s">'
+				. '<svg viewBox="175 -865 610 770" preserveAspectRatio="xMidYMin meet" aria-hidden="true"><path class="pf-book-bookmark__body" d="%s"/><path class="pf-book-bookmark__star" d="%s"/></svg>'
+				. '</span>',
+			$in ? ' is-in-list' : '',
+			$in ? 'true' : 'false',
+			esc_attr( $label ),
+			$id,
+			esc_attr( $b['title'] ),
+			$in ? '1' : '0',
+			esc_attr( self::BOOKMARK_BODY_PATH ),
+			esc_attr( self::BOOKMARK_STAR_PATH )
+		);
 	}
 
 	/**

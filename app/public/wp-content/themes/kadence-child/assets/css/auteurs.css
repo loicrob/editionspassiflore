@@ -11,6 +11,7 @@
     display: grid;
     grid-template-columns: repeat(5, 1fr);
     gap: var(--pf-space-6);
+    justify-items: center;
 }
 
 @media (max-width: 1024px) {
@@ -19,16 +20,28 @@
     }
 }
 
-@media (max-width: 768px) {
+@media (max-width: 850px) {
     .pf-auteurs-grille {
         grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+@media (max-width: 650px) {
+    .pf-auteurs-grille {
+        grid-template-columns: repeat(2, 1fr);
         gap: var(--pf-space-5);
     }
 }
 
 @media (max-width: 480px) {
     .pf-auteurs-grille {
-        grid-template-columns: repeat(2, 1fr);
+        grid-template-columns: repeat(1, 1fr);
+    }
+
+    /* Largeur de carte plafonnée sur cette page uniquement (les autres contextes
+    de .pf-auteur-card — présence événement, fiche livre — gardent leur taille). */
+    .pf-auteurs-grille .pf-card.pf-auteur-card {
+        width: 80%;
     }
 }
 

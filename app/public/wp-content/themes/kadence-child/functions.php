@@ -16,7 +16,7 @@ add_filter( 'locale_stylesheet_uri', 'chld_thm_cfg_locale_css' );
          
 if ( !function_exists( 'child_theme_configurator_css' ) ):
     function child_theme_configurator_css() {
-        wp_enqueue_style( 'chld_thm_cfg_child', trailingslashit( get_stylesheet_directory_uri() ) . 'style.css', array( 'kadence-global','kadence-header','kadence-content','kadence-woocommerce','kadence-footer' ) );
+        wp_enqueue_style( 'chld_thm_cfg_child', trailingslashit( get_stylesheet_directory_uri() ) . 'style.css', array( 'kadence-global','kadence-header','kadence-content','kadence-woocommerce','kadence-footer' ), filemtime( get_stylesheet_directory() . '/style.css' ) );
     }
 endif;
 add_action( 'wp_enqueue_scripts', 'child_theme_configurator_css', 10 );
@@ -90,7 +90,7 @@ function passiflore_enqueue_auteurs_styles() {
             'pf-auteurs',
             get_stylesheet_directory_uri() . '/assets/css/auteurs.css',
             [],
-            '1.0.0'
+            filemtime( get_stylesheet_directory() . '/assets/css/auteurs.css' )
         );
     }
     if ( is_tax( 'auteur' ) ) {
@@ -98,7 +98,7 @@ function passiflore_enqueue_auteurs_styles() {
             'pf-auteur-single',
             get_stylesheet_directory_uri() . '/assets/css/auteur-single.css',
             [],
-            '1.0.0'
+            filemtime( get_stylesheet_directory() . '/assets/css/auteur-single.css' )
         );
         wp_enqueue_style(
             'pf-events',
@@ -119,7 +119,7 @@ function passiflore_enqueue_auteurs_styles() {
             'pf-contact',
             get_stylesheet_directory_uri() . '/assets/css/contact.css',
             [],
-            '1.0.0'
+            filemtime( get_stylesheet_directory() . '/assets/css/contact.css' )
         );
     }
     if ( function_exists( 'tribe_is_event_query' ) && ( tribe_is_event_query() || is_singular( 'tribe_events' ) ) ) {
@@ -127,7 +127,7 @@ function passiflore_enqueue_auteurs_styles() {
             'pf-auteurs',
             get_stylesheet_directory_uri() . '/assets/css/auteurs.css',
             [],
-            '1.0.0'
+            filemtime( get_stylesheet_directory() . '/assets/css/auteurs.css' )
         );
         wp_enqueue_style(
             'pf-events',
@@ -177,10 +177,19 @@ function passiflore_enqueue_auteurs_styles() {
             [],
             filemtime( get_stylesheet_directory() . '/assets/css/account.css' )
         );
+        // Infobulle partagée (titre « Suggestions de Passiflore ») — dépendance
+        // de account-reco.js, qui la câble (window.pfTooltip.wire).
+        wp_enqueue_script(
+            'pf-tooltip',
+            get_stylesheet_directory_uri() . '/assets/js/pf-tooltip.js',
+            [],
+            filemtime( get_stylesheet_directory() . '/assets/js/pf-tooltip.js' ),
+            true
+        );
         wp_enqueue_script(
             'pf-account-reco',
             get_stylesheet_directory_uri() . '/assets/js/account-reco.js',
-            [],
+            [ 'pf-tooltip' ],
             filemtime( get_stylesheet_directory() . '/assets/js/account-reco.js' ),
             true
         );
@@ -200,6 +209,19 @@ function passiflore_enqueue_auteurs_styles() {
             filemtime( get_stylesheet_directory() . '/assets/js/account-nav.js' ),
             true
         );
+        // Bascule d'affichage des étagères du compte (Couvertures | Dos) : re-rend
+        // l'étagère (Suggestions / Ma liste de lecture / Catalogue) via AJAX.
+        wp_enqueue_script(
+            'pf-shelf-display',
+            get_stylesheet_directory_uri() . '/assets/js/shelf-display.js',
+            [],
+            filemtime( get_stylesheet_directory() . '/assets/js/shelf-display.js' ),
+            true
+        );
+        wp_localize_script( 'pf-shelf-display', 'pfShelfDisplay', [
+            'ajax_url' => admin_url( 'admin-ajax.php' ),
+            'nonce'    => wp_create_nonce( 'pf_shelf_display' ),
+        ] );
     }
     if ( function_exists( 'is_cart' ) && is_cart() ) {
         wp_enqueue_style(

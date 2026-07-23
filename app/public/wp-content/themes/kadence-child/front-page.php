@@ -87,6 +87,7 @@ $culture_url      = is_wp_error( $culture_link ) ? '' : $culture_link;
             style="--pf-hero-bg: url('<?php echo esc_url( $hero_image_url ); ?>')"
             <?php endif; ?>
         >
+            <div class="pf-hero-inner site-container">
             <div class="pf-hero-haut">
             <div class="pf-hero-contenu">
                 <div class="pf-hero-marque">
@@ -103,31 +104,45 @@ $culture_url      = is_wp_error( $culture_link ) ? '' : $culture_link;
                                  height="90" />
                         </a>
                     </div>
-                    <div class="pf-hero-texte">
-                        <div class="pf-hero-typage-nom" aria-label="Editions Passiflore">
-                            <div class="pf-hero-ligne" id="pf-ligne-1">Editions</div>
-                            <div class="pf-hero-ligne" id="pf-ligne-2">Passiflore</div>
-                        </div>
-                        <div class="pf-hero-sous-titre-wrap">
-                            <div class="pf-hero-ligne pf-hero-sous-titre" id="pf-ligne-3"></div>
-                            <div class="pf-hero-ligne pf-hero-sous-titre" id="pf-ligne-4"></div>
-                        </div>
+                    <div class="pf-hero-wordmark">
+                        <img src="<?php echo esc_url( get_stylesheet_directory_uri() . '/assets/img/Editions_Passiflore_logo-simple_text_Editions.png' ); ?>"
+                             alt="Editions"
+                             width="265"
+                             height="76" />
+                        <img src="<?php echo esc_url( get_stylesheet_directory_uri() . '/assets/img/Editions_Passiflore_logo-simple_text_Passiflore.png' ); ?>"
+                             alt="Passiflore"
+                             width="430"
+                             height="76" />
                     </div>
                 </div>
+                <div class="pf-hero-sous-titre-wrap">
+                    <div class="pf-hero-ligne pf-hero-sous-titre" id="pf-ligne-3"></div>
+                    <div class="pf-hero-ligne pf-hero-sous-titre" id="pf-ligne-4"></div>
+                </div>
                 <?php if ( $hero_presentation ) : ?>
-                <p id="pf-hero-presentation" class="pf-hero-presentation"><?php echo nl2br( esc_html( $hero_presentation ) ); ?></p>
+                <p id="pf-hero-presentation" class="pf-hero-presentation"><?php
+                    // <br> ne respecte ni display:block ni margin dans les moteurs de rendu
+                    // (Chrome/Blink traite <br> comme un saut de ligne forcé, indépendant de
+                    // son style calculé) : chaque ligne est donc un vrai bloc pour espacer.
+                    foreach ( preg_split( '/\r\n|\r|\n/', $hero_presentation ) as $pf_hero_line ) {
+                        if ( '' === trim( $pf_hero_line ) ) {
+                            continue;
+                        }
+                        echo '<span class="pf-hero-presentation__line">' . esc_html( $pf_hero_line ) . '</span>';
+                    }
+                ?></p>
                 <?php endif; ?>
 
                 <div class="pf-hero-categories">
                     <a class="pf-card pf-hero-cat" href="<?php echo esc_url( $litterature_url ); ?>">
+                        <span class="pf-badge pf-badge--accent pf-hero-cat-badge">Littérature</span>
                         <div class="pf-card-content">
-                            <span class="pf-card-title">Littérature</span>
                             <span class="pf-card-text">Des romans exigeants et accessibles, générateurs d’émotions</span>
                         </div>
                     </a>
                     <a class="pf-card pf-hero-cat" href="<?php echo esc_url( $culture_url ); ?>">
+                        <span class="pf-badge pf-badge--accent pf-hero-cat-badge">Culture Sud-Ouest</span>
                         <div class="pf-card-content">
-                            <span class="pf-card-title">Culture Sud-Ouest</span>
                             <span class="pf-card-text">Des beaux livres et des ouvrages sur nos sports et notre patrimoine</span>
                         </div>
                     </a>
@@ -216,6 +231,7 @@ $culture_url      = is_wp_error( $culture_link ) ? '' : $culture_link;
                     <?php endif; ?>
                 </div><!-- .pf-hero-actualites-slot -->
             </div><!-- .pf-hero-haut -->
+            </div><!-- .pf-hero-inner -->
 
             <button type="button" class="pf-hero-scroll" data-scroll-to="pf-en-ce-moment" aria-label="Découvrir la suite">
                 <svg width="32" height="18" viewBox="0 0 22 12" fill="none" aria-hidden="true"><path d="M1 1 11 11 21 1" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>

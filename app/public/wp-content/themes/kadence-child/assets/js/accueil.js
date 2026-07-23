@@ -5,6 +5,7 @@ document.addEventListener( 'DOMContentLoaded', function () {
     initScrollCarets();
     initStickyHeaderShadow();
     initBookshelfIntro();
+    initWordmarkFit();
 
     typingDone.then( function () {
         return new Promise( function ( resolve ) { setTimeout( resolve, 1000 ); } );
@@ -58,6 +59,53 @@ function initTypingAnimation() {
             } );
             // La promise résout ici : dernier caractère tapé.
         } );
+}
+
+// ── Wordmark : largeur fit-content une fois "Editions"/"Passiflore" empilés ────
+
+/* Une fois empilées (flex-wrap sur .pf-hero-wordmark, cf. accueil.css), la
+   largeur de la boîte reste par défaut celle de la paire côte à côte (le CSS
+   shrink-to-fit ne retombe pas sur la largeur du mot le plus large une fois
+   wrappé) — d'où l'espace vide à droite de "Passiflore" sans ce correctif, et
+   .pf-hero-marque (icône + cette boîte) qui paraît décalé à gauche une fois
+   centré par .pf-hero-contenu. Mesure directement en px plutôt que de poser
+   width:min-content : ce mot-clé, sur ce flex-wrap d'images, fait s'effondrer
+   sa largeur à 0 dans Chrome quel que soit le mécanisme qui le pose (classe
+   fixe ou container query, testé) — bug de layout confirmé, pas une histoire
+   de spécificité. width:auto/max-content/une valeur px fonctionnent, donc on
+   mesure la largeur réelle du mot le plus large et on la pose en style
+   inline. */
+function initWordmarkFit() {
+    var wordmark = document.querySelector( '.pf-hero-wordmark' );
+    if ( ! wordmark ) return;
+    var imgs = wordmark.querySelectorAll( 'img' );
+    if ( imgs.length < 2 ) return;
+    var first = imgs[ 0 ];
+    var last = imgs[ imgs.length - 1 ];
+
+    function apply() {
+        // Retire d'abord toute largeur posée précédemment : sinon, une fois
+        // posée, les mots resteraient toujours "empilés" au sens de cette
+        // mesure (plus assez de place pour les remettre côte à côte).
+        wordmark.style.width = '';
+        var wrapped = first.getBoundingClientRect().top !== last.getBoundingClientRect().top;
+        if ( ! wrapped ) return;
+
+        var widest = 0;
+        imgs.forEach( function ( img ) {
+            widest = Math.max( widest, img.getBoundingClientRect().width );
+        } );
+        wordmark.style.width = widest + 'px';
+    }
+
+    apply();
+    window.addEventListener( 'load', apply );
+
+    var resizeTimer = null;
+    window.addEventListener( 'resize', function () {
+        clearTimeout( resizeTimer );
+        resizeTimer = setTimeout( apply, 120 );
+    } );
 }
 
 // ── Scroll carets ─────────────────────────────────────────────────────────────

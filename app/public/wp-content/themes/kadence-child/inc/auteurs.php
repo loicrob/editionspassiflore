@@ -34,6 +34,11 @@ function passiflore_render_auteur_card( $term_id, $args = [] ) {
                 echo wp_get_attachment_image( $photo, 'large', false, [
                     'alt'     => esc_attr( passiflore_build_nom_complet( $prenom, $nom ) ),
                     'loading' => $args['loading'],
+                    // La carte vit dans une grille 5/4/3/2 colonnes (.pf-auteurs-grille).
+                    // Sans ce `sizes`, le défaut WP (100vw) fait télécharger la variante
+                    // `large` pour une vignette de ~210px. Ici le srcset (déjà présent)
+                    // choisit `medium`/`medium_large` selon la colonne réelle.
+                    'sizes'   => '(max-width: 480px) 50vw, (max-width: 768px) 33vw, (max-width: 1024px) 25vw, 20vw',
                 ] );
             endif; ?>
         </div>

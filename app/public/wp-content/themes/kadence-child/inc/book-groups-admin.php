@@ -272,14 +272,14 @@ function pf_bg_enqueue() {
 		'pf-book-picker',
 		get_stylesheet_directory_uri() . '/assets/js/book-picker.js',
 		[ 'jquery', 'jquery-ui-sortable' ],
-		'1.0.0',
+		filemtime( get_stylesheet_directory() . '/assets/js/book-picker.js' ),
 		true
 	);
 	wp_enqueue_script(
 		'pf-book-groups-admin',
 		get_stylesheet_directory_uri() . '/assets/js/book-groups-admin.js',
 		[ 'pf-book-picker' ],
-		'1.0.0',
+		filemtime( get_stylesheet_directory() . '/assets/js/book-groups-admin.js' ),
 		true
 	);
 	wp_localize_script( 'pf-book-groups-admin', 'pfBG', [

@@ -233,6 +233,11 @@ html.pf-beta-collapsed .pf-beta-dot { display: inline-flex; }
 .pf-beta-bugs + .pf-beta-bugs-intro {
     margin-top: var(--pf-space-5);
 }
+/* Date d'un bloc du changelog (onglet « Mises à jour ») — en-tête de bloc. */
+.pf-beta-date {
+    font-weight: var(--pf-weight-bold);
+    color: var(--pf-heading);
+}
 .pf-beta-bugs {
     margin: 0;
     padding-left: 1.2em;

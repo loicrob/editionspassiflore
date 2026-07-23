@@ -20,6 +20,7 @@ $nom_complet = passiflore_build_nom_complet( $prenom, $nom );
 
 ?>
 <div id="primary" class="content-area">
+    <div class="content-container site-container">
     <main id="main" class="site-main pf-auteur-single" role="main">
 
         <header class="pf-auteur-single-header">
@@ -36,7 +37,9 @@ $nom_complet = passiflore_build_nom_complet( $prenom, $nom );
             <?php if ( $photo ) : ?>
                 <div class="pf-auteur-single-photo">
                     <?php echo wp_get_attachment_image( $photo, 'large', false, [
-                        'alt' => esc_attr( $nom_complet ),
+                        'alt'   => esc_attr( $nom_complet ),
+                        // Photo à 25 % du conteneur (max 780px) ≈ 195px ; 50 % ≤600px.
+                        'sizes' => '(max-width: 600px) 50vw, 200px',
                     ] ); ?>
                 </div>
             <?php endif; ?>
@@ -89,6 +92,7 @@ $nom_complet = passiflore_build_nom_complet( $prenom, $nom );
         ?>
 
     </main>
+    </div>
 </div>
 <?php
 get_footer();

@@ -266,17 +266,19 @@ class Passiflore_Recherche_Globale {
 		$ids_in6    = implode( ',', array_map( 'intval', $ids ) );
 		$meta_rows  = $wpdb->get_results(
 			"SELECT post_id, meta_key, meta_value FROM {$wpdb->postmeta}
-			 WHERE meta_key IN ('_EventEndDate','_EventVenueID','_EventAllDay')
+			 WHERE meta_key IN ('_EventStartDate','_EventEndDate','_EventVenueID','_EventAllDay')
 			 AND post_id IN ($ids_in6)"
 		);
-		$end_strs  = [];
-		$venue_ids = [];
-		$all_days  = [];
+		$start_strs = [];
+		$end_strs   = [];
+		$venue_ids  = [];
+		$all_days   = [];
 		foreach ( $meta_rows as $r ) {
 			$pid = (int) $r->post_id;
-			if ( $r->meta_key === '_EventEndDate' )  $end_strs[ $pid ]  = $r->meta_value;
-			if ( $r->meta_key === '_EventVenueID' )  $venue_ids[ $pid ] = (int) $r->meta_value;
-			if ( $r->meta_key === '_EventAllDay' )   $all_days[ $pid ]  = (bool) $r->meta_value;
+			if ( $r->meta_key === '_EventStartDate' ) $start_strs[ $pid ] = $r->meta_value;
+			if ( $r->meta_key === '_EventEndDate' )   $end_strs[ $pid ]   = $r->meta_value;
+			if ( $r->meta_key === '_EventVenueID' )   $venue_ids[ $pid ]  = (int) $r->meta_value;
+			if ( $r->meta_key === '_EventAllDay' )    $all_days[ $pid ]   = (bool) $r->meta_value;
 		}
 
 		// Données des lieux.
@@ -384,7 +386,9 @@ class Passiflore_Recherche_Globale {
 	private function format_event_subtitle( $id, $start_str, $end_str, $all_day, $venue ) {
 		$parts = [];
 
-		// Partie dates — sans heures ; année omise si année courante.
+		// Partie dates — sans heures ; année omise si année courante. pf_date_i18n_ordinal()
+		// renvoie du HTML pré-échappé (jour "1er" avec <sup> brut) : ne pas ré-échapper le
+		// résultat de cette méthode (cf. render_item(), $subtitle sorti du esc_html() global).
 		$sd = $start_str ? DateTime::createFromFormat( 'Y-m-d H:i:s', $start_str ) : false;
 		$ed = $end_str   ? DateTime::createFromFormat( 'Y-m-d H:i:s', $end_str )   : false;
 		if ( $sd ) {
@@ -400,30 +404,31 @@ class Passiflore_Recherche_Globale {
 
 			if ( $s_ymd === $e_ymd ) {
 				// Jour unique
-				$date_str = date_i18n( 'j F', $s_ts );
+				$date_str = pf_date_i18n_ordinal( 'j F', $s_ts );
 				if ( $s_year !== $cur_year ) $date_str .= ' ' . $s_year;
 			} elseif ( $s_month === $e_month && $s_year === $e_year ) {
 				// Même mois : "Du j au j F [Y]"
-				$date_str = 'Du ' . date_i18n( 'j', $s_ts ) . ' au ' . date_i18n( 'j F', $e_ts );
+				$date_str = 'Du ' . pf_date_i18n_ordinal( 'j', $s_ts ) . ' au ' . pf_date_i18n_ordinal( 'j F', $e_ts );
 				if ( $s_year !== $cur_year ) $date_str .= ' ' . $s_year;
 			} elseif ( $s_year === $e_year ) {
 				// Même année, mois différents : "Du j F au j F [Y]"
-				$date_str = 'Du ' . date_i18n( 'j F', $s_ts ) . ' au ' . date_i18n( 'j F', $e_ts );
+				$date_str = 'Du ' . pf_date_i18n_ordinal( 'j F', $s_ts ) . ' au ' . pf_date_i18n_ordinal( 'j F', $e_ts );
 				if ( $s_year !== $cur_year ) $date_str .= ' ' . $s_year;
 			} else {
 				// Années différentes : toujours afficher les années
-				$date_str = 'Du ' . date_i18n( 'j F Y', $s_ts ) . ' au ' . date_i18n( 'j F Y', $e_ts );
+				$date_str = 'Du ' . pf_date_i18n_ordinal( 'j F Y', $s_ts ) . ' au ' . pf_date_i18n_ordinal( 'j F Y', $e_ts );
 			}
 			$parts[] = $date_str;
 		}
 
-		// Lieu.
+		// Lieu. Échappé ici (texte issu de la BD) : le sous-titre assemblé n'est plus
+		// ré-échappé en aval, à cause du HTML pré-échappé produit par pf_date_i18n_ordinal().
 		$lieu_parts = array_filter( [ $venue['title'] ?? '', $venue['city'] ?? '' ] );
-		if ( $lieu_parts ) $parts[] = implode( ', ', $lieu_parts );
+		if ( $lieu_parts ) $parts[] = esc_html( implode( ', ', $lieu_parts ) );
 
 		// Présences.
 		$presences = $this->get_event_participants_str( $id );
-		if ( $presences !== '' ) $parts[] = $presences;
+		if ( $presences !== '' ) $parts[] = esc_html( $presences );
 
 		return implode( " \xe2\x80\xa2 ", $parts );
 	}
@@ -444,6 +449,10 @@ class Passiflore_Recherche_Globale {
 			. '</div>';
 	}
 
+	/**
+	 * @param string $subtitle HTML déjà échappé (voir format_event_subtitle()) — ne pas
+	 *                         passer de texte brut non échappé ici.
+	 */
 	private function render_item( $title, $url, $img_id, $meta, $subtitle = '' ) {
 		if ( $img_id ) {
 			$img = wp_get_attachment_image( $img_id, 'woocommerce_single', false, [
@@ -458,7 +467,7 @@ class Passiflore_Recherche_Globale {
 			. '<span class="pf-gsearch-item-img-wrap">' . $img . '</span>'
 			. '<span class="pf-gsearch-item-text">'
 			. '<span class="pf-gsearch-item-title">' . esc_html( $title ) . '</span>'
-			. ( $subtitle !== '' ? '<span class="pf-gsearch-item-subtitle">' . esc_html( $subtitle ) . '</span>' : '' )
+			. ( $subtitle !== '' ? '<span class="pf-gsearch-item-subtitle">' . $subtitle . '</span>' : '' )
 			. ( $meta !== '' ? '<span class="pf-gsearch-item-meta">' . esc_html( $meta ) . '</span>' : '' )
 			. '</span>'
 			. '</a>';

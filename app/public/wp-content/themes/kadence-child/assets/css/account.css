@@ -142,34 +142,6 @@
 	color: var(--pf-accent);
 }
 
-/* ─── Résumé compact (chips) ─────────────────────────────────────── */
-
-.pf-account-summary {
-	display: flex;
-	flex-wrap: wrap;
-	gap: 0.75rem;
-	margin: 0 0 1.75rem;
-}
-
-/* Chip = .pf-card (style.css) + valeur .pf-card-title. Ici : disposition + densité. */
-.pf-account-summary__chip {
-	gap: 0.15rem;
-	min-width: 160px;
-	padding: 0.7rem 1rem;
-}
-
-.pf-account-summary__label {
-	font-size: 0.72rem;
-	text-transform: uppercase;
-	letter-spacing: 0.06em;
-	color: var(--pf-text-dim);
-}
-
-.pf-account-summary__meta {
-	font-size: 0.8rem;
-	color: var(--pf-text-dim);
-}
-
 /* ─── Suggestions de livres ──────────────────────────────────────── */
 /* L'étagère apporte son propre bookshelf.css ; ici, juste le chrome de section. */
 
@@ -181,6 +153,40 @@
 .pf-account-reco > h2,
 .pf-reco > h2 {
 	margin: 0 0 1rem;
+}
+
+/* En-tête d'étagère : titre à gauche, switch d'affichage « Couvertures | Dos »
+   à droite, sur la même ligne (Suggestions, Ma liste de lecture, Catalogue). */
+.pf-shelf-head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 1rem;
+	flex-wrap: wrap;
+	margin: 0 0 1rem;
+}
+
+.pf-shelf-head > h2 {
+	margin: 0;
+}
+
+/* Fondu de l'étagère pendant le re-rendu AJAX du switch d'affichage. */
+.pf-shelf-slot.is-loading {
+	opacity: 0.5;
+	pointer-events: none;
+	transition: opacity 0.15s ease;
+}
+
+/* État vide de « Ma liste de lecture » (page /liste-de-lecture) : message à la
+   place de l'étagère, invitant à ajouter des signets depuis le Catalogue. */
+.pf-liste-lecture-empty {
+	margin: 0;
+	color: var(--pf-text);
+	font-size: var(--pf-text-base);
+}
+
+.pf-liste-lecture-empty strong {
+	font-weight: var(--pf-weight-semibold);
 }
 
 /* Titres de section greffés (adresses dans le compte, téléchargements dans les commandes). */

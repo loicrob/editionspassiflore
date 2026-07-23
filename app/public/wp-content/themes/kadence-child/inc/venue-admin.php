@@ -593,7 +593,7 @@ function pf_enqueue_venue_admin_assets( $hook ) {
 		'pf-venue-admin',
 		get_stylesheet_directory_uri() . '/assets/js/venue-admin.js',
 		[ 'jquery' ],
-		'1.0.0',
+		filemtime( get_stylesheet_directory() . '/assets/js/venue-admin.js' ),
 		true
 	);
 

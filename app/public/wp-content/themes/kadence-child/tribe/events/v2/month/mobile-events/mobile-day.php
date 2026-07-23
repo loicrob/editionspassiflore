@@ -55,7 +55,7 @@ $has_events = ! empty( $events ) && class_exists( 'Passiflore_Event_Tiles' );
 // En-tête = le jour tapé. Jour de semaine capitalisé (initiale ASCII en français) ;
 // année ajoutée seulement si différente de l'année en cours (comme les dates de tuile).
 $pf_day_ts    = strtotime( $day['date'] );
-$pf_day_label = ucfirst( date_i18n( 'l j F', $pf_day_ts ) );
+$pf_day_label = ucfirst( pf_date_i18n_ordinal( 'l j F', $pf_day_ts ) ); // déjà échappé (avec <sup> brut pour "1er")
 if ( (int) date_i18n( 'Y', $pf_day_ts ) !== (int) date_i18n( 'Y' ) ) {
 	$pf_day_label .= ' ' . date_i18n( 'Y', $pf_day_ts );
 }
@@ -67,7 +67,7 @@ $pf_count = count( $events );
 	<?php if ( $has_events ) : ?>
 		<div class="pf-map-pop pf-month-pop">
 			<div class="pf-map-pop__header">
-				<span class="pf-map-pop__area-label"><?php echo esc_html( $pf_day_label ); ?></span>
+				<span class="pf-map-pop__area-label"><?php echo $pf_day_label; // phpcs:ignore WordPress.Security.EscapeOutput — pré-échappé (pf_date_i18n_ordinal) ?></span>
 				<span class="pf-map-pop__area-count">
 					<?php echo esc_html( $pf_count . ' ' . ( $pf_count > 1 ? 'événements' : 'événement' ) ); ?>
 				</span>

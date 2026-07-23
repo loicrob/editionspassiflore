@@ -87,14 +87,14 @@ add_action( 'admin_enqueue_scripts', function ( $hook ) {
         'pf-book-picker',
         get_stylesheet_directory_uri() . '/assets/js/book-picker.js',
         [ 'jquery', 'jquery-ui-sortable' ],
-        '1.0.0',
+        filemtime( get_stylesheet_directory() . '/assets/js/book-picker.js' ),
         true
     );
     wp_enqueue_script(
         'pf-event-admin',
         get_stylesheet_directory_uri() . '/assets/js/event-admin.js',
         [ 'pf-book-picker' ],
-        '1.0.0',
+        filemtime( get_stylesheet_directory() . '/assets/js/event-admin.js' ),
         true
     );
     wp_localize_script( 'pf-event-admin', 'pfEB', [

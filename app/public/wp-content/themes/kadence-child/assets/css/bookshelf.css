@@ -842,7 +842,10 @@ img.pf-spine-icon {
 	transition: opacity 0.25s ease;
 }
 
-.pf-bookshelf--covers .pf-book:hover .pf-chevalet,
+/* Le prix s'efface quand on survole/focus le LIVRE — mais pas quand on survole
+   seulement le badge (`:not(:has(badge:hover))`), qui flotte au-dessus et déclenche
+   sinon le :hover du livre. Sans effet sur les étagères sans badge. */
+.pf-bookshelf--covers .pf-book:hover:not(:has(.pf-book-reco-badge:hover)) .pf-chevalet,
 .pf-bookshelf--covers .pf-book:focus-visible .pf-chevalet {
 	opacity: 0;
 }
@@ -959,11 +962,11 @@ img.pf-spine-icon {
 
 /* ─── Badge de recommandation + explication (espace compte) ──────
    Posé par pf_reco_render() via Passiflore_Bookshelf::set_reco_annotations().
-   Le conteneur couvre l'empreinte du livre ; il est enfant de .pf-book (qui ne
-   pivote pas), donc l'overlay ne « part » pas avec la couverture qui s'ouvre au
-   survol, et reste borné à la couverture → jamais rogné par le conteneur de
-   défilement. Seul le badge capte le pointeur ; le reste laisse passer le clic
-   vers la fiche livre. */
+   Enfant de .pf-book (hors couverture) : le badge FLOTTE au-dessus du livre,
+   centré sur la couverture — il ne suit ni le scale ni la rotation du livre.
+   Ouverture au CLIC (le logo Passiflore devient une croix), pas au survol. Le
+   conteneur remplit l'empreinte du livre (repère de position) mais ne capte pas
+   le pointeur (clic → fiche livre) ; seuls le badge et l'explication ouverte le font. */
 .pf-book-reco {
 	position: absolute;
 	top: 0;
@@ -971,31 +974,55 @@ img.pf-spine-icon {
 	width: 100%;
 	height: var(--book-h);
 	pointer-events: none;
-	z-index: 6;
+	z-index: 7;
 }
 
+/* Pastille rouge flottant au-dessus du livre, centrée horizontalement sur la couverture. */
+/* Badge = bouton rond partagé .pf-roundbtn (rond rouge + icône crème + survol +
+   ombre, style.css) ; ici uniquement sa taille (32px) et son positionnement
+   flottant, centré au-dessus du livre. */
 .pf-book-reco-badge {
+	--pf-roundbtn-size: 24px;
 	position: absolute;
-	top: 6px;
-	left: calc(var(--spine-w) + 6px);
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	width: 26px;
-	height: 26px;
-	border-radius: 50%;
-	background: var(--pf-accent);
-	color: #fff;
-	box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
-	cursor: help;
+	bottom: calc(100% + 12px);
+	/* Aligné à droite : bord droit du badge sur le bord droit de la couverture. */
+	right: 0;
 	pointer-events: auto;
+	/* Même fondu d'apparition/disparition que le chevalet de prix ; on garde la
+	   transition de fond de .pf-roundbtn (survol accent-dark) au passage. */
+	transition: opacity 0.25s ease, background-color 0.2s ease;
+}
+
+/* « ? » = icône crème du bouton (couleur héritée de .pf-roundbtn). Centré par le
+   flex du .pf-roundbtn ; line-height:1 pour un centrage vertical net. */
+.pf-book-reco-badge__q {
+	display: block;
+	font-size: 15px;
+	font-weight: 700;
+	line-height: 1;
+}
+
+/* La croix (fermeture) prend la place du « ? » quand l'explication est ouverte. */
+.pf-book-reco-badge__close {
+	display: none;
+	width: 14px;
+	height: 14px;
+}
+
+.pf-book-reco.is-open .pf-book-reco-badge__q {
+	display: none;
+}
+
+.pf-book-reco.is-open .pf-book-reco-badge__close {
+	display: block;
 }
 
 .pf-book-reco-badge:focus-visible {
-	outline: 2px solid #fff;
-	outline-offset: 1px;
+	outline: 2px solid var(--pf-accent);
+	outline-offset: 2px;
 }
 
+/* Explication : overlay posé sur la couverture (au repos), révélé au clic. */
 .pf-book-reco-tip {
 	position: absolute;
 	top: 0;
@@ -1004,7 +1031,6 @@ img.pf-spine-icon {
 	height: var(--book-h);
 	box-sizing: border-box;
 	display: flex;
-	align-items: center;
 	margin: 0;
 	padding: 14px;
 	background: rgba(250, 246, 240, 0.96);
@@ -1023,11 +1049,99 @@ img.pf-spine-icon {
 	overflow: auto;
 }
 
-.pf-book-reco-badge:hover ~ .pf-book-reco-tip,
-.pf-book-reco-badge:focus ~ .pf-book-reco-tip,
+/* Centrage par marges auto (pas align-items:center) : quand le texte dépasse
+   la hauteur du conteneur, les marges auto se résorbent à 0 au lieu de
+   déborder symétriquement en haut ET en bas — le haut du texte reste aligné
+   sur le haut du conteneur au lieu d'être caché avant même de scroller. */
+.pf-book-reco-tip__text {
+	margin: auto 0;
+}
+
 .pf-book-reco.is-open .pf-book-reco-tip {
 	opacity: 1;
 	visibility: visible;
+	pointer-events: auto; /* capte le clic sur le texte → pas de navigation vers la fiche */
+}
+
+/* Le livre reste à plat (ni scale ni rotation) dans deux cas :
+   1) le curseur survole le BADGE (le badge flotte au-dessus mais reste un
+      descendant de .pf-book → sans ça, le survol du badge agrandissait le livre) ;
+   2) l'explication est ouverte (l'overlay est posé sur la couverture au repos →
+      elle doit rester alignée même si le curseur survole encore le livre).
+   Spécificité > la règle :hover, donc pas de !important. */
+.pf-bookshelf--covers .pf-book:hover:has(.pf-book-reco-badge:hover) .pf-book-inner,
+.pf-bookshelf--covers .pf-book:hover:has(.pf-book-reco-badge:hover) .pf-book-cover,
+.pf-bookshelf--covers .pf-book:hover:has(.pf-book-reco.is-open) .pf-book-inner,
+.pf-bookshelf--covers .pf-book:hover:has(.pf-book-reco.is-open) .pf-book-cover {
+	transform: none;
+}
+
+/* Survol du LIVRE (la couverture, pas le badge) : le badge s'efface (fondu, même
+   timing que le chevalet de prix) pour dégager la couverture agrandie. On garde
+   `opacity` plutôt que `display:none` pour l'animer ET pour qu'il reste survolable
+   (sinon insurvolable → clignotement). Il réapparaît au survol du badge lui-même
+   (`:not(:has(badge:hover))`) et reste plein quand l'explication est ouverte (le
+   badge est alors la croix de fermeture, `:not(:has(.is-open))`). */
+.pf-bookshelf--covers .pf-book:hover:not(:has(.pf-book-reco-badge:hover)):not(:has(.pf-book-reco.is-open)) .pf-book-reco-badge {
+	opacity: 0;
+}
+
+/* Étagère de suggestions : le badge flotte au-dessus des livres → on dégage le
+   haut du rayon pour lui laisser de l'air (scopé aux rayons portant un badge). */
+.pf-bookshelf:has(.pf-book-reco) .pf-shelf-books {
+	padding-top: 64px;
+}
+
+/* ─── Mode dos : badge + explication de recommandation ───────────────
+   Les dos sont étroits : le badge « ? » est UNIFORMÉMENT plus petit qu'en
+   couvertures (une taille par dos donnerait des boutons de tailles différentes,
+   incohérent) et centré au-dessus du dos. La couverture n'étant pas visible au
+   repos, l'explication ne peut pas s'y superposer comme en covers : elle
+   s'affiche en carte flottante centrée sur le livre (une seule ouverte à la
+   fois, account-reco.js). */
+.pf-bookshelf--spines .pf-book-reco-badge {
+	--pf-roundbtn-size: 20px;
+	right: auto;
+	left: 50%;
+	transform: translateX(-50%);
+	bottom: calc(100% + 8px);
+}
+
+.pf-bookshelf--spines .pf-book-reco-badge__q {
+	font-size: 13px;
+}
+
+.pf-bookshelf--spines .pf-book-reco-badge__close {
+	width: 12px;
+	height: 12px;
+}
+
+.pf-bookshelf--spines .pf-book-reco-tip {
+	left: 50%;
+	transform: translateX(-50%);
+	width: 190px;
+	max-width: 62vw;
+	height: auto;
+	max-height: var(--book-h);
+	border-radius: var(--pf-radius);
+	box-shadow: var(--pf-shadow-float), inset 0 0 0 1px var(--pf-border-light);
+}
+
+/* Livre au premier plan quand son explication est ouverte : la carte déborde
+   sur les dos voisins et doit passer au-dessus. */
+.pf-bookshelf--spines .pf-book:has(.pf-book-reco.is-open) {
+	z-index: 12;
+}
+
+/* Dès qu'une couverture est révélée (dos), TOUS les badges « ? » du rayon
+   s'effacent : on examine une couverture (et son signet), pas les suggestions.
+   Fondu de l'ensemble (et pas seulement du badge du livre révélé) car la
+   couverture agrandie déborde sur les dos voisins → sans ça leur badge dépasserait
+   au-dessus d'elle. L'explication reste consultable en survolant un dos SANS le
+   révéler (le survol du badge ne révèle pas, cf. bookshelf.js) puis en cliquant. */
+.pf-bookshelf--spines:has(.pf-book--cover-revealed) .pf-book-reco-badge {
+	opacity: 0;
+	pointer-events: none;
 }
 
 /* ─── Empty State ────────────────────────────────────────────── */
@@ -1133,11 +1247,6 @@ img.pf-spine-icon {
 /* ─── Responsive ─────────────────────────────────────────────── */
 
 @media (max-width: 768px) {
-	.pf-shelf-books {
-		gap: 12px;
-		padding: 15px 15px 0;
-	}
-
 	.pf-bookshelf--covers .pf-book-spine {
 		transform: skewY(10deg);
 		transform-origin: right center;
@@ -1167,13 +1276,6 @@ img.pf-spine-icon {
 	}
 }
 
-@media (max-width: 480px) {
-	.pf-shelf-books {
-		gap: 8px;
-		padding: 10px 10px 0;
-	}
-}
-
 /* ─── Reduced motion ─────────────────────────────────────────── */
 
 @media (prefers-reduced-motion: reduce) {
@@ -1189,4 +1291,87 @@ img.pf-spine-icon {
 		transition-duration: 0.01s !important;
 		transition-delay: 0s !important;
 	}
+}
+
+/* ─── Signet « liste de lecture » sur la couverture ──────────────
+   Enfant de .pf-book-cover → tourne AVEC la couverture au survol
+   (contrairement au badge reco, volontairement figé). Deux tons via
+   des vars locales inversées selon l'appartenance à la liste. L'infobulle,
+   elle, est un flottant global géré en JS (voir style.css / shelf-bookmarks.js).
+   Comportement : inc/class-bookshelf.php (rendu) + assets/js/shelf-bookmarks.js. */
+.pf-book-bookmark {
+	/* Étoile + contour hors liste : brun sourd propre au signet (hors palette). */
+	--pf-bm-ink: #928369;
+	--pf-bm-fill: var(--pf-cream);
+	--pf-bm-star: var(--pf-bm-ink);
+	--pf-bm-stroke: var(--pf-bm-ink);
+	position: absolute;
+	top: 0;
+	left: 0;
+	/* viewBox serré sur le path sharp (200 -840 560 720). La hauteur contraint le
+	   rendu (élément un peu plus large que le viewBox) → le signet remplit la
+	   hauteur, haut collé au top de la couverture (preserveAspectRatio xMidYMin). */
+	width: 24px;
+	height: 30px;
+	/* Zone de survol/clic élargie de 3px (gauche, droite, bas) sans déplacer le
+	   SVG : content-box → width/height = taille du SVG, le padding s'ajoute autour.
+	   Le padding-gauche de 3px compense le left remis à 0 (le SVG reste à 3px). */
+	box-sizing: content-box;
+	padding: 0 3px 3px 3px;
+	z-index: 4;
+	cursor: pointer;
+	transition: opacity 0.15s ease;
+	-webkit-tap-highlight-color: transparent;
+}
+
+.pf-book-bookmark.is-in-list {
+	--pf-bm-fill: var(--pf-accent);
+	--pf-bm-star: var(--pf-cream);
+	--pf-bm-stroke: var(--pf-cream);
+}
+
+/* Survol : aperçu des couleurs de l'état INVERSE (ce que ferait le clic).
+   `.is-hover` = survol simulé en JS (shelf-bookmarks.js) : en mode dos le signet
+   est sur une couverture 3D (preserve-3d) dont le hit-testing est incohérent, donc
+   le `:hover` natif ne s'y déclenche pas → on le détecte par géométrie. */
+.pf-book-bookmark:hover,
+.pf-book-bookmark.is-hover {
+	--pf-bm-fill: var(--pf-accent);
+	--pf-bm-star: var(--pf-cream);
+	--pf-bm-stroke: var(--pf-cream);
+}
+
+.pf-book-bookmark.is-in-list:hover,
+.pf-book-bookmark.is-in-list.is-hover {
+	--pf-bm-fill: var(--pf-cream);
+	--pf-bm-star: var(--pf-bm-ink);
+	--pf-bm-stroke: var(--pf-bm-ink);
+}
+
+.pf-book-bookmark svg {
+	display: block;
+	width: 100%;
+	height: 100%;
+}
+
+/* Silhouette pleine du signet + contour (couleur contrastée) qui trace tout le
+   pourtour pour le démarquer des couvertures. Trait centré sur le path, dessiné
+   par-dessus le remplissage (le viewBox est élargi côté SVG pour ne pas le rogner). */
+.pf-book-bookmark__body {
+	fill: var(--pf-bm-fill);
+	stroke: var(--pf-bm-stroke);
+	stroke-width: 40; /* unités viewBox → ~1,5px rendu à 24×30 */
+	transition: fill 0.15s ease, stroke 0.15s ease;
+}
+
+/* Étoile posée par-dessus, dans la couleur contrastée. */
+.pf-book-bookmark__star {
+	fill: var(--pf-bm-star);
+	transition: fill 0.15s ease;
+}
+
+.pf-book-bookmark:focus-visible {
+	outline: none;
+	border-radius: var(--pf-radius);
+	box-shadow: var(--pf-focus-ring-accent);
 }

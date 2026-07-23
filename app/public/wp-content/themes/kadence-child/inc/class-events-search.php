@@ -205,7 +205,7 @@ class Passiflore_Events_Search {
 						<img
 							class="tribe-events-calendar-list__event-featured-image"
 							src="<?php echo esc_url( $event->thumbnail->full->url ); ?>"
-							<?php if ( ! empty( $event->thumbnail->srcset ) ) : ?>srcset="<?php echo esc_attr( $event->thumbnail->srcset ); ?>"<?php endif; ?>
+							<?php if ( ! empty( $event->thumbnail->srcset ) ) : ?>srcset="<?php echo esc_attr( $event->thumbnail->srcset ); ?>" sizes="(max-width: 781px) 93vw, 360px"<?php endif; ?>
 							alt="<?php echo ! empty( $event->thumbnail->alt ) ? esc_attr( $event->thumbnail->alt ) : ''; ?>"
 							<?php if ( ! empty( $event->thumbnail->full->width ) && ! empty( $event->thumbnail->full->height ) ) : ?>
 								width="<?php echo esc_attr( $event->thumbnail->full->width ); ?>"
@@ -255,12 +255,12 @@ class Passiflore_Events_Search {
 		$show_time     = empty( $event->all_day );
 
 		$event_week_day  = $display_date->format_i18n( 'l' );
-		$event_day_num   = $display_date->format_i18n( 'j' );
+		$event_day_num   = pf_date_i18n_ordinal( 'j', $display_date->getTimestamp() ); // déjà échappé (avec <sup> brut pour "1er")
 		$event_date_attr = $display_date->format( Dates::DBDATEFORMAT );
 		$start_time      = $show_time ? pf_event_format_hm( (int) $display_date->format( 'G' ), (int) $display_date->format( 'i' ) ) : '';
 
 		$end_week_day  = $end_date->format_i18n( 'l' );
-		$end_day_num   = $end_date->format_i18n( 'j' );
+		$end_day_num   = pf_date_i18n_ordinal( 'j', $end_date->getTimestamp() ); // déjà échappé (avec <sup> brut pour "1er")
 		$end_date_attr = $end_date->format( Dates::DBDATEFORMAT );
 		$end_time      = $show_time ? pf_event_format_hm( (int) $end_date->format( 'G' ), (int) $end_date->format( 'i' ) ) : '';
 
@@ -293,11 +293,11 @@ class Passiflore_Events_Search {
 					$show_time       = true;
 					$pf_daily_hours_used = true;
 					$event_week_day  = ucfirst( date_i18n( 'l', (int) strtotime( $pf_first ) ) );
-					$event_day_num   = date_i18n( 'j', (int) strtotime( $pf_first ) );
+					$event_day_num   = pf_date_i18n_ordinal( 'j', (int) strtotime( $pf_first ) ); // déjà échappé (avec <sup> brut pour "1er")
 					$event_date_attr = date( 'Y-m-d', (int) strtotime( $pf_first ) );
 					[ $start_time, $pf_first_end ] = $pf_day_time_parts( $pf_hours[ $pf_first ] );
 					$end_week_day    = ucfirst( date_i18n( 'l', (int) strtotime( $pf_last ) ) );
-					$end_day_num     = date_i18n( 'j', (int) strtotime( $pf_last ) );
+					$end_day_num     = pf_date_i18n_ordinal( 'j', (int) strtotime( $pf_last ) ); // déjà échappé (avec <sup> brut pour "1er")
 					$end_date_attr   = date( 'Y-m-d', (int) strtotime( $pf_last ) );
 					[ $pf_last_start, $end_time ] = $pf_day_time_parts( $pf_hours[ $pf_last ] );
 				}
@@ -310,7 +310,7 @@ class Passiflore_Events_Search {
 		<div <?php tec_classes( tribe_get_post_class( [ 'tribe-events-calendar-list__event-date-tag', 'tribe-common-g-col' ], $event->ID ) ); ?>>
 			<time class="tribe-events-calendar-list__event-date-tag-datetime" datetime="<?php echo esc_attr( $event_date_attr ); ?>" aria-hidden="true">
 				<span class="tribe-events-calendar-list__event-date-tag-weekday"><?php echo esc_html( $event_week_day ); ?></span>
-				<span class="tribe-events-calendar-list__event-date-tag-daynum tribe-common-h5 tribe-common-h4--min-medium"><?php echo esc_html( $event_day_num ); ?></span>
+				<span class="tribe-events-calendar-list__event-date-tag-daynum tribe-common-h5 tribe-common-h4--min-medium"><?php echo $event_day_num; // phpcs:ignore WordPress.Security.EscapeOutput — pré-échappé (pf_date_i18n_ordinal) ?></span>
 				<?php if ( $show_time && $start_time !== '' ) : ?>
 				<span class="tribe-events-calendar-list__event-date-tag-time">
 					<?php echo esc_html( $start_time ); ?>
@@ -328,7 +328,7 @@ class Passiflore_Events_Search {
 			</span>
 			<time class="tribe-events-calendar-list__event-date-tag-datetime" datetime="<?php echo esc_attr( $end_date_attr ); ?>" aria-hidden="true">
 				<span class="tribe-events-calendar-list__event-date-tag-weekday"><?php echo esc_html( $end_week_day ); ?></span>
-				<span class="tribe-events-calendar-list__event-date-tag-daynum tribe-common-h5 tribe-common-h4--min-medium"><?php echo esc_html( $end_day_num ); ?></span>
+				<span class="tribe-events-calendar-list__event-date-tag-daynum tribe-common-h5 tribe-common-h4--min-medium"><?php echo $end_day_num; // phpcs:ignore WordPress.Security.EscapeOutput — pré-échappé (pf_date_i18n_ordinal) ?></span>
 				<?php if ( $show_time && $end_time !== '' ) : ?>
 				<span class="tribe-events-calendar-list__event-date-tag-time">
 					<?php if ( $pf_daily_hours_used && $pf_last_start !== '' ) : ?>

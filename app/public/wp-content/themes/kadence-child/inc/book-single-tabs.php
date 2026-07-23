@@ -674,7 +674,12 @@ function passiflore_tab_caracteristiques() {
 	if ( $date_raw ) {
 		$date = DateTime::createFromFormat( 'Ymd', $date_raw );
 		if ( $date ) {
-			$rows[] = [ 'Date de parution', date_i18n( 'j F Y', $date->getTimestamp() ) ];
+			if ( (int) $date->format( 'j' ) === 1 ) {
+				$date_value = '1<sup>er</sup> ' . esc_html( date_i18n( 'F Y', $date->getTimestamp() ) );
+			} else {
+				$date_value = esc_html( date_i18n( 'j F Y', $date->getTimestamp() ) );
+			}
+			$rows[] = [ 'Date de parution', $date_value, true ];
 		}
 	}
 	if ( $type ) {
@@ -716,8 +721,10 @@ function passiflore_tab_caracteristiques() {
 
 	if ( $rows ) {
 		echo '<table class="bs-caract-table">';
-		foreach ( $rows as [ $label, $value ] ) {
-			echo '<tr><th>' . esc_html( $label ) . '</th><td>' . esc_html( $value ) . '</td></tr>';
+		foreach ( $rows as $row ) {
+			[ $label, $value ] = $row;
+			$is_raw = $row[2] ?? false;
+			echo '<tr><th>' . esc_html( $label ) . '</th><td>' . ( $is_raw ? $value : esc_html( $value ) ) . '</td></tr>';
 		}
 		echo '</table>';
 	}

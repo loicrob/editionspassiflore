@@ -17,18 +17,41 @@
     overflow: hidden;
 }
 
-/* Rangée haute : contenu (+ actualités flottante sur grand écran) + catégories.
-   flex-direction:column pour le mobile+tablette (<769px, seul contexte où
-   .pf-hero-haut reste une vraie boîte flex) : empile contenu puis catégories,
-   comme sur grand écran (display:contents, cf. media query) où l'ordre vient
-   de la grille plutôt que du flex. */
-.pf-hero-haut {
+/* Contrainte latérale du hero : .pf-hero reste plein-bleed (fond ::before),
+   .pf-hero-inner (site-container) cale le CONTENU à la largeur normale du
+   site et le centre — même classe que les sections plus bas (#pf-en-ce-moment,
+   .pf-au-catalogue-section), juste posée ici sur un wrapper dédié plutôt que
+   sur la section elle-même puisque le fond doit rester plein-bleed.
+   flex:1 (≠ height:100%) : .pf-hero est déjà flex-column, ce mécanisme suffit
+   à remplir sa hauteur (cf. bloc ≤768px et desktop) sans dépendance
+   circulaire ; site-container fournit son propre max-width/margin/padding
+   (Kadence).
+   ⚠ width:100% nécessaire : testé sans — align-items:stretch (défaut du
+   flex parent) ne suffit pas à faire remplir .pf-hero-inner jusqu'à son
+   max-width une fois qu'elle passe en grid (bloc desktop plus bas) avec des
+   pistes minmax(0,50%)/1fr — ces unités retombent sur un dimensionnement
+   basé sur le contenu (donc plus étroit) le temps que le stretch soit résolu,
+   au lieu de partir de la largeur disponible. */
+.pf-hero-inner {
     flex: 1;
+    width: 100%;
     display: flex;
     flex-direction: column;
     min-height: 0;
     position: relative;
     z-index: 2;
+}
+
+/* Rangée haute : contenu (+ actualités flottante sur grand écran) + catégories.
+   flex-direction:column pour le mobile+tablette (<769px, seul contexte où
+   .pf-hero-haut reste une vraie boîte flex) : empile contenu puis catégories,
+   comme sur grand écran (display:contents, cf. media query) où l'ordre vient
+   de la grille (posée sur .pf-hero-inner) plutôt que du flex. */
+.pf-hero-haut {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
 }
 
 /* Slot actualités — masqué par défaut (mobile+tablette <769px : l'encart est
@@ -44,7 +67,7 @@
     flex: 1;
     display: flex;
     flex-direction: column;
-    justify-content: space-between;
+    justify-content: space-evenly;
     align-items: center;
     padding: 3rem 3.5rem 5rem;
     position: relative;
@@ -68,42 +91,25 @@
     z-index: 0;
 }
 
-/* Logo à gauche, colonne titre+sous-titre à droite (.pf-hero-texte). Le logo
-   tire sa hauteur du texte (2 lignes de titre) via calc() sur
-   --pf-marque-font-size — partagée avec .pf-hero-typage-nom plus bas, et
-   re-déclarée dans le bloc ≤768px (mobile+tablette) qui réduit ce font-size,
-   seule source de vérité.
-   ⚠ Ne PAS remplacer par un height:100% flexbox classique : dans un
-   conteneur à hauteur automatique, un height:100% en pourcentage ne peut pas
-   se résoudre (dépendance circulaire) et retombe sur la taille intrinsèque du
-   fichier logo (256px, cf. get_site_icon_url(256) dans le PHP) au lieu de
-   suivre le texte — logo bien plus grand que voulu.
-   align-items:flex-start (≠ center) : le logo est calé sur la hauteur du
-   seul titre, tandis que .pf-hero-texte est plus haut (titre + sous-titre) —
-   flex-start aligne leurs sommets plutôt que de centrer le logo sur
-   l'ensemble, plus court. */
+/* Logo (icône) + wordmark ("Editions" + "Passiflore", 2 images) côte à côte.
+   Tailles indépendantes (--pf-marque-logo-h / --pf-marque-wordmark-h,
+   partagée cette dernière avec .pf-hero-wordmark img plus bas) : l'icône n'a
+   plus besoin de caler sa hauteur sur le texte depuis que
+   .pf-hero-sous-titre-wrap est un sibling (cf. plus bas), pas un enfant à
+   englober en hauteur. align-items:center (≠ flex-start) : icône
+   sensiblement plus grande que le texte, centrée dessus plutôt qu'alignée en
+   haut pour rester équilibrée. */
 .pf-hero-marque {
     display: flex;
-    align-items: flex-start;
-    gap: var(--pf-space-4);
-    --pf-marque-font-size: clamp(2rem, 3vw, 3.2rem);
-}
-
-.pf-hero-texte {
-    display: flex;
-    flex-direction: column;
-    gap: var(--pf-space-1);
+    align-items: center;
+    gap: var(--pf-space-3);
+    --pf-marque-logo-h: clamp(3.5rem, 5.5vw, 5.5rem);
+    --pf-marque-wordmark-h: clamp(2rem, 3vw, 2.4rem);
 }
 
 .pf-hero-logo-wrap {
-    /* Sans flex-shrink:0, si .pf-hero-typage-nom (mots insécables) manque de
-       place, flexbox réduirait la largeur allouée au logo tout en gardant sa
-       hauteur fixe → l'image s'écraserait en tranche verticale. */
-    flex-shrink: 0;
-    /* 1.12 : même valeur que le min-height:1.12em de .pf-hero-ligne (le
-       plancher qui pilote réellement la hauteur de chaque ligne — un peu plus
-       grand que le line-height:1.08 nominal de .pf-hero-typage-nom). */
-    height: calc(2 * 1.12 * var(--pf-marque-font-size));
+    height: var(--pf-marque-logo-h);
+    aspect-ratio: 1;
 }
 
 .pf-hero-logo-wrap a {
@@ -118,37 +124,43 @@
     width: auto;
 }
 
-/* ── Typing text ── */
-
-/* row + wrap (≠ column figé) : « Editions » et « Passiflore » se mettent côte
-   à côte dès qu'il y a la largeur pour, repassent l'un sous l'autre sinon. */
-.pf-hero-typage-nom {
+/* Wordmark statique (remplace l'ancien texte tapé "Editions Passiflore") —
+   "Editions" et "Passiflore" sont deux images distinctes en flex-wrap : la
+   paire repasse l'une sous l'autre si la largeur manque, plutôt que de
+   shrinker. Alignées à gauche l'une sous l'autre (justify-content:flex-start,
+   valeur par défaut) plutôt que centrées entre elles : c'est l'ensemble
+   logo+wordmark qui doit paraître centré, pas chaque mot dans sa boîte — cf.
+   accueil.js (initWordmarkFit) qui cale la largeur de cette boîte sur
+   "Passiflore" une fois empilé pour que .pf-hero-contenu centre le bon
+   rectangle (sans ce correctif, la boîte reste large de la paire côte à côte
+   même repliée, donc le tout paraît décalé à gauche une fois centré). */
+.pf-hero-wordmark {
     display: flex;
-    flex-direction: row;
     flex-wrap: wrap;
-    align-items: baseline;
+    align-items: flex-end;
     row-gap: 0;
-    column-gap: 0.3em;
-    font-size: var(--pf-marque-font-size);
-    font-weight: 200;
-    line-height: 1.08;
-    letter-spacing: -0.015em;
-    color: var(--pf-heading);
+    column-gap: calc(var(--pf-marque-wordmark-h) * 0.24);
+    row-gap: var(--pf-space-3);
 }
 
-/* Même principe que .pf-hero-typage-nom ci-dessus. justify-content (et non
-   align-items) pilote l'alignement horizontal : en flex-wrap, il s'applique
-   indépendamment à chaque ligne repliée, donc centre (ou aligne à gauche,
-   cf. .pf-hero-contenu .pf-hero-sous-titre-wrap plus bas) aussi bien la paire
-   accolée qu'une ligne seule une fois repliée. */
+.pf-hero-wordmark img {
+    display: block;
+    height: var(--pf-marque-wordmark-h);
+    width: auto;
+}
+
+/* ── Typing text ── */
+
+/* justify-content (et non align-items) pilote l'alignement horizontal : en
+   flex-wrap, il s'applique indépendamment à chaque ligne repliée, donc centre
+   aussi bien la paire accolée qu'une ligne seule une fois repliée. */
 .pf-hero-sous-titre-wrap {
     display: flex;
-    flex-direction: row;
+    flex-direction: column;
     flex-wrap: wrap;
-    align-items: baseline;
+    align-items: center;
     justify-content: center;
-    row-gap: 0;
-    column-gap: 0.3em;
+    gap: var(--pf-space-2);
 }
 
 .pf-hero-ligne {
@@ -159,16 +171,12 @@
 .pf-hero-sous-titre {
     text-align: center;
     font-family: var(--global-heading-font-family);
-    font-size: clamp(1rem, 1.6vw, 1.2rem);
+    font-size: clamp(0.9rem, 1.6vw, 1.1rem);
     font-weight: 400;
     letter-spacing: 0.12em;
     color: var(--pf-accent);
-    min-height: 1.4em;
-    line-height: 1.4em;
-}
-
-#pf-ligne-2 {
-    font-weight: 700;
+    min-height: 1em;
+    line-height: 1em;
 }
 
 /* Blinking cursor via ::after on the active line — absolute so it doesn't
@@ -204,9 +212,17 @@
     max-width: 550px;
     margin: 0;
     font-size: clamp(0.75rem, 1.2vw, 0.88rem);
-    line-height: 1.65;
+    line-height: 1.5;
     color: var(--pf-text);
     min-height: 1.65em;
+}
+
+.pf-hero-presentation__line {
+    display: block;
+}
+
+.pf-hero-presentation__line + .pf-hero-presentation__line {
+    margin-top: var(--pf-space-2);
 }
 
 .pf-hero-presentation--active::after {
@@ -255,19 +271,28 @@
 }
 
 /* ── Hero category cards (dans .pf-hero-contenu) — spécialisation de .pf-card
-   (style.css) : seul le layout (contenu centré, texte seul sans média) est
-   propre au hero. Chrome ET typographie (taille/graisse du titre, taille du
-   texte, survol) héritées telles quelles de .pf-card. ── */
+   (style.css) : layout (contenu centré, texte seul sans média) propre au
+   hero ; le titre est un badge flottant coin haut-gauche (cf.
+   .pf-hero-cat-badge plus bas), pas un .pf-card-title classique. ── */
 
 .pf-hero-categories {
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: center;
     gap: var(--pf-space-4);
     flex-shrink: 0;
+    padding: 0 4px;
 }
 
 .pf-hero-cat {
     flex: 1;
+    max-width: 280px;
+    min-width: 200px;
+    /* .pf-card cadre normalement une image (overflow:hidden) ; ici pas de
+       média à rogner, et le badge titre a besoin de déborder du coin. */
+    overflow: visible;
+    border: 1px solid var(--pf-accent);
 }
 
 .pf-hero-cat .pf-card-content {
@@ -275,21 +300,100 @@
     justify-content: center;
     text-align: center;
     gap: var(--pf-space-2);
+    padding: var(--pf-space-4);
 }
 
-/* Encart « descendre » sous les catégories — masqué sur mobile+tablette,
-   visible à partir de 769px (cf. media query plus bas) */
-.pf-hero-scroll {
-    display: none;
+.pf-hero-cat .pf-card-content .pf-card-text {
+    font-size: clamp(0.75rem, 1.2vw, 0.88rem);
+}
+
+/* Titre en badge flottant — même motif que .bs-dispo-line (book-single.css) :
+   déborde légèrement du coin plutôt que d'être dans le flux du contenu.
+   Sélecteur à 2 classes : l'emporte sur .pf-badge--accent (style.css), même
+   spécificité sinon (ordre de fichier non garanti). */
+.pf-hero-cat .pf-hero-cat-badge {
+    position: absolute;
+    top: -0.7rem;
+    left: 0.6rem;
+    z-index: 2;
+    background: var(--pf-surface);
+    color: var(--pf-accent);
+    border: 1px solid var(--pf-accent);
+    font-size: 0.6rem;
+    transition: background var(--pf-transition), color var(--pf-transition);
+}
+
+/* Survol de la card : badge inversé (plein accent) — même logique que
+   .pf-card:hover .pf-card-title (style.css), mais en inversion de couleurs
+   plutôt qu'un simple changement de teinte. */
+.pf-hero-cat:hover .pf-hero-cat-badge,
+.pf-hero-cat:focus .pf-hero-cat-badge,
+.pf-hero-cat:focus-within .pf-hero-cat-badge {
+    background: var(--pf-accent);
+    color: var(--pf-surface);
+}
+
+/* Encart « descendre » sous les catégories — même style que .pf-hero-cat,
+   caret animé, visible à toute taille d'écran. SIBLING de .pf-hero-inner
+   (pas un enfant) : pleine largeur du hero, volontairement non contrainte
+   par site-container (cf. commentaire de la media query desktop plus bas). */
+.pf-hero-scroll, .pf-hero-scroll:active {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    margin-top: 1px;
+    padding: 1.2rem 0 1.4rem;
+    border: none;
+    background: var(--pf-hero-glass);
+    color: var(--pf-accent);
+    cursor: pointer;
+    transition: background 0.2s ease, color 0.2s ease;
+}
+
+.pf-hero-scroll:hover,
+.pf-hero-scroll:focus {
+    background: var(--pf-accent);
+    color: var(--pf-surface);
+}
+
+.pf-hero-scroll svg {
+    display: block;
+}
+
+.pf-hero-scroll.pf-hero-scroll--anim svg {
+    animation: pf-hero-scroll-fade 1.5s ease-in-out infinite;
+}
+
+.pf-hero-scroll.is-paused svg {
+    animation: none;
+    opacity: 1;
+    transform: translateY(4px);
+}
+
+.pf-hero-scroll.is-clicked svg {
+    animation: none;
+}
+
+@keyframes pf-hero-scroll-fade {
+    0%   { opacity: 0; transform: translateY(-12px); }
+    75%  { opacity: 1; transform: translateY(4px); }
+    100%  { opacity: 1; transform: translateY(4px); }
 }
 
 /* ── Grand écran (ordinateur + tablette en mode paysage) : hero en deux
    colonnes. .pf-hero-contenu (contient les catégories) remplit toute la
-   colonne de gauche, actualités seule à droite (remplit sa hauteur), scroll
-   en pleine largeur tout en bas. .pf-hero-haut passe en display:contents pour
-   que .pf-hero-contenu et .pf-hero-actualites-slot deviennent des items
-   directs de la grille posée sur .pf-hero, au même niveau que .pf-hero-scroll
-   (resté hors de .pf-hero-haut, seul à ne pas avoir besoin d'être flatten).
+   colonne de gauche, actualités seule à droite (remplit sa hauteur).
+   .pf-hero-haut passe en display:contents pour que .pf-hero-contenu et
+   .pf-hero-actualites-slot deviennent des items directs de la grille posée
+   sur .pf-hero-inner (site-container — cf. plus haut). .pf-hero-scroll, lui,
+   reste un simple SIBLING de .pf-hero-inner (hors site-container, cf. plus
+   haut) : pleine largeur du hero, pas seulement du contenu contraint — c'est
+   pour ça qu'il n'est pas dans la grille. .pf-hero lui-même reste flex-column
+   (règle de base, non surchargée ici) : seule sa hauteur change sur grand
+   écran, .pf-hero-inner{flex:1} continue de la remplir.
    En dessous de 769px, le Hero reste entièrement dans son état « mobile »
    (règles de base + le bloc ≤768px plus bas pour quelques ajustements
    partagés) : pas de palier tablette intermédiaire. ── */
@@ -298,12 +402,18 @@
     .pf-hero {
         height: calc(100dvh - var(--pf-sticky-offset, 0px));
         min-height: 520px;
+    }
+
+    .pf-hero-inner {
         display: grid;
         grid-template-columns: minmax(0, 50%) 1fr;
-        grid-template-rows: 1fr auto;
-        grid-template-areas:
-            "contenu actualites"
-            "scroll  scroll";
+        grid-template-areas: "contenu actualites";
+        /* Sépare .pf-hero-contenu et .pf-hero-actualites-slot — elles n'ont
+           plus de padding latéral propre (cf. leurs règles plus bas), site-
+           container gère déjà les bords extérieurs. Valeur = somme des deux
+           anciens paddings latéraux (2.5rem + 2.5rem), pour un espacement
+           visuel inchangé. */
+        gap: var(--pf-space-20);
     }
 
     .pf-hero-haut {
@@ -312,13 +422,7 @@
 
     .pf-hero-contenu {
         grid-area: contenu;
-        align-items: flex-start;
-        text-align: left;
-        padding: 2rem 2.5rem;
-    }
-
-    .pf-hero-contenu .pf-hero-sous-titre-wrap {
-        justify-content: flex-start;
+        padding: var(--pf-space-3) 0;
     }
 
     .pf-hero-contenu .pf-hero-btns {
@@ -333,7 +437,7 @@
         display: flex;
         align-items: center;
         justify-content: center;
-        padding: 2rem 2.5rem;
+        padding: 2rem 0;
         min-width: 0;
         min-height: 0;
     }
@@ -348,59 +452,6 @@
         /* height: 100%; */
         min-height: 0;
         overflow: hidden;
-    }
-
-    /* Deux encarts catégories côte à côte (50 / 50) */
-    .pf-hero-categories {
-        flex-direction: row;
-    }
-
-    /* Encart « descendre » : même style que .pf-hero-cat, caret animé */
-    .pf-hero-scroll, .pf-hero-scroll:active {
-        grid-area: scroll;
-        position: relative;
-        z-index: 2;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        width: 100%;
-        margin-top: 1px;
-        padding: 1.2rem 0 1.4rem;
-        border: none;
-        background: var(--pf-hero-glass);
-        color: var(--pf-accent);
-        cursor: pointer;
-        transition: background 0.2s ease, color 0.2s ease;
-    }
-
-    .pf-hero-scroll:hover,
-    .pf-hero-scroll:focus {
-        background: var(--pf-accent);
-        color: var(--pf-surface);
-    }
-
-    .pf-hero-scroll svg {
-        display: block;
-    }
-
-    .pf-hero-scroll.pf-hero-scroll--anim svg {
-        animation: pf-hero-scroll-fade 1.5s ease-in-out infinite;
-    }
-
-    .pf-hero-scroll.is-paused svg {
-        animation: none;
-        opacity: 1;
-        transform: translateY(4px);
-    }
-
-    .pf-hero-scroll.is-clicked svg {
-        animation: none;
-    }
-
-    @keyframes pf-hero-scroll-fade {
-        0%   { opacity: 0; transform: translateY(-12px); }
-        75%  { opacity: 1; transform: translateY(4px); }
-        100%  { opacity: 1; transform: translateY(4px); }
     }
 }
 
@@ -469,108 +520,6 @@ Workaround: stack two pseudo-elements. ::before is the base gradient (always vis
     55%       { translate: 0 8px; }
 }
 */
-
-/* ── Right column ── */
-
-.pf-hero-droite {
-    flex: 1 1 58%;
-    min-width: 0;
-    position: relative;
-    z-index: 2;
-    display: flex;
-    align-items: stretch;
-    background-color: var(--pf-hero-glass);
-    padding-bottom: 5rem;
-}
-
-/* Titre du carousel */
-.pf-carousel-titre {
-    padding: 1.25rem 1.5rem 0.75rem;
-    margin: 0;
-}
-
-/* Carousel in hero context */
-.pf-hero-carousel-wrap {
-    flex: 1;
-    min-width: 0;    /* supprime min-width:auto → le flex ne déborde plus pf-hero-droite */
-    overflow: hidden; /* scroll container → min-width auto = 0 ; contient Splide avant resize */
-    display: flex;
-    flex-direction: column;
-}
-
-.pf-hero-carousel {
-    flex: 1;
-    min-width: 0;
-    overflow: hidden; /* idem ; Splide recalcule la bonne largeur via ResizeObserver */
-    display: flex;
-    flex-direction: column;
-}
-
-.pf-hero-carousel .splide__track {
-    flex: 1;
-}
-
-.pf-hero-carousel .splide__list {
-    height: 100%;
-}
-
-/* Slide : centre la carte polaroïd, laisse de l'espace pour les flèches et la pagination */
-.pf-hero-carousel .pf-actualite-slide {
-    height: 100%;
-    min-height: 0;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    padding: 1.5rem 3.5rem 3rem;
-}
-
-/* Carte polaroïd — taille naturelle, centrée dans le slide */
-.pf-hero-carousel .pf-polaroid {
-    width: fit-content; /* épouse la largeur de l'image */
-    max-width: 100%;    /* ne dépasse pas l'espace entre les flèches */
-    flex: 0 0 auto;
-    display: flex;
-    flex-direction: column;
-    background: var(--pf-surface);
-    padding: 1rem;
-    box-shadow: 0 2px 8px rgb(26 22 21 / 21%), -6px 6px 20px 2px rgb(26 22 21 / 14%);
-    border-radius: 5px; /* hors échelle assumé : rendu « photo » du polaroïd */
-}
-
-/* Zone image : suit la taille naturelle de l'image */
-.pf-hero-carousel .pf-actualite-image {
-    flex: 0 0 auto; /* annule flex: 0 0 50% de la règle non-scopée */
-    line-height: 0;
-    overflow: hidden;
-    background: transparent;
-}
-
-.pf-hero-carousel .pf-actualite-image img {
-    display: block;
-    width: auto;
-    height: auto;
-    max-width: 100%;
-    max-height: calc((100dvh - var(--pf-sticky-offset, 0px)) * 0.6);
-}
-
-/* Infos sous l'image */
-.pf-hero-carousel .pf-actualite-contenu {
-    flex: 0 0 auto;
-    padding: 0;
-    margin-top: 1rem;
-    background: transparent;
-}
-
-.pf-hero-carousel .pf-actualite-titre {
-    font-size: 1.1rem;
-}
-
-/* Standalone carousel (outside hero — kept for backwards compat) */
-.pf-actualites-section {
-    width: 100%;
-    background: var(--pf-cream-dark);
-}
 
 .pf-actualites-carousel .splide__track {
     overflow: hidden;
@@ -802,17 +751,20 @@ Workaround: stack two pseudo-elements. ::before is the base gradient (always vis
     padding: 0.2rem 0.2rem 3rem 0.2rem;
 }
 
-/* Polaroid stylé et contraint.
-   height:100% donne une hauteur *définie* (≠ max-height qui ne fait que
-   plafonner et laisse la hauteur indéfinie), indispensable pour que la
-   hauteur de l'image se résolve. La chaîne est définie aussi bien dans le hero
-   (hero → slide) que sur mobile (Splide pose une hauteur inline sur le track),
-   donc l'image est contrainte en hauteur dans les deux cas — carte
-   proportionnelle qui épouse le plus large entre image et légende. */
+/* Polaroid stylé, taille NATURELLE plafonnée (≠ imposée) : height:100% a été
+   retiré au profit de max-height:100%, sinon la carte était étirée à la
+   hauteur du slide et l'image finissait en object-fit:contain dans une boîte
+   au mauvais ratio (bandes blanches haut/bas ou gauche/droite selon
+   l'orientation de la photo). La carte flotte désormais à la taille de
+   l'image (cf. .pf-actualite-image plus bas), centrée par
+   .pf-actualite-slide (align-items/justify-content:center) dans l'espace
+   fixe du carrousel — l'espace libre autour de la carte est un cadrage
+   assumé, plus un artefact de object-fit. Boîte du carrousel (et donc
+   flèches/pagination) inchangée : rien ne bouge d'une diapo à l'autre. */
 .pf-en-ce-moment-actualites .pf-polaroid {
     width: fit-content;
     max-width: 100%;
-    height: 100%;
+    max-height: 100%;
     min-height: 0;
     display: flex;
     flex-direction: column;
@@ -826,19 +778,19 @@ Workaround: stack two pseudo-elements. ::before is the base gradient (always vis
     overflow: hidden;
 }
 
-/* aspect-ratio inline (PHP) + height:100% → largeur DÉFINIE = hauteur × ratio.
-   C'est cette largeur définie (et non la largeur naturelle de l'image, que le
-   calcul intrinsèque utiliserait sinon) qui dimensionne l'image. width:auto
-   laisse le ratio piloter ; max-width évite tout débordement. NB : le polaroïd
-   épouse le plus large entre cette image et la légende (limite de CSS pur :
-   fit-content ne peut pas se caler sur la seule image quand le texte est plus
-   large). */
+/* aspect-ratio inline (PHP) + max-width/max-height (≠ height:100% imposé) →
+   l'image se dimensionne à son ratio RÉEL, plafonnée sur les deux axes (celui
+   qui plafonne en premier gagne) au lieu d'être étirée dans une boîte au
+   mauvais ratio. flex:0 0 auto (≠ flex:1) : ne grandit plus pour remplir la
+   colonne, prend sa taille naturelle. NB : le polaroïd épouse le plus large
+   entre cette image et la légende (limite de CSS pur : fit-content ne peut
+   pas se caler sur la seule image quand le texte est plus large). */
 .pf-en-ce-moment-actualites .pf-actualite-image {
-    flex: 1;
+    flex: 0 0 auto;
     min-height: 0;
-    height: 100%;
     width: auto;
     max-width: 100%;
+    max-height: 100%;
     overflow: hidden;
     background: transparent;
     display: flex;
@@ -1039,6 +991,14 @@ Workaround: stack two pseudo-elements. ::before is the base gradient (always vis
 /* ── 6. Responsive ──────────────────────────────────────────────────────────── */
 
 @media ( max-width: 768px ) {
+    .pf-hero-sous-titre-wrap {
+        gap: var(--pf-space-1);
+    }
+
+    .pf-hero-presentation__line + .pf-hero-presentation__line {
+        margin-top: var(--pf-space-1);
+    }
+
     .pf-en-ce-moment-cols {
         flex-direction: column;
         gap: 0;
@@ -1056,25 +1016,7 @@ Workaround: stack two pseudo-elements. ::before is the base gradient (always vis
     .pf-en-ce-moment-actualites .pf-actualites-carousel {
         align-self: center;
         width: 100%;
-        max-width: 460px;
-    }
-
-    /* Mobile/tablette : le carousel est relocalisé dans .pf-en-ce-moment-cols,
-       conteneur sans hauteur définie → Splide auto-dimensionnait le track trop
-       petit (images riquiqui). On lui donne une hauteur définie et généreuse,
-       comme le hero sur desktop : l'image se contraint alors à une bonne taille.
-       flex:none pour que la hauteur prime sur le flex:1 (flex-basis 0%). */
-    .pf-en-ce-moment-actualites .pf-actualites-carousel {
-        padding: 1rem;
-        flex: none;
-        height: min(62vh, 460px);
-    }
-
-    /* Annule le cap générique max-height:240px (règle .pf-actualite-image plus
-       bas, héritée de l'ancien carousel standalone) qui rapetissait les images
-       de cette section. La hauteur définie du carousel les contraint déjà. */
-    .pf-en-ce-moment-actualites .pf-actualite-image {
-        max-height: none;
+        max-width: 350px;
     }
 
     /* Polaroïd à largeur DÉFINIE sur mobile (≠ fit-content de la règle de base).
@@ -1095,11 +1037,12 @@ Workaround: stack two pseudo-elements. ::before is the base gradient (always vis
     }
 
     .pf-hero-contenu {
-        padding: 2.5rem 2rem;
+        padding: var(--pf-space-3) 0;
     }
 
     .pf-hero-marque {
-        --pf-marque-font-size: clamp(1.6rem, 7.5vw, 2.3rem);
+        --pf-marque-logo-h: clamp(2.8rem, 11vw, 4rem);
+        --pf-marque-wordmark-h: clamp(1.6rem, 7.5vw, 2.3rem);
     }
 
     .pf-actualite-slide {
@@ -1125,6 +1068,7 @@ Workaround: stack two pseudo-elements. ::before is the base gradient (always vis
     }
 
     .pf-hero-marque {
-        --pf-marque-font-size: clamp(1.6rem, 7.5vw, 2.3rem);
+        --pf-marque-logo-h: clamp(2.8rem, 11vw, 4rem);
+        --pf-marque-wordmark-h: clamp(1.6rem, 7.5vw, 2.3rem);
     }
 }

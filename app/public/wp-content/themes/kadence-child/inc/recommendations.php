@@ -6,7 +6,8 @@ if ( ! defined( 'ABSPATH' ) ) exit;
  *
  * Moteur de recommandation (lecture seule, sans état → procédural pf_reco_*) :
  * croise les achats du client et sa liste de lecture, agrège les œuvres liées
- * (vous aimerez aussi, série, traductions, même auteur), classe par nombre de
+ * (vous aimerez aussi, série, traductions, même auteur, mêmes mots-clés/étiquettes),
+ * classe par nombre de
  * « graines » contributrices, exclut le déjà-possédé, et rend l'étagère 3D avec
  * une explication par livre (« Parce que vous avez commandé… »).
  *
@@ -137,6 +138,26 @@ function pf_reco_candidates_for_seed( int $seed_id ): array {
 		}
 	}
 
+	// Mêmes mots-clés (étiquettes produit WooCommerce, ex. « Landes »). Une seule
+	// requête indexée par graine (tax_query sur wp_term_relationships), pas de
+	// parcours du catalogue. À égalité avec les autres relations (choix acté).
+	$tag_terms = wp_get_object_terms( $seed_id, 'product_tag', [ 'fields' => 'ids' ] );
+	if ( ! is_wp_error( $tag_terms ) && ! empty( $tag_terms ) ) {
+		$tagged = get_posts( [
+			'post_type'      => 'product',
+			'post_status'    => 'publish',
+			'posts_per_page' => -1,
+			'fields'         => 'ids',
+			'no_found_rows'  => true,
+			'tax_query'      => [ [
+				'taxonomy' => 'product_tag',
+				'field'    => 'term_id',
+				'terms'    => $tag_terms,
+			] ],
+		] );
+		$add( pf_bg_dedup( $tagged ), 'mots-cles' );
+	}
+
 	return $out;
 }
 
@@ -206,47 +227,75 @@ function pf_reco_get_recommendations( int $user_id, int $limit = 12 ): array {
 }
 
 /**
- * Phrase d'explication (FR) à partir des raisons d'un candidat.
- * Garde au plus 2 graines (achats prioritaires), ex. :
- * « Parce que vous avez commandé « Le bleu des flammes » et « L'amer du thé »
- *   est dans votre liste de lecture. »
+ * Phrase d'explication (FR) d'un candidat. Titres en gras + italique, regroupés
+ * par provenance (liste de lecture, puis achats), ex. :
+ * « Suggéré parce que <em>A</em> et <em>B</em> sont dans votre liste de lecture
+ *   et parce que vous avez commandé <em>C</em>. » Accord est/sont géré. Au-delà de
+ * 3 titres par groupe, le surplus est résumé (« et N autres livres ») pour borner la
+ * longueur quand beaucoup de graines contribuent.
+ * ⚠ Contient du HTML (<strong>/<em>) → à rendre via wp_kses, pas esc_html.
  */
 function pf_reco_explanation( array $reasons ): string {
-	$by_seed = [];
+	// Titres regroupés par provenance, dédupliqués par graine.
+	$groups = [ 'liste' => [], 'achat' => [] ];
+	$seen   = [];
 	foreach ( $reasons as $r ) {
 		$sid = (int) $r['seed_id'];
-		if ( ! isset( $by_seed[ $sid ] ) ) {
-			$by_seed[ $sid ] = [ 'title' => (string) $r['title'], 'source' => $r['source'] ];
+		if ( isset( $seen[ $sid ] ) ) {
+			continue;
 		}
+		$seen[ $sid ] = true;
+		$src              = ( 'achat' === $r['source'] ) ? 'achat' : 'liste';
+		$groups[ $src ][] = (string) $r['title'];
 	}
-	if ( empty( $by_seed ) ) {
+
+	$clauses = [];
+	// Ordre imposé par le pattern : liste de lecture, puis achats.
+	if ( $groups['liste'] ) {
+		$verb      = ( count( $groups['liste'] ) > 1 ) ? 'sont' : 'est';
+		$clauses[] = pf_reco_format_titles( $groups['liste'] ) . ' ' . $verb . ' dans votre liste de lecture';
+	}
+	if ( $groups['achat'] ) {
+		$clauses[] = 'vous avez commandé ' . pf_reco_format_titles( $groups['achat'] );
+	}
+	if ( empty( $clauses ) ) {
 		return '';
 	}
 
-	// Achats d'abord, puis liste.
-	uasort( $by_seed, function ( $a, $b ) {
-		$rank = [ 'achat' => 0, 'liste' => 1 ];
-		return ( $rank[ $a['source'] ] ?? 9 ) <=> ( $rank[ $b['source'] ] ?? 9 );
-	} );
-	$by_seed = array_slice( $by_seed, 0, 2 );
+	return 'Suggéré parce que ' . implode( ' et parce que ', $clauses ) . '.';
+}
 
-	$clauses = [];
-	foreach ( $by_seed as $seed ) {
-		$titre = '« ' . $seed['title'] . ' »';
-		$clauses[] = ( 'achat' === $seed['source'] )
-			? 'vous avez commandé ' . $titre
-			: $titre . ' est dans votre liste de lecture';
+/**
+ * Titres en gras + italique, joints « A, B et C » (passiflore_join_with_et).
+ * Au-delà de 3, le surplus est résumé en « et N autres livres » — on ne résume qu'à
+ * partir de 5 titres (à 4, « et 1 autre » n'économiserait rien : on les liste
+ * tous). Titres échappés (esc_html) avant d'être enveloppés de <strong><em>.
+ */
+function pf_reco_format_titles( array $titles ): string {
+	$max = 3;
+	if ( count( $titles ) > $max + 1 ) {
+		$extra  = count( $titles ) - $max;
+		$titles = array_slice( $titles, 0, $max );
+	} else {
+		$extra = 0;
 	}
-
-	return 'Parce que ' . implode( ' et ', $clauses ) . '.';
+	$items = array_map( static function ( $t ) {
+		return '<strong><em>' . esc_html( $t ) . '</em></strong>';
+	}, $titles );
+	if ( $extra > 0 ) {
+		$s       = ( $extra > 1 ) ? 's' : '';
+		$items[] = $extra . ' autre' . $s . ' livre' . $s;
+	}
+	return passiflore_join_with_et( $items );
 }
 
 /**
  * Rend l'étagère de suggestions (annotée), ou un repli « nouveautés » pour un
  * client sans historique exploitable.
  */
-function pf_reco_render( int $user_id = 0, int $limit = 12 ): string {
+function pf_reco_render( int $user_id = 0, int $limit = 12, string $display = 'covers' ): string {
 	$user_id = $user_id ?: get_current_user_id();
+	$display = ( 'spines' === $display ) ? 'spines' : 'covers';
 	$recos   = pf_reco_get_recommendations( $user_id, $limit );
 
 	if ( ! empty( $recos ) ) {
@@ -259,7 +308,7 @@ function pf_reco_render( int $user_id = 0, int $limit = 12 ): string {
 		if ( class_exists( 'Passiflore_Bookshelf' ) ) {
 			Passiflore_Bookshelf::set_reco_annotations( $ann );
 		}
-		$html = do_shortcode( '[passiflore_etagere ids="' . implode( ',', $ids ) . '" mode="scroll" show_price="true"]' );
+		$html = do_shortcode( '[passiflore_etagere ids="' . implode( ',', $ids ) . '" mode="shelves" display="' . $display . '" show_price="true" show-bookmarks="true"]' );
 		if ( class_exists( 'Passiflore_Bookshelf' ) ) {
 			Passiflore_Bookshelf::set_reco_annotations( [] );
 		}
@@ -267,7 +316,101 @@ function pf_reco_render( int $user_id = 0, int $limit = 12 ): string {
 	}
 
 	// Repli : aucun historique exploitable → nouveautés.
-	return do_shortcode( '[passiflore_etagere decouvrir="nouveautes" mode="scroll" show_price="true"]' );
+	return do_shortcode( '[passiflore_etagere decouvrir="nouveautes" mode="shelves" display="' . $display . '" show_price="true" show-bookmarks="true"]' );
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Bascule d'affichage des étagères du compte (Couvertures | Dos)
+   ───────────────────────────────────────────────────────────────
+   Un switch .pf-switch posé à droite du titre re-rend l'étagère en
+   « covers » ou « spines » via AJAX. Les deux affichages diffèrent au rendu
+   SERVEUR (épaisseur des dos ×1,5, packing des rangées, signets/prix/badges
+   propres aux couvertures) → un simple toggle CSS ne suffirait pas.
+   Étagères concernées : Suggestions (accueil compte), Ma liste de lecture et
+   Catalogue (page /liste-de-lecture).
+   ═══════════════════════════════════════════════════════════════ */
+
+/**
+ * Callbacks de rendu de l'INTÉRIEUR de chaque étagère basculable, indexés par
+ * clé. Source unique partagée entre le rendu initial et l'endpoint AJAX.
+ *
+ * @return array<string,callable>
+ */
+function pf_shelf_display_specs(): array {
+	return [
+		'reco'      => static function ( string $display ): string {
+			return function_exists( 'pf_reco_render' ) ? pf_reco_render( get_current_user_id(), 12, $display ) : '';
+		},
+		'readlist'  => static function ( string $display ): string {
+			return class_exists( 'Passiflore_Reading_List' ) ? Passiflore_Reading_List::render_shelf_inner( $display ) : '';
+		},
+		'catalogue' => static function ( string $display ): string {
+			return do_shortcode( '[passiflore_etagere mode="shelves" display="' . $display . '" show_price="true" show-bookmarks="true"]' );
+		},
+	];
+}
+
+/**
+ * Switch « Couvertures | Dos » d'une étagère, à poser à droite du titre.
+ * $shelf = clé de pf_shelf_display_specs() ; $active = affichage courant.
+ */
+function pf_shelf_display_switch( string $shelf, string $active = 'covers' ): string {
+	$active = ( 'spines' === $active ) ? 'spines' : 'covers';
+	$btn    = static function ( string $display, string $label ) use ( $active ): string {
+		$is = ( $display === $active );
+		return '<button type="button" class="pf-switch__btn' . ( $is ? ' is-active' : '' ) . '"'
+			. ' data-display="' . esc_attr( $display ) . '" aria-pressed="' . ( $is ? 'true' : 'false' ) . '">'
+			. esc_html( $label ) . '</button>';
+	};
+	return '<div class="pf-switch pf-shelf-switch" role="group" aria-label="Affichage de l\'étagère" data-pf-shelf="' . esc_attr( $shelf ) . '">'
+		. $btn( 'covers', 'Couvertures' ) . $btn( 'spines', 'Dos' )
+		. '</div>';
+}
+
+/**
+ * Préférence d'affichage (covers|spines) d'une étagère pour l'utilisateur
+ * courant, mémorisée en user meta `_pf_shelf_display` → l'utilisateur retrouve
+ * toujours son affichage préféré. Défaut « covers ».
+ */
+function pf_shelf_display_pref( string $shelf ): string {
+	$uid = get_current_user_id();
+	if ( ! $uid ) {
+		return 'covers';
+	}
+	$prefs = get_user_meta( $uid, '_pf_shelf_display', true );
+	$val   = ( is_array( $prefs ) && isset( $prefs[ $shelf ] ) ) ? $prefs[ $shelf ] : 'covers';
+	return ( 'spines' === $val ) ? 'spines' : 'covers';
+}
+
+/** Enregistre la préférence d'affichage d'une étagère (au basculement du switch). */
+function pf_shelf_display_save_pref( string $shelf, string $display ): void {
+	$uid = get_current_user_id();
+	if ( ! $uid ) {
+		return;
+	}
+	$prefs = get_user_meta( $uid, '_pf_shelf_display', true );
+	if ( ! is_array( $prefs ) ) {
+		$prefs = [];
+	}
+	$prefs[ $shelf ] = ( 'spines' === $display ) ? 'spines' : 'covers';
+	update_user_meta( $uid, '_pf_shelf_display', $prefs );
+}
+
+/** Endpoint AJAX : re-rend l'intérieur d'une étagère dans l'affichage demandé, et mémorise la préférence. */
+add_action( 'wp_ajax_pf_shelf_display', 'pf_shelf_display_ajax' );
+function pf_shelf_display_ajax() {
+	check_ajax_referer( 'pf_shelf_display', 'nonce' );
+	if ( ! is_user_logged_in() ) {
+		wp_send_json_error( [ 'reason' => 'auth' ], 403 );
+	}
+	$shelf   = isset( $_POST['shelf'] ) ? sanitize_key( wp_unslash( $_POST['shelf'] ) ) : '';
+	$display = ( isset( $_POST['display'] ) && 'spines' === $_POST['display'] ) ? 'spines' : 'covers';
+	$specs   = pf_shelf_display_specs();
+	if ( ! isset( $specs[ $shelf ] ) ) {
+		wp_send_json_error();
+	}
+	pf_shelf_display_save_pref( $shelf, $display );
+	wp_send_json_success( [ 'html' => $specs[ $shelf ]( $display ) ] );
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -285,8 +428,8 @@ function pf_account_menu_reorder( $items ) {
 		return $items;
 	}
 
-	if ( isset( $items['liste-lecture'] ) ) {
-		$items['liste-lecture'] = 'Liste de lecture';
+	if ( isset( $items['dashboard'] ) ) {
+		$items['dashboard'] = 'Accueil';
 	}
 
 	// Téléchargements fusionnés dans « Commandes » — endpoint conservé.
@@ -308,7 +451,7 @@ function pf_account_menu_reorder( $items ) {
 		unset( $items['mes-avis'] );
 	}
 
-	$order = [ 'dashboard', 'liste-lecture', 'orders', 'mes-avis', 'edit-address', 'edit-account', 'customer-logout' ];
+	$order = [ 'dashboard', 'liste-de-lecture', 'orders', 'mes-avis', 'edit-address', 'edit-account', 'customer-logout' ];
 	$out   = [];
 	foreach ( $order as $k ) {
 		if ( isset( $items[ $k ] ) ) {
