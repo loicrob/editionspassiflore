@@ -445,19 +445,26 @@ function pf_account_menu_reorder( $items ) {
 		}
 	}
 
-	// « Mes avis » seulement s'il y a au moins un avis.
-	if ( isset( $items['mes-avis'] ) && class_exists( 'Passiflore_Mes_Avis' )
+	// « Avis laissés » seulement s'il y a au moins un avis.
+	if ( isset( $items['avis-laisses'] ) && class_exists( 'Passiflore_Mes_Avis' )
 		&& ! Passiflore_Mes_Avis::get_user_reviews() ) {
-		unset( $items['mes-avis'] );
+		unset( $items['avis-laisses'] );
 	}
 
-	$order = [ 'dashboard', 'liste-de-lecture', 'orders', 'mes-avis', 'edit-address', 'edit-account', 'customer-logout' ];
+	$order = [ 'dashboard', 'liste-de-lecture', 'avis-laisses', 'orders', 'edit-address', 'payment-methods', 'edit-account', 'customer-logout' ];
 	$out   = [];
 	foreach ( $order as $k ) {
 		if ( isset( $items[ $k ] ) ) {
 			$out[ $k ] = $items[ $k ];
 			unset( $items[ $k ] );
 		}
+	}
+
+	// Garde-fou : toute entrée que $order ne connaît pas (nouveau plugin, MAJ WooCommerce…)
+	// atterrirait silencieusement en queue — cf. le bug « Moyens de paiement » après
+	// « Se déconnecter ». On la journalise pour que l'oubli soit visible plutôt que silencieux.
+	if ( ! empty( $items ) && defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+		error_log( 'pf_account_menu_reorder: entrée(s) menu compte absente(s) de $order : ' . implode( ', ', array_keys( $items ) ) );
 	}
 
 	return $out + $items; // entrées imprévues (plugins…) préservées en queue

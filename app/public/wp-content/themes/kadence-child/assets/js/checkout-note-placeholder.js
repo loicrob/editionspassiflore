@@ -9,7 +9,7 @@
  * réapparition plutôt qu'un simple réglage au chargement.
  */
 ( function () {
-	var PLACEHOLDER = 'Cacher le prix, ajouter un mot personnalisé…';
+	var PLACEHOLDER = 'Paquet-cadeau, masquage du prix, ajout d’un mot personnalisé…';
 
 	function applyPlaceholder() {
 		var textareas = document.querySelectorAll(

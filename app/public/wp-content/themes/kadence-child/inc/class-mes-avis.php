@@ -2,10 +2,10 @@
 if ( ! defined( 'ABSPATH' ) ) exit;
 
 /**
- * Passiflore_Mes_Avis — « Mes avis »
+ * Passiflore_Mes_Avis — « Avis laissés »
  *
  * Espace de suivi des avis déposés par un client dans « Mon compte »
- * (endpoint /mes-avis). Liste les avis (commentaires produit) de
+ * (endpoint /avis-laisses). Liste les avis (commentaires produit) de
  * l'utilisateur connecté avec leur statut, permet de les modifier ou
  * supprimer, et affiche les réponses de l'éditeur.
  *
@@ -20,10 +20,10 @@ if ( ! defined( 'ABSPATH' ) ) exit;
  */
 class Passiflore_Mes_Avis {
 
-	const ENDPOINT          = 'mes-avis';
+	const ENDPOINT          = 'avis-laisses';
 	const NONCE             = 'pf_mes_avis';
 	const FLUSH_OPTION      = 'pf_avis_endpoint_v';
-	const FLUSH_VERSION     = '1';
+	const FLUSH_VERSION     = '2';
 	const META_USER_DELETED = '_pf_user_deleted';
 	const META_REPLY_PUBLIC = '_pf_reply_public';
 
@@ -258,7 +258,7 @@ class Passiflore_Mes_Avis {
 		$checked = get_comment_meta( $comment->comment_ID, self::META_REPLY_PUBLIC, true );
 		echo '<p><label><input type="checkbox" name="pf_reply_public" value="1"' . checked( $checked, '1', false ) . '> ';
 		echo 'Afficher cette réponse publiquement sous l\'avis, sur la fiche livre.</label></p>';
-		echo '<p class="description">Décochée, la réponse reste visible uniquement par le client dans son espace « Mes avis ».</p>';
+		echo '<p class="description">Décochée, la réponse reste visible uniquement par le client dans son espace « Avis laissés ».</p>';
 	}
 
 	public function save_reply_meta( $comment_id ) {
@@ -285,17 +285,17 @@ class Passiflore_Mes_Avis {
 		return $vars;
 	}
 
-	/** Insère « Mes avis » juste après le tableau de bord. */
+	/** Insère « Avis laissés » juste après le tableau de bord (position finale fixée par pf_account_menu_reorder()). */
 	public function add_menu_item( $items ) {
 		$new = [];
 		foreach ( $items as $key => $label ) {
 			$new[ $key ] = $label;
 			if ( 'dashboard' === $key ) {
-				$new[ self::ENDPOINT ] = 'Mes avis';
+				$new[ self::ENDPOINT ] = 'Avis laissés';
 			}
 		}
 		if ( ! isset( $new[ self::ENDPOINT ] ) ) {
-			$new = [ self::ENDPOINT => 'Mes avis' ] + $new;
+			$new = [ self::ENDPOINT => 'Avis laissés' ] + $new;
 		}
 		return $new;
 	}

@@ -127,14 +127,6 @@ function passiflore_enqueue_auteurs_styles() {
             true
         );
     }
-    if ( is_page( 'contact' ) ) {
-        wp_enqueue_style(
-            'pf-contact',
-            get_stylesheet_directory_uri() . '/assets/css/contact.css',
-            [],
-            filemtime( get_stylesheet_directory() . '/assets/css/contact.css' )
-        );
-    }
     if ( function_exists( 'tribe_is_event_query' ) && ( tribe_is_event_query() || is_singular( 'tribe_events' ) ) ) {
         wp_enqueue_style(
             'pf-auteurs',

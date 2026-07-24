@@ -72,6 +72,51 @@ class Passiflore_Bookshelf {
 		add_shortcode( 'passiflore_etagere', [ $this, 'render_shortcode' ] );
 		add_action( 'wp_enqueue_scripts', [ $this, 'register_assets' ] );
 		add_action( 'after_setup_theme', [ $this, 'register_image_sizes' ] );
+		$this->register_counts_cache_hooks();
+	}
+
+	/* ─── Cache des compteurs de filtres (get_filter_counts) ─────────
+	 *
+	 * get_filter_counts() lance ~50 requêtes (une par option de filtre) pour les
+	 * compteurs « (N) » du catalogue, et il est appelé 2× au rendu de la page
+	 * (état courant + compteurs globaux) puis 1× à chaque filtrage AJAX → coût
+	 * dominant du catalogue (constaté : 8 s connecté). On mémoïse le RÉSULTAT
+	 * (petit tableau d'entiers) dans un transient keyé par une version globale +
+	 * l'état de filtre, invalidé à tout changement produit (bump de version ;
+	 * les anciennes clés expirent via leur TTL). Registre d'invalidation posé une
+	 * seule fois (drapeau static — la classe est instanciée plusieurs fois/requête).
+	 */
+	const COUNTS_VERSION_OPTION = 'pf_shelf_counts_ver';
+	private static $counts_hooks_registered = false;
+
+	private function register_counts_cache_hooks() {
+		if ( self::$counts_hooks_registered ) return;
+		self::$counts_hooks_registered = true;
+		add_action( 'save_post',          [ __CLASS__, 'bump_counts_version_for_post' ] );
+		add_action( 'before_delete_post', [ __CLASS__, 'bump_counts_version_for_post' ] );
+		add_action( 'trashed_post',       [ __CLASS__, 'bump_counts_version_for_post' ] );
+		add_action( 'untrashed_post',     [ __CLASS__, 'bump_counts_version_for_post' ] );
+		add_action( 'woocommerce_update_product', [ __CLASS__, 'bump_counts_version' ] );
+		add_action( 'woocommerce_new_product',    [ __CLASS__, 'bump_counts_version' ] );
+		add_action( 'set_object_terms',   [ __CLASS__, 'bump_counts_version_on_terms' ], 10, 4 );
+	}
+
+	public static function bump_counts_version() {
+		$ver = (int) get_option( self::COUNTS_VERSION_OPTION, 1 );
+		update_option( self::COUNTS_VERSION_OPTION, $ver + 1, false );
+	}
+
+	public static function bump_counts_version_for_post( $post_id ) {
+		if ( 'product' === get_post_type( $post_id ) ) {
+			self::bump_counts_version();
+		}
+	}
+
+	public static function bump_counts_version_on_terms( $object_id, $terms, $tt_ids, $taxonomy ) {
+		if ( in_array( $taxonomy, [ 'product_cat', 'product_tag', 'pa_format_particulier', 'format_groupe' ], true )
+			&& 'product' === get_post_type( $object_id ) ) {
+			self::bump_counts_version();
+		}
 	}
 
 	/**
@@ -792,7 +837,22 @@ class Passiflore_Bookshelf {
 	public function get_filter_counts( $atts = [] ) {
 		$atts = shortcode_atts( $this->default_atts(), $atts, 'passiflore_etagere' );
 
-		return [
+		// La recherche a une cardinalité quasi infinie (une entrée par chaîne
+		// tapée) → on ne la met PAS en cache (seul vrai risque de bloat) : calcul
+		// en direct. Ses résultats forment de toute façon un sous-ensemble plus
+		// petit, donc moins lourd à compter. Seuls les combos de FILTRES (bornés,
+		// entrées ~1 Ko) sont mémoïsés.
+		$use_cache = ( '' === trim( (string) $atts['search'] ) );
+
+		if ( $use_cache ) {
+			$cache_key = $this->counts_cache_key( $atts );
+			$cached    = get_transient( $cache_key );
+			if ( is_array( $cached ) ) {
+				return $cached;
+			}
+		}
+
+		$counts = [
 			'format'    => $this->count_options( $atts, 'format',    $this->get_format_options() ),
 			'category'  => $this->count_options( $atts, 'category',  $this->get_term_option_slugs( 'product_cat' ) ),
 			'public'    => $this->count_options( $atts, 'public',    $this->get_scf_choice_slugs( 'public' ) ),
@@ -800,6 +860,29 @@ class Passiflore_Bookshelf {
 			'langues'   => $this->count_options( $atts, 'langues',   $this->get_scf_choice_slugs( 'langues' ) ),
 			'decouvrir' => $this->count_options( $atts, 'decouvrir', [ '', 'nouveautes', 'prix-litteraires', 'a-paraitre' ] ),
 		];
+
+		if ( $use_cache ) {
+			set_transient( $cache_key, $counts, 6 * HOUR_IN_SECONDS );
+		}
+		return $counts;
+	}
+
+	/**
+	 * Clé de cache des compteurs : version globale + état de filtre. Seules les
+	 * atts qui changent l'ENSEMBLE des produits comptés entrent dans la clé.
+	 * `orderby` en fait partie : trier par une meta (date_de_parution, _price,
+	 * nombre_de_pages) fait une jointure INNER qui EXCLUT les livres dépourvus de
+	 * cette meta — le nombre compté en dépend donc. `order` (ASC/DESC) et
+	 * l'affichage n'ont, eux, aucun effet sur l'ensemble.
+	 */
+	private function counts_cache_key( $atts ) {
+		$relevant = [];
+		foreach ( [ 'ids', 'category', 'tag', 'format', 'public', 'type', 'langues',
+			'decouvrir', 'disponibilite', 'reliure', 'auteur', 'role', 'search', 'orderby' ] as $k ) {
+			$relevant[ $k ] = (string) ( $atts[ $k ] ?? '' );
+		}
+		$ver = (int) get_option( self::COUNTS_VERSION_OPTION, 1 );
+		return 'pf_ccounts_' . $ver . '_' . md5( wp_json_encode( $relevant ) );
 	}
 
 	private function count_options( $atts, $key, $options ) {
