@@ -57,11 +57,15 @@ add_filter( 'rank_math/frontend/robots', function ( $robots ) {
 } );
 
 // 2) Exclusion du sitemap XML (retour vide = entrée ignorée).
+// ⚠️ Le provider de sitemap de Rank Math passe ici des lignes SQL brutes
+// (stdClass via $wpdb->get_results, cf. Post_Type::get_posts()) — PAS des
+// WP_Post. On teste donc par propriété (->post_type / ->ID), pas par classe.
 add_filter( 'rank_math/sitemap/entry', function ( $url, $type, $object ) {
     if ( 'post' === $type
-         && $object instanceof WP_Post
+         && is_object( $object )
+         && isset( $object->post_type, $object->ID )
          && 'tribe_events' === $object->post_type
-         && pf_event_seo_stale( $object->ID ) ) {
+         && pf_event_seo_stale( (int) $object->ID ) ) {
         return false;
     }
     return $url;
