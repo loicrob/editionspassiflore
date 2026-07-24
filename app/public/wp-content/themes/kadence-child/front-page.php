@@ -37,13 +37,16 @@ $culture_url      = is_wp_error( $culture_link ) ? '' : $culture_link;
 
 <?php /*
  Primer --pf-sticky-offset : posé AVANT le premier paint du hero.
- Le hero fait `calc(100svh - var(--pf-sticky-offset))`. Sans ce primer, la
- variable vaut 0 au premier rendu (recherche-globale.js est un script externe
- en footer, exécuté trop tard) → le hero démarre à 100svh puis rétrécit quand
- la variable passe à la hauteur du header → .pf-hero-categories saute vers le
- haut. Ce script inline est placé entre le header (déjà dans le DOM) et le hero
- (pas encore parsé) : il mesure le header et fixe la variable juste à temps.
- recherche-globale.js reste la source des mises à jour (resize/scroll).
+ Le hero fait `calc(100svh - var(--pf-sticky-offset))`. Sans ce primer, la variable
+ tombe sur son défaut (:root = 80px, cf. style.css) au premier rendu — recherche-globale.js
+ est un script externe en footer, exécuté trop tard → le hero démarrerait à la mauvaise
+ hauteur puis se recalerait quand la vraie valeur arrive → .pf-hero-categories sauterait.
+ Ce script inline, placé entre le header (déjà dans le DOM) et le hero (pas encore parsé),
+ mesure le header et fixe la variable juste à temps.
+ Ensuite recherche-globale.js met à jour --pf-sticky-offset au resize / orientationchange /
+ load — PAS au scroll (le header ne change pas de hauteur ; s'abstenir au scroll évite le
+ jiggle iOS où getBoundingClientRect suit la barre d'outils Safari). svh (≠ dvh) rend par
+ ailleurs la hauteur du hero stable face au repli de cette barre.
  ⚠ Garder la liste de sélecteurs synchronisée avec recherche-globale.js. */ ?>
 <script>
 (function () {

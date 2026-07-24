@@ -6,6 +6,17 @@
 	// Ce script est chargé sur toutes les pages (via le header). Il est donc
 	// la source unique de --pf-sticky-offset ; catalogue.js, recherche-auteurs.js
 	// et accueil.js lisent la variable sans la recalculer.
+	//
+	// Mise à jour au resize / orientationchange / load — PAS au scroll. Le header
+	// Kadence garde une position ET une hauteur constantes au scroll (vérifié en
+	// headless : offset identique de scrollY=0 à 1600, desktop comme mobile), donc
+	// recalculer au scroll ne faisait que réécrire la même valeur… sauf sur iOS, où
+	// getBoundingClientRect() est relatif au viewport VISUEL : la mesure « bougeait »
+	// quand la barre d'outils Safari se rétracte au scroll → les éléments calés dessus
+	// (hero en svh, barres sticky) sautaient. En s'abstenant au scroll, la valeur reste
+	// figée pendant le défilement. Seul écart connu et ASSUMÉ : la barre d'admin WP en
+	// mobile (position:absolute, défile) → offset figé ~46px trop haut pour un admin
+	// connecté prévisualisant sur téléphone ; sans effet pour un vrai visiteur.
 	const HEADER_SELECTORS = [
 		'.site-header-inner-wrap.kadence-sticky-header',
 		'.site-header-wrap.kadence-sticky-header',
@@ -38,7 +49,10 @@
 		document.documentElement.style.setProperty('--pf-sticky-offset', Math.max(0, best) + 'px');
 	}
 	window.addEventListener('resize', updateStickyOffset, { passive: true });
-	window.addEventListener('scroll', updateStickyOffset, { passive: true });
+	window.addEventListener('orientationchange', updateStickyOffset);
+	// Filet : header définitif une fois tout chargé (utile après un reload avec scroll
+	// restauré, où le sticky JS de Kadence n'a pas encore re-fixé le header au DOMContentLoaded).
+	window.addEventListener('load', updateStickyOffset);
 
 	document.addEventListener('DOMContentLoaded', function () {
 		updateStickyOffset();

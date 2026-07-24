@@ -368,6 +368,7 @@ require_once get_stylesheet_directory() . '/inc/class-reading-list.php';
 require_once get_stylesheet_directory() . '/inc/class-mes-avis.php';
 require_once get_stylesheet_directory() . '/inc/recommendations.php';
 require_once get_stylesheet_directory() . '/inc/shipping.php';
+require_once get_stylesheet_directory() . '/inc/boxtal-perf.php';
 require_once get_stylesheet_directory() . '/inc/numerique-offer.php';
 require_once get_stylesheet_directory() . '/inc/checkout.php';
 require_once get_stylesheet_directory() . '/inc/mini-cart.php';

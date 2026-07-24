@@ -131,6 +131,12 @@ Updated: 2026-03-23 12:48:18
        --pf-sticky-offset (header + barre admin) est tenu à jour par recherche-globale.js. */
     --pf-adminbar: 0px;
 
+    /* Hauteur cumulée du header sticky (+ barre admin), en px. Défaut ~80px « en
+       attendant » : recherche-globale.js pose la vraie valeur au DOMContentLoaded /
+       load / resize (plus au scroll — le header ne change pas de hauteur). Le primer
+       inline de front-page.php / section-nav.php la pose même avant le premier paint. */
+    --pf-sticky-offset: 80px;
+
     /* Échelle d'espacement Kadence (rythme du contenu Gutenberg) câblée sur NOS tokens
        → source unique. !important pour battre le CSS inline du personnalisateur. */
     --global-xs-spacing:  var(--pf-space-4)  !important;
