@@ -171,3 +171,56 @@ function passiflore_clean_auteur_form() {
 }
 add_action('auteur_add_form_fields', 'passiflore_clean_auteur_form');
 add_action('auteur_edit_form_fields', 'passiflore_clean_auteur_form');
+
+/**
+ * Synchronise les VRAIES relations de termes `auteur` sur un livre à partir du
+ * champ SCF `contributions` (source de vérité).
+ *
+ * Les livres ne sont liés aux auteurs que par le repeater SCF (IDs en postmeta),
+ * jamais par de vraies relations de termes → tous les termes `auteur` ont
+ * count=0. Rank Math les traite alors comme « vides » : `noindex_empty_taxonomies`
+ * les passe en noindex ET `tax_auteur_include_empty=off` les exclut du sitemap.
+ * En posant la relation réelle (dérivée du SCF), le compteur devient exact → les
+ * fiches auteurs redeviennent indexables et entrent dans le sitemap.
+ *
+ * On réutilise passiflore_get_product_author_ids() (toute contribution
+ * fiche-auteur, quel que soit le rôle) : exactement l'ensemble que la page
+ * auteur affiche. Mode remplacement (`false`)
+ * → la relation reste le miroir fidèle du SCF (nettoie aussi les orphelines).
+ * Additif et idempotent : ne touche pas au SCF, rejouable sans effet de bord.
+ */
+function passiflore_sync_auteur_terms( $post_id ) {
+    if ( ! is_numeric( $post_id ) ) return;            // acf/save_post passe aussi "options", "auteur_123"…
+    if ( get_post_type( $post_id ) !== 'product' ) return;
+    if ( wp_is_post_revision( $post_id ) ) return;
+    if ( ! function_exists( 'passiflore_get_product_author_ids' ) ) return;
+
+    wp_set_object_terms( (int) $post_id, passiflore_get_product_author_ids( (int) $post_id ), 'auteur', false );
+}
+// acf/save_post @20 : après l'écriture des champs SCF (contributions à jour).
+add_action( 'acf/save_post', 'passiflore_sync_auteur_terms', 20 );
+// save_post_product : import, quick edit, modif hors SCF.
+add_action( 'save_post_product', 'passiflore_sync_auteur_terms', 20 );
+
+/**
+ * Backfill unique : pose les relations `auteur` sur tous les livres existants.
+ * Renvoie le nombre de livres traités.
+ */
+function passiflore_backfill_auteur_terms() {
+    global $wpdb;
+    $ids = $wpdb->get_col(
+        "SELECT ID FROM {$wpdb->posts}
+         WHERE post_type = 'product'
+         AND post_status IN ( 'publish', 'draft', 'pending', 'private' )"
+    );
+    foreach ( $ids as $id ) {
+        wp_set_object_terms( (int) $id, passiflore_get_product_author_ids( (int) $id ), 'auteur', false );
+    }
+    return count( $ids );
+}
+// Rejoué une fois par environnement (flag en option) au premier chargement admin.
+add_action( 'admin_init', function () {
+    if ( get_option( 'pf_auteur_terms_synced' ) ) return;
+    passiflore_backfill_auteur_terms();
+    update_option( 'pf_auteur_terms_synced', 1 );
+} );

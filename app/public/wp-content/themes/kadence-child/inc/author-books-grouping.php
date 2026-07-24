@@ -122,15 +122,16 @@ function passiflore_join_auteur_names( array $names ): string {
 }
 
 /**
- * Exact author term IDs for a product (contributions of type=auteur, assignation=fiche-auteur).
- * Returns a sorted array of unique integer term IDs.
+ * Author term IDs for a product — any fiche-auteur contribution, regardless of
+ * the contribution `type` label (auteur, photographies, traduction, illustrations…).
+ * The `type` is a role label; a person credited on a book in ANY role is one of
+ * its authors (an auteur term). Returns a sorted array of unique integer term IDs.
  */
 function passiflore_get_product_author_ids( int $post_id ): array {
 	$term_ids      = [];
 	$contributions = get_field( 'contributions', $post_id );
 	if ( ! is_array( $contributions ) ) return [];
 	foreach ( $contributions as $row ) {
-		if ( ( $row['type'] ?? '' ) !== 'auteur' ) continue;
 		if ( ( $row['assignation'] ?? '' ) !== 'fiche-auteur' ) continue;
 		foreach ( (array) ( $row['fiche-auteur'] ?? [] ) as $item ) {
 			$tid = is_object( $item ) ? (int) $item->term_id : absint( $item );
@@ -143,9 +144,11 @@ function passiflore_get_product_author_ids( int $post_id ): array {
 }
 
 /**
- * Product IDs whose contributions (type=auteur) reference one of the given auteur term IDs.
- * Mirrors Passiflore_Bookshelf::get_product_ids_by_auteur() — handles the three storage
- * shapes SCF uses for multi_select taxonomy fields.
+ * Product IDs whose contributions reference one of the given auteur term IDs,
+ * in ANY contribution role — the contribution `type` label (auteur, photographies,
+ * traduction…) is not filtered: a person credited on a book in any role is one of
+ * its authors. Mirrors Passiflore_Bookshelf::get_product_ids_by_auteur() — handles
+ * the three storage shapes SCF uses for multi_select taxonomy fields.
  */
 function passiflore_product_ids_by_auteur_terms( array $term_ids ): array {
 	global $wpdb;
@@ -162,8 +165,7 @@ function passiflore_product_ids_by_auteur_terms( array $term_ids ): array {
 	}
 
 	$sql  = "SELECT DISTINCT a.post_id FROM {$wpdb->postmeta} a";
-	$sql .= " INNER JOIN {$wpdb->postmeta} t ON t.post_id = a.post_id AND t.meta_key = REPLACE( a.meta_key, '_fiche-auteur', '_type' )";
-	$sql .= " WHERE a.meta_key LIKE %s AND ( " . implode( ' OR ', $or_clauses ) . " ) AND t.meta_value = 'auteur'";
+	$sql .= " WHERE a.meta_key LIKE %s AND ( " . implode( ' OR ', $or_clauses ) . " )";
 
 	return array_map( 'intval', $wpdb->get_col( $wpdb->prepare( $sql, $params ) ) );
 }

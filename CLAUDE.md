@@ -308,6 +308,16 @@ Registered via CPT UI. SCF field group `group_69c2ca10aa3d2` ("Fiche d'auteur"):
 
 The `auteur` taxonomy term name, slug and description are auto-synced from SCF fields via hooks in `inc/auteurs.php`. The standard WordPress name/slug/description fields are hidden in the admin form.
 
+**Relations de termes `auteur` sur les livres — synchronisées depuis SCF (`inc/auteurs.php`) :**
+
+Les livres ne référencent leurs auteurs que via le repeater SCF `contributions → fiche-auteur` (IDs en postmeta), **jamais** par de vraies relations de termes WordPress → sans correctif, tous les termes `auteur` ont `count=0`. Conséquence SEO : Rank Math les traite comme « vides » et (a) **`noindex_empty_taxonomies=on` → passe les fiches auteurs en `noindex`**, (b) `tax_auteur_include_empty=off` → les **exclut du sitemap**. Les pages auteurs étaient donc désindexées ET absentes du sitemap alors qu'elles affichent des livres.
+
+- **Correctif** : `passiflore_sync_auteur_terms()` pose la vraie relation `wp_set_object_terms( $product, …, 'auteur', false )` (mode remplacement = miroir fidèle du SCF, nettoie les orphelines) à partir de **`passiflore_get_product_author_ids()`** (`inc/author-books-grouping.php`) — exactement l'ensemble que la page auteur affiche via `passiflore_product_ids_by_auteur_terms()`. Hooks `acf/save_post` @20 (contributions déjà écrites) **+** `save_post_product` (import/quick edit).
+- **Toute contribution `fiche-auteur` compte, quel que soit le rôle** : `type` (auteur, photographies, traduction, illustrations, dessins, notes, textes) est un simple *label* — une personne créditée sur un livre dans **n'importe quel** rôle est un auteur (décision actée 2026-07-24). `passiflore_get_product_author_ids()` et `passiflore_product_ids_by_auteur_terms()` ne filtrent donc **pas** sur `type` (élargi le 2026-07-24 : ces deux helpers partagés servent aussi recherche, recommandations, « ajouter par auteur » admin, page auteur — cohérent partout). Le filtrage par rôle spécifique reste possible via le param `role=` de `[passiflore_etagere]` (indépendant). Un terme `auteur` sans **aucune** contribution garde count=0 → reste noindex (correct : page vide).
+- **Additif, idempotent, réversible** : ne touche pas au SCF (source de vérité), rejouable sans effet de bord.
+- **Backfill** : `passiflore_backfill_auteur_terms()` (tous les livres), déclenché une fois par environnement au premier `admin_init` (flag option `pf_auteur_terms_synced`). Le compteur devient exact → Rank Math ré-indexe les fiches et les ajoute au sitemap (⚠️ purger le cache sitemap après, cf. section SEO événements). **Après une ré-importation d'auteurs/livres** : si l'import ne déclenche pas `save_post_product`, relancer la synchro (supprimer l'option `pf_auteur_terms_synced`, ou `wp eval 'passiflore_backfill_auteur_terms();'`).
+- **Vérifié** (local) : backfill 229 livres → **77/80 termes count>0** (dont un contributeur au seul rôle photographe) ; page auteur `follow, noindex` → `index, follow` ; `auteur-sitemap.xml` apparaît avec **77 URLs**.
+
 ---
 
 ## Child theme structure
