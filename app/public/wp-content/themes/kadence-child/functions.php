@@ -356,6 +356,7 @@ require_once get_stylesheet_directory() . '/inc/event-admin.php';
 require_once get_stylesheet_directory() . '/inc/venue-admin.php';
 require_once get_stylesheet_directory() . '/inc/book-groups-admin.php';
 require_once get_stylesheet_directory() . '/inc/event-hours.php';
+require_once get_stylesheet_directory() . '/inc/seo-events.php';
 require_once get_stylesheet_directory() . '/inc/pageflip.php';
 require_once get_stylesheet_directory() . '/inc/section-nav.php';
 require_once get_stylesheet_directory() . '/inc/book-single-tabs.php';
@@ -373,5 +374,6 @@ require_once get_stylesheet_directory() . '/inc/numerique-offer.php';
 require_once get_stylesheet_directory() . '/inc/checkout.php';
 require_once get_stylesheet_directory() . '/inc/mini-cart.php';
 require_once get_stylesheet_directory() . '/inc/shortcodes.php';
+require_once get_stylesheet_directory() . '/inc/privacy-cookies.php';
 require_once get_stylesheet_directory() . '/inc/beta-banner.php'; // TEMPORAIRE — bandeau phase bêta
 require_once get_stylesheet_directory() . '/inc/sticky-debug.php'; // DIAGNOSTIC TEMPORAIRE — header sticky

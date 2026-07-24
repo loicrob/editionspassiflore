@@ -276,6 +276,20 @@ Contrairement aux vues d'archive (v2, dossier `tribe/events/v2/`), la fiche d'un
 
 ---
 
+### SEO — désindexation des événements passés anciens (`inc/seo-events.php`)
+
+Rank Math n'a pas de règle « noindex par date » ; ce fichier la pose via ses filtres. Un événement **terminé depuis plus de `PF_EVENT_SEO_STALE_AGE`** (constante, `-6 months`) passe en **noindex** et sort du **sitemap**, **sauf** s'il porte le flag SCF `evenement_marquant` (alors indexé quel que soit son âge). Futur / en cours / passé récent : indexé (défaut Rank Math, non touché). Contexte : ~97 % des événements sont d'anciens passés (fiches à faible valeur SEO + mauvaise UX pour un visiteur qui y atterrit depuis Google).
+
+- **`pf_event_seo_stale( $event_id )`** : `true` si `evenement_marquant` non coché **et** `_EventEndDate` (heure locale TEC, `Y-m-d H:i:s`) antérieur à `strtotime( PF_EVENT_SEO_STALE_AGE )`. Comparaison à la maille du mois → l'écart de fuseau (local vs UTC) est négligeable, pas de conversion.
+- **Balise `<meta robots>`** : filtre `rank_math/frontend/robots` (dernier filtre robots de Rank Math, `class-paper.php`) → `$robots['index'] = 'noindex'` sur la fiche périmée. Rendu au vol, pas de cache.
+- **Sitemap** : le sitemap Rank Math ne relit **pas** ce filtre — son SQL exclut les posts dont la post-meta `rank_math_robots` contient « noindex ». Notre noindex étant calculé au vol (non stocké en meta), un **second** filtre `rank_math/sitemap/entry` (retour `false` = URL exclue) retire les fiches périmées du sitemap. ⚠️ Le sitemap Rank Math est **mis en cache** : une fiche franchissant le seuil des 6 mois n'en disparaît qu'à la régénération (enregistrement d'un post ou purge du cache sitemap).
+- **Type « Événements » dans le sitemap** : activé côté Rank Math **en ligne uniquement** (`pt_tribe_events_sitemap`) — **pas en local** (l'index local ne liste que pages + produits, donc le filtre sitemap y est un filet inerte). Sans ce réglage, les événements restent découvrables par le maillage interne (archive `/evenements`).
+- **Portabilité** : aucune valeur d'environnement en dur (ni domaine ni slug) — uniquement `is_singular('tribe_events')`, les meta `evenement_marquant`/`_EventEndDate` et les hooks Rank Math. Rien à changer au déploiement.
+- **Interaction avec le déréférencement global (site en test)** : tant que WordPress est réglé « Demander aux moteurs de ne pas indexer » (`blog_public = 0`), tout le site est noindex et ce filtre est redondant. Au repassage en public, le défaut redevient `index` et le filtre reprend seul son rôle (anciens → noindex, récents → index), sans réactivation.
+- **Vérifié** (headless, site local) : périmé non marquant → `noindex, follow` ; récent → `index, follow` ; périmé **marquant** → `index` (bascule temporaire de `evenement_marquant` sur un événement périmé, puis restauration). 1282/1323 événements concernés.
+
+---
+
 ### Authors → `auteur` custom taxonomy
 
 Registered via CPT UI. SCF field group `group_69c2ca10aa3d2` ("Fiche d'auteur"):
@@ -319,6 +333,7 @@ kadence-child/
 │   ├── class-events-search.php      — Passiflore_Events_Search — barre de recherche /evenements (vue liste) : moteur pf_search_events_ranked() partagé, endpoint AJAX pf_events_search, rendu de ligne sans passer par le pipeline Vue TEC
 │   ├── class-events-map.php         — Passiflore_Events_Map + Passiflore_Map_View — vue Carte (3e onglet TEC V2) : Leaflet + OSM ; géocodage Nominatim côté écriture (save_post + backfill WP-Cron), cache post meta _pf_venue_lat/lng/geo_src ; recherche carte (render_search_bar + endpoint AJAX pf_events_map_search → IDs via pf_search_events_ranked) ; + mini-carte mono-lieu de la fiche événement (render_single_venue_map + enqueue_single)
 │   ├── event-single.php             — Fiche événement (single) : passiflore_get_event_sections_parts() → {nav, top(Horaires/Lieu/Organisateur), bot(Présence/Livres)} pour le layout 2 zones ; méta hero (site événement, agenda). Squelette = override tribe-events/single-event.php
+│   ├── seo-events.php               — SEO Rank Math : noindex + exclusion sitemap des événements passés > 6 mois (sauf evenement_marquant) ; filtres rank_math/frontend/robots + rank_math/sitemap/entry ; pf_event_seo_stale() ; constante PF_EVENT_SEO_STALE_AGE
 │   ├── section-nav.php              — Composant PARTAGÉ (fiche livre + fiche événement), DÉCOUPLÉ : pf_sectionnav_bar() (barre <nav> + primer, ≥3 sections) / pf_sectionnav_sections() (blocs .pf-section) / pf_render_sectionnav() (livre : combine dans .pf-body). + body.no-anchor-scroll
 │   ├── header-hooks.php             — Header customizations; [passiflore_account_btn] shortcode
 │   ├── modifier-produit.php         — Product edit screen: format_groupe single-term constraint. Product list screen: hides native « Trier » button + default sort by date_de_parution DESC then title ASC
