@@ -330,6 +330,7 @@ function passiflore_redirect_empty_cart() {
     }
 }
 
+require_once get_stylesheet_directory() . '/inc/a11y.php';
 require_once get_stylesheet_directory() . '/inc/author-books-grouping.php';
 require_once get_stylesheet_directory() . '/inc/search.php';
 require_once get_stylesheet_directory() . '/inc/modifier-produit.php';
@@ -359,6 +360,7 @@ require_once get_stylesheet_directory() . '/inc/class-recherche-globale.php';
 require_once get_stylesheet_directory() . '/inc/accueil.php';
 require_once get_stylesheet_directory() . '/inc/class-reading-list.php';
 require_once get_stylesheet_directory() . '/inc/class-mes-avis.php';
+require_once get_stylesheet_directory() . '/inc/account-auth.php';
 require_once get_stylesheet_directory() . '/inc/recommendations.php';
 require_once get_stylesheet_directory() . '/inc/shipping.php';
 require_once get_stylesheet_directory() . '/inc/boxtal-perf.php';

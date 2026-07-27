@@ -86,6 +86,7 @@ $culture_url      = is_wp_error( $culture_link ) ? '' : $culture_link;
             <div class="pf-hero-inner site-container">
             <div class="pf-hero-haut">
             <div class="pf-hero-contenu">
+                <h1 class="screen-reader-text">Éditions Passiflore – En toute indépendance, depuis 2009.</h1>
                 <div class="pf-hero-marque">
                     <div class="pf-hero-logo-wrap">
                         <?php
@@ -171,9 +172,9 @@ $culture_url      = is_wp_error( $culture_link ) ? '' : $culture_link;
                                         if ( 'grande' === ( $slide['taille_de_description'] ?? '' ) )  $texte_classes .= ' pf-actualite-texte--grande';
                                         if ( 'centre' === ( $slide['aligner_la_description'] ?? '' ) )  $texte_classes .= ' pf-actualite-texte--centre';
 
-                                        $lien_attrs = ! empty( $slide['ouvrir_dans_un_nouvel_onglet'] )
-                                            ? ' target="_blank" rel="noopener noreferrer"'
-                                            : '';
+                                        $lien_blank = ! empty( $slide['ouvrir_dans_un_nouvel_onglet'] );
+                                        $lien_attrs = $lien_blank ? ' target="_blank" rel="noopener noreferrer"' : '';
+                                        $lien_note  = $lien_blank ? pf_new_window_note() : '';
                                     ?>
                                     <li class="splide__slide pf-actualite-slide">
                                         <div class="pf-polaroid">
@@ -211,7 +212,7 @@ $culture_url      = is_wp_error( $culture_link ) ? '' : $culture_link;
 
                                                 <?php if ( $lien ) : ?>
                                                 <a class="pf-actualite-lien pf-btn pf-btn--primary" href="<?php echo esc_url( $lien ); ?>"<?php echo $lien_attrs; ?>>
-                                                    <?php echo esc_html( $label_lien ?: __( 'En savoir plus', 'kadence-child' ) ); ?>
+                                                    <?php echo esc_html( $label_lien ?: __( 'En savoir plus', 'kadence-child' ) ); ?><?php echo $lien_note; ?>
                                                 </a>
                                                 <?php endif; ?>
                                             </div>

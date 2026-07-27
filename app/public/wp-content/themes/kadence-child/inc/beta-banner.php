@@ -83,6 +83,14 @@ function pf_beta_mises_a_jour() {
 				'Optimisation des images, devrait donner un gain de vitesse de chargement des pages',
 			],
 		],
+		[
+			'date'  => '27 juillet 2026 - 16h',
+			'items' => [
+				'Baisse significative des temps de chargement',
+				'Amélioration de l’affichage des livres dans les étagères',
+				'Séparation de Connexion / Création de compte en deux pages',
+			],
+		],
 	];
 }
 

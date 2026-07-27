@@ -102,36 +102,190 @@
 	font-size: 0.9rem;
 }
 
-/* ─── Connexion / Inscription (deux colonnes) ────────────────────── */
+/* ─── Connexion / Création de compte (panneau unique) ────────────── */
+/* Un seul panneau visible à la fois ; l'état est porté par la classe
+   .is-register, posée au rendu depuis ?action=register (et basculée par
+   account-auth.js). Cf. woocommerce/myaccount/form-login.php. */
 
-.woocommerce #customer_login.col2-set {
-	display: grid;
-	grid-template-columns: 1fr 1fr;
-	gap: clamp(1.5rem, 4vw, 3rem);
-	float: none;
-	width: 100%;
+/* `.woocommerce` est en flex (layout nav + contenu du compte connecté) et, ici,
+   `.woocommerce-notices-wrapper` en est un autre enfant : sans base 100 %, une
+   notice d'erreur courte (« identifiant inconnu ») tiendrait sur la même ligne
+   flex que le formulaire, à côté de lui. On force donc la ligne entière, et le
+   plafond de largeur est porté par le panneau, pas par l'item flex (un
+   max-width sur l'item réduirait sa taille hypothétique et autoriserait à
+   nouveau la cohabitation). */
+/* Largeur commune au panneau et aux notices qui l'accompagnent. */
+.woocommerce-account {
+	--pf-auth-width: 30rem;
 }
 
-/* Kadence ajoute un clearfix ::before/::after sur .col2-set ; en contexte grid
-   ces pseudo-éléments deviennent des items et décalent les colonnes. */
-.woocommerce #customer_login.col2-set::before,
-.woocommerce #customer_login.col2-set::after {
+/* `#primary.content-area` porte une marge basse (48px) qui s'ajouterait SOUS la
+   zone plein écran et repousserait le bloc newsletter sous la ligne de
+   flottaison. Neutralisée ici seulement (`:has()`), pour que le haut de la
+   newsletter tombe exactement sur le bas de l'écran. La marge HAUTE du même
+   élément, elle, est conservée (respiration sous le header) : elle est déjà
+   comptée dans --pf-auth-top, mesuré depuis le haut du viewport. */
+.woocommerce-account #primary:has(.pf-auth) {
+	margin-bottom: 0;
+}
+
+/* Écran d'authentification plein écran : header + panneau occupent au moins la
+   hauteur du viewport, le panneau étant centré verticalement dans l'espace
+   restant (`.woocommerce` est en flex-wrap → align-content centre les lignes).
+   `svh` et non `dvh`/`vh` — même choix que le hero d'accueil : stable face au
+   repli de la barre d'adresse iOS, qui ferait sinon sauter la mise en page.
+
+   --pf-auth-top = distance réelle entre le haut du viewport et le début de la
+   zone. CSS ne sait pas l'exprimer : --pf-sticky-offset ne compte que les
+   barres COLLANTES (80px ici), or la zone démarre plus bas — le bandeau bêta,
+   non collant, occupe le haut du header, plus la marge de `.entry-content`.
+   account-auth.js écrase donc cette valeur par la mesure réelle ; la valeur
+   déclarée ci-dessous est le repli sans JS (exact une fois le bandeau retiré). */
+.woocommerce-account .woocommerce:has(> .pf-auth) {
+	--pf-auth-top: calc(var(--pf-sticky-offset) + var(--global-md-spacing, 0px));
+	min-height: calc(100svh - var(--pf-auth-top));
+	align-content: center;
+	/* Le `gap` du layout compte connecté fausserait le centrage : le wrapper de
+	   notices, MÊME VIDE, forme une ligne flex, donc un gap complet s'insère
+	   au-dessus du panneau et le pousse vers le bas de la moitié du gap. */
+	gap: 0;
+}
+
+/* L'espacement notice → panneau est donc porté par la notice, et seulement
+   quand elle a effectivement du contenu. */
+.woocommerce:has(> .pf-auth) > .woocommerce-notices-wrapper:has(*) {
+	margin-bottom: var(--pf-space-5);
+}
+
+.pf-auth {
+	flex: 0 0 100%;
+	min-width: 0;
+}
+
+.pf-auth__panel {
+	max-width: var(--pf-auth-width);
+	margin-inline: auto;
+}
+
+/* Les notices WooCommerce (erreur de connexion, inscription refusée) sont un
+   frère du panneau : on les cale sur la même colonne, sinon elles flottent
+   pleine largeur à gauche face à un formulaire centré et étroit. */
+.woocommerce:has(> .pf-auth) > .woocommerce-notices-wrapper {
+	width: 100%;
+	max-width: var(--pf-auth-width);
+	margin-inline: auto;
+}
+
+/* display:none (et non visibility/opacité) : le panneau masqué sort de l'ordre
+   de tabulation ET de l'arbre d'accessibilité — donc un seul <h1> exposé, et
+   pas de champ invisible capturant l'autocomplétion du navigateur. */
+.pf-auth__panel--register,
+.pf-auth.is-register .pf-auth__panel--login {
 	display: none;
 }
 
-.woocommerce #customer_login .col-1,
-.woocommerce #customer_login .col-2 {
-	width: auto;
-	float: none;
-	padding: clamp(1.2rem, 3vw, 2rem);
-	border: 1px solid var(--pf-border-light);
-	border-radius: var(--pf-radius-lg);
-	background: var(--pf-surface);
+.pf-auth.is-register .pf-auth__panel--register {
+	display: block;
 }
 
-.woocommerce #customer_login h2 {
-	margin-top: 0;
-	color: var(--pf-heading);
+/* Le titre vit HORS de la carte ; seul le formulaire est encadré. */
+.pf-auth__title {
+	margin: 0 0 var(--pf-space-4);
+	text-align: center;
+}
+
+/* Le formulaire EST la carte : apparence fournie par .pf-panel (style.css).
+   WooCommerce pose son propre cadre gris sur form.login/form.register en
+   (0,2,1) — on ré-impose les valeurs du composant en (0,3,1), sans !important. */
+.woocommerce .pf-auth form.login,
+.woocommerce .pf-auth form.register {
+	margin: 0;
+	padding: var(--pf-panel-pad);
+	border: 1px solid var(--pf-border-light);
+	border-radius: var(--pf-radius-lg);
+}
+
+.pf-auth__form .form-row {
+	margin: 0 0 var(--pf-space-3);
+	padding: 0;
+}
+
+.pf-auth__form .form-row:last-child {
+	margin-bottom: 0;
+}
+
+.pf-auth__form input.input-text {
+	width: 100%;
+}
+
+/* Libellés en placeholder (les <label> restent en .screen-reader-text). */
+.pf-auth__form input::placeholder {
+	color: var(--pf-text-dim);
+}
+
+/* (Le fondu du placeholder au focus imposé par WooCommerce est neutralisé
+   globalement dans style.css, pour tous les formulaires du site.) */
+
+/* « Rester connecté » passe au-dessus du bouton, qui prend toute la largeur.
+   Kadence impose `bold` + 90 % + palette5 sur tout `form .form-row label`
+   (0,2,2) : on revient à la voix de texte courante en (0,3,0). */
+.woocommerce .pf-auth__form .woocommerce-form-login__rememberme {
+	display: flex;
+	align-items: center;
+	gap: var(--pf-space-2);
+	margin: 0 0 var(--pf-space-4);
+	color: var(--pf-text);
+	font-size: var(--pf-text-base);
+	font-weight: var(--pf-weight-normal);
+	line-height: var(--pf-leading-snug);
+}
+
+.woocommerce .pf-auth__form .woocommerce-form-login__rememberme input {
+	margin: 0;
+	flex: 0 0 auto;
+}
+
+.pf-auth__form .woocommerce-form-login__submit,
+.pf-auth__form .woocommerce-form-register__submit {
+	width: 100%;
+}
+
+/* Mention légale (hook woocommerce_register_form) et message « mot de passe
+   envoyé par e-mail » : voix secondaire, sinon ce paragraphe pèse plus lourd
+   que les champs dans une carte étroite. */
+.pf-auth__hint,
+.pf-auth__form .woocommerce-privacy-policy-text {
+	margin: 0 0 var(--pf-space-3);
+	font-size: var(--pf-text-sm);
+	color: var(--pf-muted);
+}
+
+.pf-auth__form .woocommerce-privacy-policy-text p:last-child {
+	margin-bottom: 0;
+}
+
+.woocommerce .pf-auth .woocommerce-LostPassword {
+	margin: var(--pf-space-3) 0 0;
+	text-align: center;
+	font-size: var(--pf-text-sm);
+}
+
+/* Bascule vers l'autre panneau, sous la carte. */
+.pf-auth__switch {
+	margin: var(--pf-space-4) 0 0;
+	text-align: center;
+	font-size: var(--pf-text-sm);
+	color: var(--pf-muted);
+}
+
+.pf-auth__switch-link {
+	color: var(--pf-accent);
+	font-weight: var(--pf-weight-semibold);
+}
+
+.pf-auth__switch-link:hover,
+.pf-auth__switch-link:focus {
+	color: var(--pf-accent-dark);
 }
 
 .woocommerce-LostPassword a {
@@ -241,11 +395,5 @@
 @media (max-width: 1023px) {
 	.woocommerce-account .woocommerce-MyAccount-navigation.pf-sectionnav {
 		width: calc(100vw - var(--scrollbar-offset, 0px));
-	}
-}
-
-@media (max-width: 768px) {
-	.woocommerce #customer_login.col2-set {
-		grid-template-columns: 1fr;
 	}
 }

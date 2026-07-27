@@ -70,3 +70,60 @@ add_filter( 'rank_math/sitemap/entry', function ( $url, $type, $object ) {
     }
     return $url;
 }, 10, 3 );
+
+/**
+ * 3) Canonical des vues d'archive événements : retrait du slash final.
+ *
+ * Sur ces vues (liste / mois / carte, paginées ou non), Rank Math dérive le
+ * canonical de get_post_type_archive_link( 'tribe_events' ), que TEC filtre
+ * (Tribe__Events__Main::event_archive_link) pour y forcer un slash final. Or la
+ * structure de permaliens du site est sans slash (/%postname%) → WordPress
+ * (redirect_canonical) redirige /evenements/ en 301 vers /evenements. Le
+ * canonical pointait donc vers une URL qui redirige.
+ *
+ * Garde-fou de portabilité : on ne normalise que si le site est bien en mode
+ * « sans slash final ». Si la structure de permaliens passait un jour en mode
+ * avec slash, le slash de TEC redeviendrait correct et ce filtre s'efface.
+ */
+add_filter( 'rank_math/frontend/canonical', function ( $canonical ) {
+    global $wp_rewrite;
+
+    if ( ! is_string( $canonical ) || '' === $canonical ) {
+        return $canonical;
+    }
+    if ( empty( $wp_rewrite ) || $wp_rewrite->use_trailing_slashes ) {
+        return $canonical;
+    }
+    // Vues d'archive TEC uniquement (fiche événement exclue : elle est déjà
+    // sans slash, son canonical vient de get_permalink()).
+    if ( ! function_exists( 'tribe_is_event_query' ) || ! tribe_is_event_query() || is_singular() ) {
+        return $canonical;
+    }
+
+    return untrailingslashit( $canonical );
+} );
+
+/**
+ * 4) Titre <title> de l'archive événements — remplacement d'un titre TEC buggé.
+ *
+ * Pour construire le <title> (uniquement — le contenu affiché de la page est
+ * correct), TEC (Title::build_post_range_title()) relance une requête interne
+ * triée par date croissante SANS filtrer sur « à venir seulement », et affiche
+ * la plage [premier événement retourné → dernier]. Avec ~1300 événements
+ * historiques importés de PrestaShop, cette requête remonte les tout premiers
+ * événements jamais enregistrés (2014-2015) au lieu des événements à venir
+ * affichés sur la page : titre du type « Évènements depuis samedi 18 octobre
+ * 2014 – jeudi 26 février 2015 ». Bug de TEC, pas de notre code : on se
+ * contente de remplacer ce titre par un simple « Événements ».
+ *
+ * Vue mois également ramenée à « Événements » (simple choix éditorial, son
+ * titre par date n'était pas buggé — cf. Title::build_month_title()). Jour
+ * garde son propre titre ; fiche événement (vue singulière) non concernée,
+ * ce filtre n'y étant pas atteint avec ce titre.
+ */
+add_filter( 'tribe_events_v2_view_title', function ( $title ) {
+    if ( is_singular( 'tribe_events' ) || tribe_is_day() ) {
+        return $title;
+    }
+    return 'Événements';
+} );

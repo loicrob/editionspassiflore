@@ -14,11 +14,6 @@
 	background: var(--pf-red-soft);
 }
 
-.bs-hero__readlist.is-busy {
-	opacity: 0.6;
-	cursor: progress;
-}
-
 .bs-hero__readlist-label {
 	line-height: 1.2;
 }

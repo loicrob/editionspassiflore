@@ -198,14 +198,27 @@
 			var shelf      = book.closest('.pf-shelf');
 			var shelfBooks = shelf && shelf.querySelector('.pf-shelf-books');
 			var plank      = shelf && shelf.querySelector('.pf-shelf-plank');
-			var padV = 0;
+			var padV = 0, padH = 0;
 			if (shelfBooks) {
 				var sbCS = getComputedStyle(shelfBooks);
 				padV = (parseFloat(sbCS.paddingTop) || 0) + (parseFloat(sbCS.paddingBottom) || 0);
+				padH = (parseFloat(sbCS.paddingLeft) || 0) + (parseFloat(sbCS.paddingRight) || 0);
 			}
 			var chromeV  = padV + (plank ? plank.offsetHeight : 0);
 			var desiredH = Math.max(raw.bh, bookshelf.offsetHeight - chromeV); // jamais sous la taille naturelle
-			return desiredH / raw.bh;
+			var fitH     = desiredH / raw.bh;
+
+			// Plafond largeur : de l'origine de la colonne visuelle (stable, fixée
+			// par la grille — cf. commentaire sideBySide plus haut) au bord droit
+			// du hero (stable, bloc normal non rétréci par son contenu). Sans ce
+			// plafond, une couverture au format panoramique (plus large que haute)
+			// scale uniquement sur la hauteur dispo et déborde à droite.
+			var heroRect   = hero.getBoundingClientRect();
+			var visualRect = visual.getBoundingClientRect();
+			var availW     = heroRect.right - visualRect.left - padH;
+			var fitW       = ( availW > 0 ) ? availW / footprint : fitH;
+
+			return Math.min(fitH, fitW);
 		}
 
 		// Empilé : largeur de référence = conteneur hero (jamais l'étagère).
@@ -230,8 +243,8 @@
 			if (!raw.cw && !raw.sw) return;
 
 			// Empreinte au repos (bord droit du livre) selon le mode : en
-			// spines seule la tranche est visible ; la liseuse n'a pas de
-			// tranche papier ; sinon couverture + tranche.
+			// spines seul le dos est visible ; la liseuse n'a pas de
+			// dos papier ; sinon couverture + dos.
 			var footprint = isSpines
 				? raw.sw
 				: (book.classList.contains('pf-book--ereader') ? raw.cw : raw.cw + raw.sw);
@@ -287,8 +300,8 @@
 	   sa cible et oscillerait) : seuls l'inner et la déco reçoivent les
 	   décalages calculés ici. */
 
-	// Spines : position du livre saisi. Couverture centrée sur la tranche
-	// par défaut, recalée pour que l'empreinte totale (tranche fantôme à
+	// Spines : position du livre saisi. Couverture centrée sur le dos
+	// par défaut, recalée pour que l'empreinte totale (dos fantôme à
 	// gauche incluse, scale 1.1 d'origine left bottom) reste dans le
 	// container (.pf-shelf = viewport du scroll en mode scroll).
 	function computeRevealShift(book) {
@@ -298,7 +311,7 @@
 		var spineW = cssVarPx(book, '--spine-w-base');
 		if (!coverW) return;
 		var c     = coverW * HOVER_SCALE; // empreinte couverture [0, c] (origine x=0)
-		var s     = spineW * HOVER_SCALE; // tranche fantôme [-s, 0]
+		var s     = spineW * HOVER_SCALE; // dos fantôme [-s, 0]
 		var rect  = book.getBoundingClientRect();
 		var box   = shelf.getBoundingClientRect();
 		var dx    = (rect.width - c) / 2;
@@ -440,10 +453,25 @@
 				coverReady = true;
 				attemptReveal();
 			};
-			img.addEventListener('load', onDone, { once: true });
-			img.addEventListener('error', onDone, { once: true });
+			// `load` ne signifie que « octets reçus » : le DÉCODAGE en bitmap
+			// arrive plus tard, à la première peinture qui en a besoin —
+			// c'est-à-dire pile sur la première image de la rotation, d'où une
+			// saccade au tout premier dévoilement de chaque livre (mesuré :
+			// 3 à 15 ms après `load` en local, davantage sur une machine lente
+			// ou une grande couverture). decode() force ce travail AVANT, hors
+			// du chemin critique de l'animation. Le délai est absorbé par les
+			// REVEAL_DELAY_MS d'attente, donc rien n'est retardé en pratique.
 			img.src = img.dataset.src;
 			img.removeAttribute('data-src');
+			if (typeof img.decode === 'function') {
+				// decode() rejette sur erreur de chargement : même issue, on
+				// laisse la rotation se faire (couverture manquante = cadre
+				// blanc, comme avant).
+				img.decode().then(onDone, onDone);
+			} else {
+				img.addEventListener('load', onDone, { once: true });
+				img.addEventListener('error', onDone, { once: true });
+			}
 		}
 
 		function scheduleCoverLoad() {

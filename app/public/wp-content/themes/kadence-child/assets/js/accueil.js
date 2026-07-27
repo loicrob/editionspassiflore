@@ -162,21 +162,50 @@ function initScrollCarets() {
 
 // ── Carousel ─────────────────────────────────────────────────────────────────
 
+// Mobile + tablette : ni flèches ni pagination, le glissement tactile suffit.
+// Critère = capacité de pointage, PAS la largeur : les breakpoints de Splide sont
+// des seuils en px, or les tablettes vont de 744px (iPad mini) à 1366px (iPad Pro
+// 13" en paysage) — aucun seuil ne sépare proprement tablette et ordinateur.
+// `hover: none` + `pointer: coarse` = doigt sans survol possible, donc tactile.
+var PF_TACTILE = window.matchMedia( '(hover: none) and (pointer: coarse)' );
+
+// Classe posée sur le carousel quand il n'a NI flèches NI pagination. C'est la
+// seule source de vérité : le CSS y accroche la bande réservée sous le slide
+// (padding-bottom), et initActualiteFit() lit ce padding pour dimensionner la
+// carte et la boîte du carousel. Sans contrôles → réserve nulle → rien n'est
+// décompté pour des boutons absents, et le CSS n'a pas à redupliquer la media
+// query tactile (il suivrait sinon sa propre logique, dérivable de celle-ci).
+var PF_SANS_CONTROLES = 'pf-actualites-carousel--sans-controles';
+
 function initCarousel() {
     var el = document.querySelector( '.pf-actualites-carousel' );
     if ( ! el ) return null;
 
-    return new Splide( el, {
+    el.classList.toggle( PF_SANS_CONTROLES, PF_TACTILE.matches );
+
+    var splide = new Splide( el, {
         type        : 'loop',
         autoplay    : 'pause',
         interval    : 6000,
         pauseOnHover: true,
-        arrows      : true,
-        pagination  : true,
-        speed       : 600,
+        arrows      : ! PF_TACTILE.matches,
+        pagination  : ! PF_TACTILE.matches,
+        speed       : 800,
         gap         : 0,
         perPage     : 1,
     } ).mount();
+
+    // Cas rare (souris branchée sur une tablette, mode bureau) : les contrôles
+    // apparaissent/disparaissent, donc la réserve sous le slide change → refresh()
+    // pour que la boîte du carousel soit recalculée (initActualiteFit écoute
+    // 'refresh'), sinon elle resterait dimensionnée pour l'état précédent.
+    PF_TACTILE.addEventListener( 'change', function ( e ) {
+        el.classList.toggle( PF_SANS_CONTROLES, e.matches );
+        splide.options = { arrows: ! e.matches, pagination: ! e.matches };
+        splide.refresh();
+    } );
+
+    return splide;
 }
 
 // ── Actualités : relocalisation responsive ─────────────────────────────────────
@@ -320,7 +349,7 @@ function initActualiteFit( splide ) {
         if ( ! firstSlide ) return;
         var scs = getComputedStyle( firstSlide );
         var padTop = parseFloat( scs.paddingTop );
-        var padBot = parseFloat( scs.paddingBottom ); // réserve flèches/pagination
+        var padBot = parseFloat( scs.paddingBottom ); // réserve flèches/pagination (nulle si absentes)
 
         // 1) Ajuste chaque carte à la hauteur max (place des contrôles réservée).
         var cardMaxH = colH - padTop - padBot;

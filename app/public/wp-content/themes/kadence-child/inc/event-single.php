@@ -78,7 +78,7 @@ function passiflore_render_event_organizer( $event_id ) {
 		$site = function_exists( 'tribe_get_organizer_website_url' ) ? tribe_get_organizer_website_url( $oid ) : '';
 		if ( $site ) {
 			$rows[] = '<a href="' . esc_url( $site ) . '" target="_blank" rel="noopener noreferrer">'
-				. esc_html( preg_replace( '#^https?://(www\.)?#', '', untrailingslashit( $site ) ) ) . '</a>';
+				. esc_html( preg_replace( '#^https?://(www\.)?#', '', untrailingslashit( $site ) ) ) . pf_new_window_note() . '</a>';
 		}
 		// Email brut pour la validation is_email() (antispambot() remplace le @ par une
 		// entité HTML, is_email() ne le reconnaîtrait plus) ; obfusqué pour l'affichage —
@@ -127,7 +127,7 @@ function passiflore_render_event_hero_meta( $event_id ) {
 		$site = tribe_get_event_website_url( $event_id );
 		if ( $site ) {
 			$items[] = '<a class="button" href="' . esc_url( $site )
-				. '" target="_blank" rel="noopener noreferrer">' . esc_html__( 'Site de l\'événement', 'kadence-child' ) . '</a>';
+				. '" target="_blank" rel="noopener noreferrer">' . esc_html__( 'Site de l\'événement', 'kadence-child' ) . pf_new_window_note() . '</a>';
 		}
 	}
 	if ( function_exists( 'tribe_get_single_ical_link' ) ) {

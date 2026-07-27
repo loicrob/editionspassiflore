@@ -8,8 +8,13 @@
  *
  * window.pfToast.show( opts ) → handle
  *   opts.html      : markup du message (de CONFIANCE — l'appelant échappe).
+ *   opts.icon      : markup d'une icône de tête (SVG, de CONFIANCE) → gouttière
+ *                    à gauche du message. Décorative (aria-hidden).
  *   opts.duration  : ms avant fermeture auto (défaut 5000 ; 0 = illimité).
- *   opts.actions   : [ { label, onClick } ] → boutons .pf-btn.pf-btn--sm.
+ *   opts.actions   : [ { label, onClick } | { label, href } ] → .pf-btn--primary.--sm.
+ *                    `href` produit un vrai lien (clic milieu / nouvel onglet
+ *                    possibles) et ne ferme pas le toast : la navigation s'en charge,
+ *                    et un ctrl-clic doit laisser le toast en place.
  *   opts.onClose   : fn(reason) appelée une seule fois au départ du toast.
  *                    reason ∈ 'timeout' | 'close' | 'action' | 'programmatic'.
  *   opts.closeLabel: aria-label du bouton de fermeture (défaut « Fermer »).
@@ -56,10 +61,25 @@
 		body.className = 'pf-toast__body';
 		toast.appendChild( body );
 
+		// Ligne icône + message. Ce niveau existe pour que l'icône se centre sur le
+		// SEUL bloc de texte : sœur de .pf-toast__body, elle se centrerait sur
+		// texte + boutons et descendrait dès qu'une action est présente.
+		var main = document.createElement( 'div' );
+		main.className = 'pf-toast__main';
+		body.appendChild( main );
+
+		if ( opts.icon ) {
+			var icon = document.createElement( 'span' );
+			icon.className = 'pf-toast__icon';
+			icon.setAttribute( 'aria-hidden', 'true' );
+			icon.innerHTML = opts.icon;
+			main.appendChild( icon );
+		}
+
 		var msg = document.createElement( 'div' );
 		msg.className = 'pf-toast__msg';
 		msg.innerHTML = opts.html || '';
-		body.appendChild( msg );
+		main.appendChild( msg );
 
 		var closed  = false;
 		var timer   = null;
@@ -126,16 +146,24 @@
 			var actions = document.createElement( 'div' );
 			actions.className = 'pf-toast__actions';
 			opts.actions.forEach( function ( a ) {
-				var btn = document.createElement( 'button' );
-				btn.type = 'button';
-				btn.className = 'pf-btn pf-btn--sm';
+				var btn = document.createElement( a.href ? 'a' : 'button' );
+				// --primary explicite : `.pf-btn` seul ne porte AUCUNE apparence
+				// (fond/couleur viennent du modificateur). Un <button> nu héritait
+				// du bouton Kadence — de mêmes fond et couleur, par coïncidence —
+				// mais un <a> nu retombait en simple lien rouge sans fond.
+				btn.className = 'pf-btn pf-btn--primary pf-btn--sm';
 				btn.textContent = a.label || '';
-				btn.addEventListener( 'click', function () {
-					if ( typeof a.onClick === 'function' ) {
-						try { a.onClick(); } catch ( e ) {}
-					}
-					close( 'action' );
-				} );
+				if ( a.href ) {
+					btn.href = a.href;
+				} else {
+					btn.type = 'button';
+					btn.addEventListener( 'click', function () {
+						if ( typeof a.onClick === 'function' ) {
+							try { a.onClick(); } catch ( e ) {}
+						}
+						close( 'action' );
+					} );
+				}
 				actions.appendChild( btn );
 			} );
 			body.appendChild( actions );

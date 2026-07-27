@@ -7,15 +7,16 @@
 		public: 'public', type: 'type', langues: 'langues', decouvrir: 'decouvrir', display: 'affichage',
 	};
 	// Internal state values → URL values (display only).
-	const URL_VALUE_OUT = { display: { covers: 'couvertures', spines: 'tranches' } };
-	const URL_VALUE_IN  = { display: { couvertures: 'covers', tranches: 'spines' } };
+	const URL_VALUE_OUT = { display: { covers: 'couvertures', spines: 'dos' } };
+	// `tranches` reste accepté en entrée (alias legacy, anciens liens partagés/marque-pages).
+	const URL_VALUE_IN  = { display: { couvertures: 'covers', dos: 'spines', tranches: 'spines' } };
 
 	const DEFAULTS = { orderby: 'date', order: 'DESC', display: 'covers' };
 	const MULTI_FILTERS = new Set(['langues', 'type']);
 
 	const UNIVERS_LABELS = { 'litterature': 'Littérature', 'culture-sud-ouest': 'Culture Sud-Ouest' };
 	// Formats pouvant afficher des livres numériques (rendus en liseuse) :
-	// l'affichage tranches n'a pas de sens pour eux → option spines grisée.
+	// l'affichage dos n'a pas de sens pour eux → option spines grisée.
 	const NO_SPINES_FORMATS = ['tous', 'numerique'];
 	const FORMAT_SWITCH_SLUGS = ['grands-caracteres', 'numerique'];
 	const FORMAT_LABELS = { 'grands-caracteres': 'Grands caractères', 'numerique': 'Numérique', 'tous': 'Tous les formats', 'classique': 'Classique' };
@@ -182,6 +183,13 @@
 			Object.keys(state).forEach(k => { cleared[k] = (DEFAULTS[k] !== undefined) ? DEFAULTS[k] : ''; });
 			cleared.category = '';
 			cleared.univers  = '';
+			// Avec un rayon/une thématique actif, l'état réinitialisé est une AUTRE
+			// page (/catalogue) : on y navigue (servie par le cache) plutôt que de
+			// re-rendre l'étagère en AJAX.
+			if (state.univers || state.category) {
+				goTo(cleared);
+				return;
+			}
 			setFilters(cleared);
 			root.querySelectorAll('.pf-cat-dropdown').forEach(dd => {
 				const f = dd.dataset.filter;
@@ -268,13 +276,12 @@
 			});
 		});
 
-		// ── Rayon switch (univers)
+		// ── Rayon switch (univers) — navigation vers la page du rayon (cf. goTo).
 		root.querySelectorAll('.pf-cat-univers-btn').forEach(btn => {
 			btn.addEventListener('click', () => {
 				const v    = btn.dataset.value;
 				const next = state.univers === v ? '' : v;
-				root.querySelectorAll('.pf-cat-dropdown[data-filter="category"]').forEach(d => setSelectedInDropdown(d, '', false));
-				setFilters({ univers: next, category: '' });
+				goToCategory(next, '');
 			});
 		});
 
@@ -297,21 +304,15 @@
 				} else {
 					next = (state[filterKey] === v) ? '' : v;
 				}
-				setSelectedInDropdown(dd, next, false);
+				// Thématique = vraie page (cachée) → navigation directe, pas d'AJAX.
+				// Sélectionner une thématique active son rayon parent ; la
+				// désélectionner revient à la page du rayon courant.
 				if (filterKey === 'category') {
-					root.querySelectorAll('.pf-cat-dropdown[data-filter="category"]').forEach(d => {
-						if (d !== dd) setSelectedInDropdown(d, '', false);
-					});
+					goToCategory(next !== '' ? (categoryParents[next] || state.univers) : state.univers, next);
+					return;
 				}
+				setSelectedInDropdown(dd, next, false);
 				closeAllDropdowns();
-				// When selecting a subcategory, auto-activate its parent rayon.
-				if (filterKey === 'category' && next !== '') {
-					const parent = categoryParents[v];
-					if (parent && state.univers !== parent) {
-						setFilters({ category: next, univers: parent });
-						return;
-					}
-				}
 				setFilter(filterKey, next);
 			});
 		});
@@ -420,9 +421,12 @@
 						setFilters({ orderby: DEFAULTS.orderby, order: DEFAULTS.order });
 						syncSortUI();
 					} else if (f === 'univers') {
-						// Removing the rayon chip clears both univers and subcategory.
-						root.querySelectorAll('.pf-cat-dropdown[data-filter="category"]').forEach(d => setSelectedInDropdown(d, '', false));
-						setFilters({ univers: '', category: '' });
+						// Retirer le chip « rayon » efface rayon ET thématique
+						// → page /catalogue (cf. goTo).
+						goToCategory('', '');
+					} else if (f === 'category') {
+						// Retirer la thématique → page du rayon courant.
+						goToCategory(state.univers, '');
 					} else if (MULTI_FILTERS.has(f)) {
 						const cur = (state[f] || '').split(',').filter(Boolean);
 						const next = cur.filter(x => x !== v).join(',');
@@ -431,12 +435,8 @@
 						if (dd) setSelectedInDropdown(dd, next, true);
 					} else {
 						setFilter(f, '');
-						if (f === 'category') {
-							root.querySelectorAll('.pf-cat-dropdown[data-filter="category"]').forEach(d => setSelectedInDropdown(d, '', false));
-						} else {
-							const dd = root.querySelector('.pf-cat-dropdown[data-filter="' + f + '"]');
-							if (dd) setSelectedInDropdown(dd, '', false);
-						}
+						const dd = root.querySelector('.pf-cat-dropdown[data-filter="' + f + '"]');
+						if (dd) setSelectedInDropdown(dd, '', false);
 					}
 				});
 			});
@@ -495,7 +495,7 @@
 			});
 		}
 
-		// ── Display switch : grise l'option tranches quand le format peut
+		// ── Display switch : grise l'option dos quand le format peut
 		// afficher des liseuses, et rebascule sur couvertures si besoin.
 		// Retourne true si le display a dû changer.
 		function enforceDisplayRule() {
@@ -550,24 +550,61 @@
 		}
 
 		// ── URL sync
-		function syncUrl() {
+		/**
+		 * URL du catalogue pour l'état courant, éventuellement modifié par
+		 * `overrides`. Chemin canonique SANS slash final : une URL à slash
+		 * déclenche la redirection canonique de WordPress (301), soit un aller-retour
+		 * PHP complet avant d'atteindre la page — qui, elle, est servie par le cache.
+		 */
+		function buildUrl(overrides) {
+			const s   = Object.assign({}, state, overrides || {});
 			const url = new URL(window.location.href);
-			if (state.univers && state.category) {
-				url.pathname = '/catalogue/' + state.univers + '/' + state.category;
-			} else if (state.univers) {
-				url.pathname = '/catalogue/' + state.univers;
+			if (s.univers && s.category) {
+				url.pathname = '/catalogue/' + s.univers + '/' + s.category;
+			} else if (s.univers) {
+				url.pathname = '/catalogue/' + s.univers;
 			} else {
 				url.pathname = '/catalogue';
 			}
 			Object.entries(URL_KEYS).forEach(([attKey, urlKey]) => {
-				const v    = state[attKey];
+				const v    = s[attKey];
 				const urlV = URL_VALUE_OUT[attKey] ? (URL_VALUE_OUT[attKey][v] ?? v) : v;
 				const def  = DEFAULTS[attKey] !== undefined ? DEFAULTS[attKey] : '';
 				const urlDef = URL_VALUE_OUT[attKey] ? (URL_VALUE_OUT[attKey][def] ?? def) : def;
 				if (urlV === '' || urlV === urlDef || urlV == null) url.searchParams.delete(urlKey);
 				else                                                url.searchParams.set(urlKey, urlV);
 			});
-			history.pushState({ pf: state }, '', url.toString());
+			return url.toString();
+		}
+
+		function syncUrl() {
+			history.pushState({ pf: state }, '', buildUrl());
+		}
+
+		/**
+		 * Navigation « rayon / thématique » : on charge la vraie page au lieu de
+		 * re-rendre l'étagère en AJAX.
+		 *
+		 * Chaque rayon et chaque thématique a son URL (/catalogue/<univers>[/<thematique>])
+		 * donc sa page mise en cache côté serveur : y naviguer est nettement plus
+		 * rapide qu'un appel admin-ajax, qui contourne le cache de page et repaie le
+		 * bootstrap WordPress + le rendu de l'étagère à chaque clic.
+		 *
+		 * location.replace() plutôt qu'un lien ou pushState : les vues de catalogue
+		 * se REMPLACENT dans l'historique au lieu de s'y empiler → le bouton Retour
+		 * ramène à la page d'où vient l'utilisateur, au lieu de le piéger dans la
+		 * suite de ses propres clics. Les autres filtres, eux, restent en AJAX
+		 * (combinatoires, pas d'URL de page dédiée).
+		 */
+		function goTo(overrides) {
+			closeAllDropdowns();
+			closePanel();
+			if (grid) grid.classList.add('is-loading');
+			window.location.replace(buildUrl(overrides));
+		}
+
+		function goToCategory(nextUnivers, nextCategory) {
+			goTo({ univers: nextUnivers, category: nextCategory });
 		}
 
 		window.addEventListener('popstate', e => {

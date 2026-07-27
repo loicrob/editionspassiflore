@@ -1,12 +1,19 @@
 /**
- * Signets « liste de lecture » sur les couvertures d'étagère.
+ * Contrôleur unique de la « liste de lecture », pour ses DEUX affordances :
+ *  - les signets posés sur les couvertures d'étagère (`.pf-book-bookmark`, rendus
+ *    par inc/class-bookshelf.php) — pages du compte ;
+ *  - le bouton du hero de la fiche livre (`.bs-hero__readlist`, rendu par
+ *    Passiflore_Reading_List::render_button).
+ * Les deux vues d'un même livre sont tenues en phase par setIcon() : même état,
+ * mêmes toasts, une seule file d'écritures.
  *
- * Rendu du signet : inc/class-bookshelf.php (`.pf-book-bookmark`, dans la cover).
  * Ce script (handlers délégués sur `document`, donc résilients aux swaps AJAX) :
- *  - bascule l'état du signet (rempli/vide) instantanément sur TOUTES les instances
- *    d'un même livre (il peut figurer sur deux étagères) ;
+ *  - bascule l'état instantanément sur TOUTES les instances d'un même livre
+ *    (il peut figurer sur deux étagères, ou sur sa propre fiche) ;
  *  - AJOUT = commit immédiat (toast de confirmation) ;
  *  - RETRAIT = différé à la fin du toast (bouton « Annuler » l'annule) ;
+ *  - INVITÉ = aucune écriture, une invitation à se connecter (toast sans fermeture
+ *    automatique, une seule à la fois) ;
  *  - sur la page « Mon compte → Liste de lecture », reconstruit l'étagère « Ma liste
  *    de lecture » à partir du HTML renvoyé par le serveur (pf_reading_list_toggle + with_shelf) ;
  *  - infobulle flottante en espace écran, ancrée au signet, après 1 s de survol.
@@ -21,6 +28,7 @@
 	}
 
 	var S     = pfBookmarks.strings || {};
+	var ICONS = pfBookmarks.icons || {};
 	var state = {};          // { [id]: { inFlight, pendingRemove } }
 
 	// File d'attente SÉRIE des toggles serveur : une requête à la fois. Le back
@@ -65,6 +73,24 @@
 			n.setAttribute( 'aria-pressed', inList ? 'true' : 'false' );
 			n.setAttribute( 'data-in-list', inList ? '1' : '0' );
 			n.setAttribute( 'aria-label', inList ? S.tip_remove : S.tip_add );
+		}
+		// Autre vue du même état : le bouton du hero de la fiche livre. Libellé,
+		// infobulle native et tracé d'icône sont portés en data-* par le PHP.
+		var btns = document.querySelectorAll( '.bs-hero__readlist[data-product-id="' + id + '"]' );
+		for ( var j = 0; j < btns.length; j++ ) {
+			var b = btns[ j ];
+			b.classList.toggle( 'is-in-list', inList );
+			b.setAttribute( 'aria-pressed', inList ? 'true' : 'false' );
+			b.setAttribute( 'data-in-list', inList ? '1' : '0' );
+			b.title = inList ? b.dataset.titleIn : b.dataset.titleAdd;
+			var label = b.querySelector( '.bs-hero__readlist-label' );
+			if ( label ) {
+				label.textContent = inList ? b.dataset.labelIn : b.dataset.labelAdd;
+			}
+			var path = b.querySelector( '.bs-hero__readlist-icon path' );
+			if ( path ) {
+				path.setAttribute( 'd', inList ? b.dataset.iconIn : b.dataset.iconAdd );
+			}
 		}
 	}
 
@@ -199,6 +225,7 @@
 			if ( s.inFlight ) { return; }
 			setIcon( id, true );
 			window.pfToast.show( {
+				icon: ICONS.added,
 				html: fmt( S.added, titleHTML( title ) ),
 				duration: 5000,
 				closeLabel: S.close
@@ -210,6 +237,7 @@
 			var rec = { handle: null, cancelled: false };
 			s.pendingRemove = rec;
 			rec.handle = window.pfToast.show( {
+				icon: ICONS.removed,
 				html: fmt( S.removed, titleHTML( title ) ),
 				duration: 5000,
 				closeLabel: S.close,
@@ -229,6 +257,38 @@
 			} );
 		}
 	}
+
+	/* ─── Invité : invitation à se connecter ─────────────────────── */
+
+	// Une seule invitation à la fois : re-cliquer le bouton pendant qu'elle est
+	// affichée ne réempile pas de toast. 7 s plutôt que les 5 s des confirmations
+	// d'ajout/retrait — il y a ici plus à lire ET un bouton à atteindre.
+	var loginToast = null;
+	function inviteToLogin( title ) {
+		if ( loginToast ) { return; }
+		loginToast = window.pfToast.show( {
+			html: fmt( S.login, titleHTML( title ) ),
+			duration: 7000,
+			closeLabel: S.close,
+			actions: [ { label: S.login_cta, href: pfBookmarks.login_url } ],
+			onClose: function () { loginToast = null; }
+		} );
+	}
+
+	/* ─── Bouton « Liste de lecture » du hero (fiche livre) ──────── */
+
+	document.addEventListener( 'click', function ( e ) {
+		var btn = e.target.closest ? e.target.closest( '.bs-hero__readlist' ) : null;
+		if ( ! btn ) { return; }
+		// Invité : le bouton est un <a> vers /connexion (repli sans JS) → on retient
+		// la navigation au profit du toast.
+		e.preventDefault();
+		if ( btn.classList.contains( 'bs-hero__readlist--guest' ) ) {
+			inviteToLogin( btn.getAttribute( 'data-title' ) || '' );
+			return;
+		}
+		activate( btn );
+	} );
 
 	// Signet cliqué sous le pointeur (chemin normal). En mode « dos », le signet
 	// est posé sur une couverture en 3D (transform-style: preserve-3d) : le

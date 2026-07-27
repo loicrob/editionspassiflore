@@ -231,9 +231,10 @@ function passiflore_render_sections_layout() {
 	// ── Distinctions ─────────────────────────────────────────────
 	$distinctions = get_field( 'distinctions', $id ) ?: [];
 	if ( $distinctions ) {
+		$icon  = '<svg class="bs-distinctions-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 -960 960 960" fill="currentColor" aria-hidden="true"><path d="m438-452-58-57q-11-11-27.5-11T324-508q-11 11-11 28t11 28l86 86q12 12 28 12t28-12l170-170q12-12 11.5-28T636-592q-12-12-28.5-12.5T579-593L438-452ZM326-90l-58-98-110-24q-15-3-24-15.5t-7-27.5l11-113-75-86q-10-11-10-26t10-26l75-86-11-113q-2-15 7-27.5t24-15.5l110-24 58-98q8-13 22-17.5t28 1.5l104 44 104-44q14-6 28-1.5t22 17.5l58 98 110 24q15 3 24 15.5t7 27.5l-11 113 75 86q10 11 10 26t-10 26l-75 86 11 113q2 15-7 27.5T802-212l-110 24-58 98q-8 13-22 17.5T584-74l-104-44-104 44q-14 6-28 1.5T326-90Zm52-72 102-44 104 44 56-96 110-26-10-112 74-84-74-86 10-112-110-24-58-96-102 44-104-44-56 96-110 24 10 112-74 86 74 84-10 114 110 24 58 96Zm102-318Z"/></svg>';
 		$html  = '<ul class="bs-distinctions">';
 		foreach ( $distinctions as $d ) {
-			$html .= '<li><span aria-hidden="true">★</span>' . esc_html( $d['distinction'] ) . '</li>';
+			$html .= '<li>' . $icon . esc_html( $d['distinction'] ) . '</li>';
 		}
 		$html .= '</ul>';
 		$sections[] = [ 'id' => 'bs-distinctions', 'label' => 'Distinctions', 'html' => $html ];
@@ -441,11 +442,17 @@ function passiflore_render_auteurs_section( int $id ): bool {
 	}
 
 	if ( $nom_de_plume ) {
-		echo '<p class="bs-auteur-meta">Publié sous le nom de ' . esc_html( $nom_de_plume ) . '</p>';
+		echo '<div class="bs-auteur-meta">';
+		echo '<p class="pf-label">Nom de plume</p>';
+		echo '<p class="bs-auteur-meta-value">' . esc_html( $nom_de_plume ) . '</p>';
+		echo '</div>';
 	}
 
 	if ( $illus ) {
-		echo '<p class="bs-auteur-meta">Illustration de couverture&nbsp;: ' . esc_html( $illus ) . '</p>';
+		echo '<div class="bs-auteur-meta">';
+		echo '<p class="pf-label">Illustration de couverture</p>';
+		echo '<p class="bs-auteur-meta-value">' . esc_html( $illus ) . '</p>';
+		echo '</div>';
 	}
 
 	echo '</div>';
@@ -468,7 +475,7 @@ function passiflore_render_presse_section( array $items ): void {
 		}
 		echo '<div class="pf-card' . ( $url ? '' : ' pf-card--static' ) . $hidden . '">';
 		if ( $url ) {
-			echo '<a class="pf-card-link" href="' . esc_url( $url ) . '" target="_blank" rel="noopener noreferrer" aria-label="' . esc_attr( $article['titre'] ?: 'Lire l’article' ) . '"></a>';
+			echo '<a class="pf-card-link" href="' . esc_url( $url ) . '" target="_blank" rel="noopener noreferrer" aria-label="' . esc_attr( pf_new_window_label( $article['titre'] ?: 'Lire l’article' ) ) . '"></a>';
 		}
 		echo '<div class="pf-card-content">';
 		if ( ! empty( $article['titre'] ) ) {
@@ -565,7 +572,7 @@ function passiflore_render_videos_section( array $items ): void {
 
 		echo '<div class="pf-card' . ( $url ? '' : ' pf-card--static' ) . $hidden . '">';
 		if ( $url ) {
-			echo '<a class="pf-card-link" href="' . esc_url( $url ) . '" target="_blank" rel="noopener noreferrer" aria-label="' . esc_attr( $video['titre'] ?: 'Voir la vidéo' ) . '"></a>';
+			echo '<a class="pf-card-link" href="' . esc_url( $url ) . '" target="_blank" rel="noopener noreferrer" aria-label="' . esc_attr( pf_new_window_label( $video['titre'] ?: 'Voir la vidéo' ) ) . '"></a>';
 		}
 		echo '<div class="pf-card-content">';
 		if ( ! empty( $video['titre'] ) ) {
@@ -607,7 +614,7 @@ function passiflore_render_podcasts_section( array $items ): void {
 
 		echo '<div class="pf-card' . ( $url ? '' : ' pf-card--static' ) . $hidden . '">';
 		if ( $url ) {
-			echo '<a class="pf-card-link" href="' . esc_url( $url ) . '" target="_blank" rel="noopener noreferrer" aria-label="' . esc_attr( $podcast['titre'] ?: 'Écouter' ) . '"></a>';
+			echo '<a class="pf-card-link" href="' . esc_url( $url ) . '" target="_blank" rel="noopener noreferrer" aria-label="' . esc_attr( pf_new_window_label( $podcast['titre'] ?: 'Écouter' ) ) . '"></a>';
 		}
 		echo '<div class="pf-card-content">';
 		if ( ! empty( $podcast['titre'] ) ) {

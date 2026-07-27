@@ -17,13 +17,41 @@ class Passiflore_Bookshelf {
 	const MAX_WIDTH_MM      = 350;
 	const PASSIFLORE_RED    = '#c62836';
 	const COLOR_META_KEY    = '_pf_cover_color';
+	// Incrémenter à chaque changement d'algorithme de couleur de dos : le cache
+	// COLOR_META_KEY est alors purgé une fois par environnement (admin_init).
+	const COLOR_ALGO_VER    = 2;
+	const COLOR_PURGE_OPT   = 'pf_cover_color_algo';
+	// Préchauffage du cache couleur, par lots depuis l'admin (cf.
+	// maybe_warm_cover_colors) : ~30 ms par couverture, à ne pas faire porter
+	// d'un bloc au premier rendu du catalogue.
+	const COLOR_WARM_OPT    = 'pf_cover_color_warm';
+	const COLOR_WARM_BATCH  = 15;
+	// Bornes du corps du titre sur un dos généré (cf. spine_layout()).
+	const SPINE_FONT_MIN    = 7;
+	const SPINE_FONT_MAX    = 14;
+	// Seuil de CONFORT, distinct du plancher : on préfère raccourcir les
+	// auteurs plutôt que descendre sous ce corps. SPINE_FONT_MIN ne sert qu'en
+	// dernier recours, quand même le titre seul ne rentre pas.
+	const SPINE_FONT_OK     = 9;
+	// Les auteurs se composent un cran sous le titre, comme sur un vrai dos.
+	const SPINE_AUTHOR_RATIO = 0.85;
+	// Marges haute + basse d'un dos généré, cumulées.
+	// ⚠️ DOIT rester synchronisé avec le `padding` de .pf-spine-generated
+	// (bookshelf.css) : c'est ce qu'on déduit du budget vertical du texte.
+	const SPINE_PAD_Y       = 26;
+	// Largeur moyenne d'un caractère, en em, letter-spacing (0.02em) inclus.
+	// Mesurée au canvas sur un corpus de vrais titres et noms du catalogue :
+	// Newsreader 700 = 0.480, Inter 700 = 0.513, Inter 400 = 0.497.
+	const SPINE_EM_SERIF    = 0.500;
+	const SPINE_EM_SANS     = 0.533;
+	const SPINE_EM_AUTHOR   = 0.517;
 	// Tailles d'image dédiées à l'étagère GÉNÉRIQUE (les ~300 livres du
 	// catalogue, servis × chaque visite / chaque filtre) à la place de
 	// medium_large (768) / large (1024) surdimensionnés. Non-crop → le ratio
-	// est préservé : indispensable pour les tranches, images très étroites et
+	// est préservé : indispensable pour les dos, images très étroites et
 	// hautes (la hauteur est la dimension contraignante, la largeur suit).
 	// Calées sur le rendu réel : couverture ≤ ~420px de large / ~480px de haut
-	// (mode covers) ; tranche ≤ ~108px de large / ~720px de haut (mode spines).
+	// (mode covers) ; dos ≤ ~108px de large / ~720px de haut (mode spines).
 	// Le mode HÉROS (fiche livre, livre affiché bien plus grand) conserve
 	// medium_large / large — cf. prepare_books().
 	const SHELF_COVER_SIZE  = 'pf-shelf-cover'; // 400 × 600 (boîte englobante)
@@ -72,6 +100,8 @@ class Passiflore_Bookshelf {
 		add_shortcode( 'passiflore_etagere', [ $this, 'render_shortcode' ] );
 		add_action( 'wp_enqueue_scripts', [ $this, 'register_assets' ] );
 		add_action( 'after_setup_theme', [ $this, 'register_image_sizes' ] );
+		add_action( 'admin_init', [ __CLASS__, 'maybe_purge_cover_colors' ] );
+		add_action( 'admin_init', [ __CLASS__, 'maybe_warm_cover_colors' ], 11 );
 		$this->register_counts_cache_hooks();
 	}
 
@@ -121,7 +151,7 @@ class Passiflore_Bookshelf {
 
 	/**
 	 * Sous-tailles dédiées à l'étagère générique (cf. constantes SHELF_*_SIZE).
-	 * Non-crop : le ratio est préservé — pour une tranche (étroite et haute)
+	 * Non-crop : le ratio est préservé — pour un dos (étroit et haut)
 	 * c'est la hauteur qui contraint, la largeur suit le ratio.
 	 * ⚠️ Les images déjà en médiathèque doivent être régénérées pour que ces
 	 * sous-tailles existent ; sinon wp_get_attachment_image_url() retombe sur
@@ -172,23 +202,33 @@ class Passiflore_Bookshelf {
 	}
 
 	/**
-	 * Enqueue (une seule fois) le JS des signets sur couverture + le composant
+	 * Enqueue (une seule fois) le contrôleur « liste de lecture » + le composant
 	 * toast, et localise `pfBookmarks`. Réutilise le nonce de Passiflore_Reading_List
 	 * (même endpoint pf_reading_list_toggle). Le CSS du signet vit dans bookshelf.css
 	 * (déjà enqueué) et celui du toast dans style.css (toujours chargé).
+	 *
+	 * Publique : la fiche livre l'appelle aussi (Passiflore_Reading_List::enqueue_assets),
+	 * son bouton de hero étant piloté par le même contrôleur que les signets.
 	 */
-	private function enqueue_bookmark_assets() {
+	public static function enqueue_bookmark_assets() {
 		static $done = false;
 		if ( $done ) {
 			return;
 		}
 		$done = true;
 
+		// Invité : aucun nonce (l'endpoint le refuserait de toute façon) — le
+		// contrôleur se contente d'inviter à se connecter.
+		$logged_in = is_user_logged_in();
+		$login_url = function_exists( 'pf_auth_url' ) ? pf_auth_url( 'login' ) : wc_get_page_permalink( 'myaccount' );
+
 		wp_enqueue_script( 'pf-shelf-bookmarks' );
 		wp_localize_script( 'pf-shelf-bookmarks', 'pfBookmarks', [
 			'ajax_url'      => admin_url( 'admin-ajax.php' ),
-			'nonce'         => wp_create_nonce( Passiflore_Reading_List::NONCE ),
+			'nonce'         => $logged_in ? wp_create_nonce( Passiflore_Reading_List::NONCE ) : '',
 			'toggle_action' => 'pf_reading_list_toggle',
+			'login_url'     => $login_url,
+			'icons'         => Passiflore_Reading_List::toast_icons(),
 			// Vrai sur la page « Mon compte → Liste de lecture » : c'est là que se
 			// trouve l'étagère « Ma liste de lecture » à reconstruire après un toggle.
 			'rebuild_readlist' => (bool) ( function_exists( 'is_wc_endpoint_url' ) && class_exists( 'Passiflore_Reading_List' ) && is_wc_endpoint_url( Passiflore_Reading_List::ENDPOINT ) ),
@@ -199,6 +239,9 @@ class Passiflore_Bookshelf {
 				'added'      => '%s ajouté à votre liste de lecture.',
 				/* translators: %s = titre du livre (déjà mis en forme). */
 				'removed'    => '%s retiré de votre liste de lecture.',
+				/* translators: %s = titre du livre (déjà mis en forme). */
+				'login'      => 'Veuillez vous connecter pour pouvoir ajouter %s à votre liste de lecture.',
+				'login_cta'  => 'Se connecter',
 				'undo'       => 'Annuler',
 				'close'      => 'Fermer',
 			],
@@ -233,7 +276,7 @@ class Passiflore_Bookshelf {
 		// Opt-in: arrange the books tallest → shortest. Enabled per shelf via
 		// orderby="hauteur" (used by the home-page « Culture Sud-Ouest » shelf).
 		// The sort key is `height_px` — the very value used to render each
-		// spine's height (book height in mm × scale; cover/tranche images only
+		// spine's height (book height in mm × scale; cover/dos images only
 		// affect spine *width*) — so it can only run after prepare_books has
 		// resolved every book's dimensions. Ties fall back to the parution
 		// date, most recent first.
@@ -266,7 +309,7 @@ class Passiflore_Bookshelf {
 			&& ! $is_hero
 			&& is_user_logged_in() && class_exists( 'Passiflore_Reading_List' );
 		if ( $show_bookmarks ) {
-			$this->enqueue_bookmark_assets();
+			self::enqueue_bookmark_assets();
 		}
 
 		// Étiquettes « À paraître » / « Nouveauté » : actives par défaut.
@@ -995,10 +1038,10 @@ class Passiflore_Bookshelf {
 		// générée pour toute la médiathèque, contrairement à une sous-taille
 		// dédiée) sans coût perf, la couverture n'étant chargée que pour le
 		// livre réellement survolé.
-		$cover_size   = ( $is_hero || $display === 'spines' ) ? 'medium_large' : self::SHELF_COVER_SIZE;
-		$tranche_size = $is_hero ? 'large' : self::SHELF_SPINE_SIZE;
+		$cover_size = ( $is_hero || $display === 'spines' ) ? 'medium_large' : self::SHELF_COVER_SIZE;
+		$dos_size   = $is_hero ? 'large' : self::SHELF_SPINE_SIZE;
 
-		// Amorçage groupé des attachments (couvertures + tranches). Sans ça, les
+		// Amorçage groupé des attachments (couvertures + dos). Sans ça, les
 		// wp_get_attachment_image_url/_src de la boucle déclenchent 1-2 requêtes
 		// par image (les vignettes ne sont pas dans le cache de la requête
 		// produits) → N+1. Un seul _prime_post_caches charge posts + métas d'un
@@ -1007,13 +1050,17 @@ class Passiflore_Bookshelf {
 		foreach ( $products as $post ) {
 			$tid = get_post_thumbnail_id( $post->ID );
 			if ( $tid ) $att_ids[] = (int) $tid;
-			$tranche = (int) get_post_meta( $post->ID, 'tranche', true );
-			if ( $tranche ) $att_ids[] = $tranche;
+			// `tranche` est le nom (slug) réel du champ SCF ; il désigne le dos.
+			$dos_id = (int) get_post_meta( $post->ID, 'tranche', true );
+			if ( $dos_id ) $att_ids[] = $dos_id;
 		}
 		$att_ids = array_values( array_unique( $att_ids ) );
 		if ( $att_ids ) {
 			_prime_post_caches( $att_ids, false, true );
 		}
+
+		// Auteurs + famille typo des dos générés, en lot (cf. spine_meta_for()).
+		$spine_meta = ( $display === 'spines' ) ? $this->spine_meta_for( $products ) : [];
 
 		foreach ( $products as $post ) {
 			$product = wc_get_product( $post->ID );
@@ -1033,19 +1080,19 @@ class Passiflore_Bookshelf {
 			$is_cd      = in_array( 'audio', $format_slugs, true );
 
 			if ( $is_ereader ) {
-				// Liseuse : hauteur d'appareil fixe, pas de tranche papier ni
+				// Liseuse : hauteur d'appareil fixe, pas de dos papier ni
 				// d'épaisseur dérivée des pages. La largeur est calculée plus
 				// bas, en px, à partir du ratio de la couverture.
-				$height_mm  = self::EREADER_HEIGHT_MM;
-				$width_mm   = self::DEFAULT_WIDTH_MM; // recalculé en px ci-dessous
-				$spine_mm   = self::EREADER_SPINE_MM;
-				$tranche_id = 0;
+				$height_mm = self::EREADER_HEIGHT_MM;
+				$width_mm  = self::DEFAULT_WIDTH_MM; // recalculé en px ci-dessous
+				$spine_mm  = self::EREADER_SPINE_MM;
+				$dos_id    = 0;
 			} elseif ( $is_cd ) {
 				// Boîtier CD : dimensions de boîtier cristal standard.
-				$height_mm  = self::CD_HEIGHT_MM;
-				$width_mm   = self::CD_WIDTH_MM;
-				$spine_mm   = self::CD_SPINE_MM;
-				$tranche_id = 0;
+				$height_mm = self::CD_HEIGHT_MM;
+				$width_mm  = self::CD_WIDTH_MM;
+				$spine_mm  = self::CD_SPINE_MM;
+				$dos_id    = 0;
 			} else {
 				$height_mm = $this->wc_dim_to_mm( $product->get_height(), $unit );
 				$width_mm  = $this->wc_dim_to_mm( $product->get_width(), $unit );
@@ -1075,16 +1122,17 @@ class Passiflore_Bookshelf {
 				$height_mm = max( self::MIN_HEIGHT_MM, min( self::MAX_HEIGHT_MM, $height_mm ) );
 				$width_mm  = max( self::MIN_WIDTH_MM,  min( self::MAX_WIDTH_MM,  $width_mm ) );
 
-				// Lecture directe en post meta : `tranche` (return_format=id) et
-				// `nombre_de_pages` stockent une valeur brute, le formatage SCF de
-				// get_field() est inutile ici (méta déjà en cache via la requête).
-				$tranche_id = (int) get_post_meta( $post->ID, 'tranche', true );
-				$pages      = absint( get_post_meta( $post->ID, 'nombre_de_pages', true ) );
+				// Lecture directe en post meta : `tranche` (nom réel du champ SCF,
+				// désigne le dos, return_format=id) et `nombre_de_pages` stockent
+				// une valeur brute, le formatage SCF de get_field() est inutile
+				// ici (méta déjà en cache via la requête).
+				$dos_id = (int) get_post_meta( $post->ID, 'tranche', true );
+				$pages  = absint( get_post_meta( $post->ID, 'nombre_de_pages', true ) );
 
 				$spine_mm    = 0;
 				$from_image  = false;
-				if ( $tranche_id ) {
-					$img = wp_get_attachment_image_src( $tranche_id, 'full' );
+				if ( $dos_id ) {
+					$img = wp_get_attachment_image_src( $dos_id, 'full' );
 					if ( $img && $img[1] && $img[2] ) {
 						$spine_mm   = round( $height_mm * ( $img[1] / $img[2] ) );
 						$from_image = true;
@@ -1096,7 +1144,7 @@ class Passiflore_Bookshelf {
 				if ( ! $spine_mm ) {
 					$spine_mm = 15;
 				}
-				// Only clamp the page-derived fallback. When a tranche image exists,
+				// Only clamp the page-derived fallback. When a dos image exists,
 				// preserve its aspect ratio exactly so it renders without cropping.
 				if ( ! $from_image ) {
 					$spine_mm = max( self::MIN_SPINE_MM, min( self::MAX_SPINE_MM, $spine_mm ) );
@@ -1122,9 +1170,14 @@ class Passiflore_Bookshelf {
 				$cover_w_px = (int) round( $screen_h * $ratio ) + 2 * self::EREADER_BEZEL_PX;
 			}
 
-			$thumb_url   = $thumb_id ? wp_get_attachment_image_url( $thumb_id, $cover_size ) : '';
-			$tranche_url = $tranche_id ? wp_get_attachment_image_url( $tranche_id, $tranche_size ) : '';
-			$spine_color = ( $tranche_id || $is_ereader ) ? '' : $this->extract_cover_color( $thumb_id );
+			$thumb_url = $thumb_id ? wp_get_attachment_image_url( $thumb_id, $cover_size ) : '';
+			$dos_url   = $dos_id ? wp_get_attachment_image_url( $dos_id, $dos_size ) : '';
+			// Couleur dominante de la couverture. Extraite pour TOUS les livres
+			// (et plus seulement ceux sans image de dos) : elle sert désormais
+			// aussi à peindre la quatrième de couverture sur l'arête arrière du
+			// bandeau de pages, qui existe quel que soit le dos. Une liseuse n'a
+			// ni bloc pages ni couverture cartonnée → rien à extraire.
+			$cover_color = $is_ereader ? '' : self::extract_cover_color( $thumb_id );
 
 			// « À paraître » = valeur brute du champ SCF `disponibilite`
 			// (slug stocké tel quel, cf. apply_decouvrir_filter).
@@ -1146,8 +1199,8 @@ class Passiflore_Bookshelf {
 				'url'          => get_permalink( $post->ID ),
 				'title'        => $product->get_name(),
 				'cover_url'    => $thumb_url,
-				'tranche_url'  => $tranche_url,
-				'spine_color'  => $spine_color,
+				'dos_url'      => $dos_url,
+				'cover_color'  => $cover_color,
 				'price'        => $price_html,
 				'height_px'    => $height_px,
 				'cover_w_px'   => $cover_w_px,
@@ -1157,6 +1210,8 @@ class Passiflore_Bookshelf {
 				'is_aparaitre' => $is_aparaitre,
 				'is_nouveaute' => $is_nouveaute,
 				'format_label' => $format_label,
+				'authors'      => $spine_meta[ $post->ID ]['authors'] ?? [],
+				'spine_font'   => $spine_meta[ $post->ID ]['font'] ?? '',
 			];
 		}
 
@@ -1236,7 +1291,30 @@ class Passiflore_Bookshelf {
 		return (int) round( $value * 10 );
 	}
 
-	private function extract_cover_color( $attachment_id ) {
+	/**
+	 * Couleur du dos fictif : couleur DOMINANTE de la couverture.
+	 *
+	 * On ne prend pas la moyenne (l'ancienne méthode, un resize en 1x1) : elle
+	 * régresse vers un gris-brun dès que la couverture est contrastée, et sur
+	 * 33 couvertures elle donnait 39 % de dos où le titre blanc était illisible.
+	 * On ne prend pas non plus un pixel du coin ni la moyenne du bord : le fond
+	 * est souvent le blanc de la marge (mesuré : 5 à 6 dos quasi blancs sur 33).
+	 *
+	 * Méthode : histogramme QUANTIFIÉ. On réduit d'abord à 64x64 (le
+	 * rééchantillonnage est fait en C, donc quasi gratuit), puis on range les
+	 * 4096 pixels dans 4096 casiers de couleur (4 bits par canal) — sans cette
+	 * quantification, deux pixels n'ont presque jamais exactement la même
+	 * valeur et le comptage ne veut rien dire. Le casier gagnant est celui qui
+	 * maximise « fréquence x saturation » : la fréquence prime, la saturation
+	 * départage en faveur d'une vraie couleur d'imprimeur plutôt qu'un gris.
+	 * Les casiers quasi blancs (papier) et quasi noirs (encre) sont écartés :
+	 * ils dominent souvent le comptage sans jamais faire une couleur de dos.
+	 *
+	 * Coût mesuré ~17 ms/couverture, sans importance : le résultat est figé
+	 * dans la post-meta COLOR_META_KEY, donc calculé une seule fois à vie.
+	 * Changer l'algorithme => incrémenter COLOR_ALGO_VER (purge automatique).
+	 */
+	private static function extract_cover_color( $attachment_id ) {
 		if ( ! $attachment_id ) return self::PASSIFLORE_RED;
 
 		$cached = get_post_meta( $attachment_id, self::COLOR_META_KEY, true );
@@ -1268,19 +1346,225 @@ class Passiflore_Bookshelf {
 		}
 		if ( ! $im ) return self::PASSIFLORE_RED;
 
-		$small = imagecreatetruecolor( 1, 1 );
-		imagecopyresampled( $small, $im, 0, 0, 0, 0, 1, 1, imagesx( $im ), imagesy( $im ) );
-		$rgb = imagecolorat( $small, 0, 0 );
-		imagedestroy( $small );
+		$hex = self::dominant_color( $im );
 		imagedestroy( $im );
-
-		$r = ( $rgb >> 16 ) & 0xFF;
-		$g = ( $rgb >> 8 ) & 0xFF;
-		$b = $rgb & 0xFF;
-		$hex = sprintf( '#%02x%02x%02x', $r, $g, $b );
 
 		update_post_meta( $attachment_id, self::COLOR_META_KEY, $hex );
 		return $hex;
+	}
+
+	/**
+	 * Auteurs et famille typographique de chaque livre, pour les dos générés.
+	 *
+	 * Tout est amorcé EN LOT — 1 requête pour l'arbre product_cat, 1 pour les
+	 * catégories des livres, 1 pour les termes auteur et leurs métas — puis la
+	 * boucle de prepare_books() ne lit plus que des caches. Sans ça on
+	 * retomberait sur le N+1 déjà corrigé pour les pièces jointes.
+	 *
+	 * Famille : Newsreader (serif) sous « Littérature », Inter (sans-serif)
+	 * sous « Culture Sud-Ouest ». Les deux ancres sont des catégories racines,
+	 * on remonte donc l'arbre depuis la catégorie du livre. Ces deux polices
+	 * sont déjà chargées par Kadence (vérifié : Inter 400/700 + Newsreader 700),
+	 * il n'y a aucune webfont à ajouter.
+	 *
+	 * @return array [ post_id => [ 'authors' => [ ['full','last'], … ], 'font' => 'serif'|'sans' ] ]
+	 */
+	private function spine_meta_for( $products ) {
+		$ids = [];
+		foreach ( $products as $p ) $ids[] = (int) $p->ID;
+		if ( ! $ids ) return [];
+
+		// --- Famille typo : term_id de catégorie -> serif | sans.
+		$font_of_term = [];
+		$cats = get_terms( [ 'taxonomy' => 'product_cat', 'hide_empty' => false ] );
+		if ( ! is_wp_error( $cats ) ) {
+			$parent = []; $slug = [];
+			foreach ( $cats as $t ) { $parent[ $t->term_id ] = (int) $t->parent; $slug[ $t->term_id ] = $t->slug; }
+			foreach ( $parent as $tid => $p ) {
+				$cur = $tid; $guard = 0;
+				while ( ! empty( $parent[ $cur ] ) && $guard++ < 10 ) $cur = $parent[ $cur ];
+				$root = $slug[ $cur ] ?? '';
+				if ( 'litterature' === $root )            $font_of_term[ $tid ] = 'serif';
+				elseif ( 'culture-sud-ouest' === $root )  $font_of_term[ $tid ] = 'sans';
+			}
+		}
+
+		$out = [];
+		foreach ( $ids as $pid ) $out[ $pid ] = [ 'authors' => [], 'font' => '' ];
+
+		$rel = wp_get_object_terms( $ids, 'product_cat', [ 'fields' => 'all_with_object_id' ] );
+		if ( ! is_wp_error( $rel ) ) {
+			foreach ( $rel as $t ) {
+				$pid = (int) $t->object_id;
+				if ( isset( $out[ $pid ] ) && '' === $out[ $pid ]['font'] && isset( $font_of_term[ $t->term_id ] ) ) {
+					$out[ $pid ]['font'] = $font_of_term[ $t->term_id ];
+				}
+			}
+		}
+
+		// --- Auteurs : toutes les contributions, dans l'ordre du repeater SCF.
+		if ( ! function_exists( 'passiflore_get_product_author_ids' ) ) return $out;
+
+		$per_book = []; $all = [];
+		foreach ( $ids as $pid ) {
+			$a = passiflore_get_product_author_ids( $pid );
+			$per_book[ $pid ] = $a;
+			foreach ( $a as $tid ) $all[] = (int) $tid;
+		}
+		$all = array_values( array_unique( $all ) );
+		if ( ! $all ) return $out;
+		_prime_term_caches( $all, true );   // termes + term meta en une fois
+
+		foreach ( $per_book as $pid => $tids ) {
+			foreach ( $tids as $tid ) {
+				$term = get_term( (int) $tid, 'auteur' );
+				if ( ! $term || is_wp_error( $term ) ) continue;
+				$nom    = (string) get_term_meta( (int) $tid, 'nom', true );
+				$prenom = (string) get_term_meta( (int) $tid, 'prenom', true );
+				$last   = $nom !== '' ? $nom : $term->name;
+				$full   = trim( $prenom . ' ' . $nom );
+				$out[ $pid ]['authors'][] = [
+					'full' => $full !== '' ? $full : $term->name,
+					'last' => $last,
+				];
+			}
+		}
+		return $out;
+	}
+
+	/** Histogramme quantifié — voir extract_cover_color(). */
+	private static function dominant_color( $im ) {
+		$size  = 64;
+		$small = imagecreatetruecolor( $size, $size );
+		imagecopyresampled( $small, $im, 0, 0, 0, 0, $size, $size, imagesx( $im ), imagesy( $im ) );
+
+		$buckets = [];
+		for ( $y = 0; $y < $size; $y++ ) {
+			for ( $x = 0; $x < $size; $x++ ) {
+				$rgb = imagecolorat( $small, $x, $y );
+				$r   = ( $rgb >> 16 ) & 0xFF;
+				$g   = ( $rgb >> 8 ) & 0xFF;
+				$b   = $rgb & 0xFF;
+				// 4 bits par canal : 16x16x16 = 4096 casiers.
+				$key = ( ( $r >> 4 ) << 8 ) | ( ( $g >> 4 ) << 4 ) | ( $b >> 4 );
+				if ( ! isset( $buckets[ $key ] ) ) {
+					$buckets[ $key ] = [ 0, 0, 0, 0 ];
+				}
+				$buckets[ $key ][0]++;
+				$buckets[ $key ][1] += $r;
+				$buckets[ $key ][2] += $g;
+				$buckets[ $key ][3] += $b;
+			}
+		}
+		imagedestroy( $small );
+
+		$best = null; $best_score = -1;   // hors papier / encre
+		$any  = null; $any_score  = -1;   // repli si tout est écarté
+		foreach ( $buckets as $d ) {
+			$n = $d[0];
+			$r = $d[1] / $n; $g = $d[2] / $n; $b = $d[3] / $n;
+
+			$max = max( $r, $g, $b );
+			$min = min( $r, $g, $b );
+			$lum = ( $max + $min ) / 510;                       // L de HSL, 0..1
+			$den = 255 - abs( $max + $min - 255 );
+			$sat = $den > 0 ? ( $max - $min ) / $den : 0;
+
+			$score = $n * ( 0.25 + $sat );
+			if ( $score > $any_score ) {
+				$any_score = $score;
+				$any       = [ $r, $g, $b ];
+			}
+			if ( $lum > 0.93 || $lum < 0.07 ) continue;
+			if ( $score > $best_score ) {
+				$best_score = $score;
+				$best       = [ $r, $g, $b ];
+			}
+		}
+
+		$c = $best ?: $any;
+		if ( ! $c ) return self::PASSIFLORE_RED;
+
+		return sprintf( '#%02x%02x%02x', (int) round( $c[0] ), (int) round( $c[1] ), (int) round( $c[2] ) );
+	}
+
+	/**
+	 * Le titre blanc passe-t-il sur ce fond ? Seuil WCAG AA (4.5:1). En dessous,
+	 * le dos bascule en « clair » : titre et logo sombres. On garde la couleur
+	 * exacte de la couverture — un livre pâle a un dos pâle, c'est ce que fait
+	 * un vrai livre — plutôt que de l'assombrir pour sauver le texte blanc.
+	 */
+	public static function spine_is_light( $hex ) {
+		$rgb = sscanf( $hex, '#%02x%02x%02x' );
+		if ( ! $rgb || count( $rgb ) < 3 ) return false;
+		$lin = static function ( $c ) {
+			$c /= 255;
+			return $c <= 0.03928 ? $c / 12.92 : pow( ( $c + 0.055 ) / 1.055, 2.4 );
+		};
+		$l = 0.2126 * $lin( $rgb[0] ) + 0.7152 * $lin( $rgb[1] ) + 0.0722 * $lin( $rgb[2] );
+		return ( 1.05 / ( $l + 0.05 ) ) < 4.5;
+	}
+
+	/**
+	 * Purge unique du cache couleur quand l'algorithme change (idiome maison,
+	 * cf. pf_auteur_terms_synced / pf_shipping_seuil_migrated) : rien à lancer
+	 * à la main au déploiement, la première visite d'un écran d'admin suffit.
+	 */
+	public static function maybe_purge_cover_colors() {
+		if ( (int) get_option( self::COLOR_PURGE_OPT ) === self::COLOR_ALGO_VER ) return;
+		global $wpdb;
+		$ids = $wpdb->get_col( $wpdb->prepare(
+			"SELECT post_id FROM {$wpdb->postmeta} WHERE meta_key = %s", self::COLOR_META_KEY
+		) );
+		if ( $ids ) {
+			$wpdb->query( $wpdb->prepare(
+				"DELETE FROM {$wpdb->postmeta} WHERE meta_key = %s", self::COLOR_META_KEY
+			) );
+			// Le cache objet garderait sinon les anciennes valeurs.
+			foreach ( $ids as $id ) {
+				wp_cache_delete( (int) $id, 'post_meta' );
+			}
+		}
+		update_option( self::COLOR_PURGE_OPT, self::COLOR_ALGO_VER, false );
+		delete_option( self::COLOR_WARM_OPT );   // le préchauffage est à refaire
+	}
+
+	/**
+	 * Préchauffage borné du cache couleur, par lots, depuis l'admin.
+	 *
+	 * La couleur dominante est extraite pour TOUTES les couvertures (le plat
+	 * arrière du bandeau de pages en a besoin, image de dos ou non) : 165 sur
+	 * ce catalogue, ~30 ms pièce. Laissé purement paresseux, le premier rendu
+	 * du catalogue les calculerait TOUTES dans la même requête — mesuré ~3,8 s
+	 * en local, et l'hébergement de prod est nettement plus lent. On draine
+	 * donc par lots de COLOR_WARM_BATCH à chaque écran d'admin, jusqu'à
+	 * épuisement (option posée à ce moment-là, une seule lecture ensuite).
+	 *
+	 * Le rendu reste capable de calculer à la volée : ce préchauffage n'est
+	 * qu'une avance de phase, jamais une dépendance.
+	 */
+	public static function maybe_warm_cover_colors() {
+		if ( get_option( self::COLOR_WARM_OPT ) ) return;
+		global $wpdb;
+		$ids = $wpdb->get_col( $wpdb->prepare(
+			"SELECT DISTINCT t.meta_value
+			   FROM {$wpdb->postmeta} t
+			   JOIN {$wpdb->posts} p ON p.ID = t.post_id
+			   LEFT JOIN {$wpdb->postmeta} c
+			          ON c.post_id = t.meta_value AND c.meta_key = %s
+			  WHERE t.meta_key = '_thumbnail_id'
+			    AND p.post_type = 'product' AND p.post_status = 'publish'
+			    AND c.meta_id IS NULL
+			  LIMIT %d",
+			self::COLOR_META_KEY, self::COLOR_WARM_BATCH
+		) );
+		if ( ! $ids ) {
+			update_option( self::COLOR_WARM_OPT, 1, false );
+			return;
+		}
+		foreach ( $ids as $id ) {
+			self::extract_cover_color( (int) $id );
+		}
 	}
 
 	/* ─── Render Modes ───────────────────────────────────────────── */
@@ -1315,7 +1599,7 @@ class Passiflore_Bookshelf {
 	 */
 	private function render_libraires_link( $libraires_url ) {
 		if ( ! $libraires_url ) return '';
-		return '<a class="bs-hero__libraires" href="' . esc_url( $libraires_url ) . '" target="_blank" rel="noopener noreferrer">Voir sur Place des libraires</a>';
+		return '<a class="bs-hero__libraires" href="' . esc_url( $libraires_url ) . '" target="_blank" rel="noopener noreferrer">Voir sur Place des libraires' . pf_new_window_note() . '</a>';
 	}
 
 	private function render_shelves( $books, $display, $show_price, $shelf_inner, $per_shelf, $nb_first = 12, $is_hero = false, $cat_theme = '', $show_formats = false, $libraires_url = '', $show_bookmarks = false ) {
@@ -1398,8 +1682,15 @@ class Passiflore_Bookshelf {
 			$b['cover_w_px'] + $b['spine_w_px']
 		);
 
-		// Le prix (chevalet) n'existe qu'en covers : en spines les tranches
-		// sont trop étroites pour le porter, et on ne l'affiche pas non plus
+		// Couleur des plats (quatrième de couverture peinte sur l'arête arrière
+		// du bandeau de pages, cf. .pf-book-pages). Absente pour les liseuses,
+		// qui n'ont pas de bandeau ; le CD garde le noir de son boîtier.
+		if ( ! empty( $b['cover_color'] ) ) {
+			$style .= '--cover-color:' . $b['cover_color'] . ';';
+		}
+
+		// Le prix (chevalet) n'existe qu'en covers : en spines les dos
+		// sont trop étroits pour le porter, et on ne l'affiche pas non plus
 		// sur le livre saisi.
 		$with_price   = ( $show_price && $b['price'] && $display === 'covers' );
 		$with_formats = ( $show_formats && ! empty( $b['format_label'] ) && $display === 'covers' );
@@ -1443,10 +1734,10 @@ class Passiflore_Bookshelf {
 
 		// Explicit width/height on every <img> so lazy placeholders reserve
 		// the right amount of space (CLS = 0). Cover dimensions match
-		// --cover-w / --book-h ; the tranche image inherits cover height
+		// --cover-w / --book-h ; the dos image inherits cover height
 		// and is as wide as the spine.
-		$cover_dims   = sprintf( 'width="%d" height="%d"', $b['cover_w_px'], $b['height_px'] );
-		$tranche_dims = sprintf( 'width="%d" height="%d"', $b['spine_w_px'], $b['height_px'] );
+		$cover_dims = sprintf( 'width="%d" height="%d"', $b['cover_w_px'], $b['height_px'] );
+		$dos_dims   = sprintf( 'width="%d" height="%d"', $b['spine_w_px'], $b['height_px'] );
 
 		if ( $is_hero ) {
 			$aria  = $has_extract ? esc_attr( "Feuilleter l’extrait" ) : esc_attr( $b['title'] );
@@ -1472,14 +1763,14 @@ class Passiflore_Bookshelf {
 			$html .= '<div class="pf-book-inside">' . $hint . '</div>';
 		}
 
-		// Spine face: tranche image OR generated (cover-extracted color +
+		// Spine face: dos image OR generated (cover-extracted color +
 		// vertical title + logo Passiflore) OR chant de liseuse. The generated
 		// rendering is used in both modes; CSS hides title/icon in covers mode
 		// where the spine is just a thin parallelogram. En covers, la liseuse
-		// est une ardoise plate : ni tranche ni bandeau de pages.
-		$tranche_attrs = ( $display === 'spines' ) ? $primary_attrs : 'loading="lazy"';
+		// est une ardoise plate : ni dos ni bandeau de pages.
+		$dos_attrs = ( $display === 'spines' ) ? $primary_attrs : 'loading="lazy"';
 		if ( ! ( $is_ereader && $display === 'covers' ) ) {
-			$html .= '<div class="pf-book-spine">' . $this->spine_face_html( $b, $tranche_attrs, $tranche_dims ) . '</div>';
+			$html .= '<div class="pf-book-spine">' . $this->spine_face_html( $b, $dos_attrs, $dos_dims ) . '</div>';
 		}
 
 		// Cover face. In spines mode the cover is hidden until hover, so we
@@ -1487,6 +1778,15 @@ class Passiflore_Bookshelf {
 		// Pour les liseuses, l'image est dans .pf-ereader-screen (fond blanc,
 		// overflow:hidden) qui clipe la rotation sans bouger le cadre device.
 		$html .= '<div class="pf-book-cover">';
+		// Mode spines : la couverture qui s'ouvre au curseur est un SOUS-bloc.
+		// .pf-book-cover reste la face rigide du volume ; .pf-cover-leaf porte
+		// la rotation d'ouverture dans une scène 3D locale (perspective propre)
+		// — sinon la caméra déportée du volume amplifie sa profondeur et la
+		// couverture s'étire vers la droite au lieu de pivoter. Cf. bookshelf.css.
+		$cover_leaf = ( $display === 'spines' && ! $is_hero && ! $is_ereader );
+		if ( $cover_leaf ) {
+			$html .= '<div class="pf-cover-leaf">';
+		}
 		if ( $is_ereader ) {
 			$html .= '<div class="pf-ereader-screen">';
 			if ( $is_hero && $has_extract ) {
@@ -1518,7 +1818,11 @@ class Passiflore_Bookshelf {
 		if ( $is_ereader ) {
 			$html .= '</div>'; // .pf-ereader-screen
 			// Pastille de marque dans le menton de la liseuse.
-			$html .= '<span class="pf-ereader-brand">' . $this->spine_icon_html() . '</span>';
+			$html .= '<span class="pf-ereader-brand">' . $this->spine_icon_html( true ) . '</span>';
+		}
+
+		if ( $cover_leaf ) {
+			$html .= '</div>'; // .pf-cover-leaf
 		}
 
 		$html .= '</div>';
@@ -1530,21 +1834,6 @@ class Passiflore_Bookshelf {
 		}
 
 		$html .= '</div>';
-
-		// Décor « livre en main » (spines uniquement) : réplique 2D de
-		// l'anatomie covers — tranche biseautée à gauche + bandeau de pages
-		// en haut. Au repos la tranche fantôme recouvre exactement la tranche
-		// réelle ; pendant la saisie elle glisse/biseaute vers sa place covers
-		// et le bandeau se déploie, en synchronisation avec la rotation du
-		// volume. Frère de .pf-book-inner : il ne tourne pas avec le volume
-		// et ne suit pas l'ouverture de la couverture. La liseuse (ardoise
-		// plate) n'en a pas besoin.
-		if ( $display === 'spines' && ! $is_hero && ! $is_ereader ) {
-			$html .= '<div class="pf-book-held-deco" aria-hidden="true">'
-				. '<div class="pf-spine-ghost">' . $this->spine_face_html( $b, 'loading="lazy"', $tranche_dims ) . '</div>'
-				. '<div class="pf-pages-ghost"></div>'
-				. '</div>';
-		}
 
 		if ( $with_price ) {
 			$html .= '<div class="pf-chevalet"><div class="pf-chevalet-card"><span class="pf-chevalet-price">' . $b['price'] . '</span></div></div>';
@@ -1618,33 +1907,174 @@ class Passiflore_Bookshelf {
 	}
 
 	/**
-	 * Face visible de la tranche : image de tranche, tranche générée
+	 * Face visible du dos : image de dos, dos généré
 	 * (couleur extraite + titre vertical + logo), ou chant de liseuse.
-	 * Utilisée par .pf-book-spine et dupliquée dans .pf-spine-ghost.
+	 * Utilisée par .pf-book-spine.
 	 */
-	private function spine_face_html( $b, $img_attrs, $tranche_dims ) {
+	private function spine_face_html( $b, $img_attrs, $dos_dims ) {
 		if ( ! empty( $b['is_ereader'] ) ) {
+			// Le chant d'une liseuse n'est pas un dos de livre : titre seul.
+			$device = $b; $device['authors'] = [];
 			return '<div class="pf-spine-generated pf-spine-generated--device" style="--spine-bg:#2a2a2c;">'
-				. '<span class="pf-spine-title">' . esc_html( $b['title'] ) . '</span>'
-				. $this->spine_icon_html()
+				. $this->spine_texts_html( $device )
+				. $this->spine_icon_html( false )
 				. '</div>';
 		}
-		if ( $b['tranche_url'] ) {
-			return '<img src="' . esc_url( $b['tranche_url'] ) . '" alt="" ' . $img_attrs . ' ' . $tranche_dims . ' draggable="false" />';
+		if ( $b['dos_url'] ) {
+			return '<img src="' . esc_url( $b['dos_url'] ) . '" alt="" ' . $img_attrs . ' ' . $dos_dims . ' draggable="false" />';
 		}
-		$bg = $b['spine_color'] ?: self::PASSIFLORE_RED;
-		return '<div class="pf-spine-generated" style="--spine-bg:' . esc_attr( $bg ) . ';">'
-			. '<span class="pf-spine-title">' . esc_html( $b['title'] ) . '</span>'
-			. $this->spine_icon_html()
+		$bg    = $b['cover_color'] ?: self::PASSIFLORE_RED;
+		$light = self::spine_is_light( $bg );
+		$serif = ( 'serif' === ( $b['spine_font'] ?? '' ) );
+		return '<div class="pf-spine-generated' . ( $light ? ' pf-spine-generated--light' : '' )
+			. ( $serif ? ' pf-spine-generated--serif' : '' )
+			. '" style="--spine-bg:' . esc_attr( $bg ) . ';">'
+			. $this->spine_texts_html( $b )
+			. $this->spine_icon_html( $light )
 			. '</div>';
 	}
 
 	/**
-	 * Logo rond Passiflore (site icon) en bas des tranches générées et dans
+	 * Titre imprimé sur le dos.
+	 *
+	 * Le suffixe entre parenthèses est retiré : sur ce catalogue il vaut
+	 * toujours « (grands caractères) », « (numérique) » ou « (deuxième
+	 * édition) » — un marqueur de format, jamais du titre, et qu'aucun
+	 * imprimeur ne mettrait sur un dos. C'est aussi ce qui faisait déborder
+	 * les titres : les 3 seuls qui dépassaient 42 caractères le devaient
+	 * entièrement à ce suffixe.
+	 *
+	 * Filet pour le reste : plutôt que de tronquer, on réduit la police quand
+	 * le titre ne rentre pas. En écriture verticale un caractère occupe ~0,53
+	 * em (mesuré : 290 px pour 49 caractères à 11 px), et .pf-spine-title est
+	 * plafonné à 75 % de la hauteur du dos, padding déduit.
+	 */
+	/** Titre imprimé, suffixe de format retiré (cf. spine_texts_html()). */
+	private function spine_label( $title ) {
+		$label = trim( preg_replace( '/\s*\([^()]*\)\s*$/u', '', $title ) );
+		return '' === $label ? $title : $label;
+	}
+
+	/**
+	 * Auteurs + titre d'un dos généré : auteurs en haut, titre au milieu (le
+	 * logo, 3e enfant flex, ferme le bas — c'est le `space-between` qui centre
+	 * le titre). L'élément auteurs est émis même vide, pour que ce centrage
+	 * tienne aussi sur les livres sans auteur.
+	 */
+	private function spine_texts_html( $b ) {
+		$layout = $this->spine_layout( $b );
+		$fs_a   = round( $layout['size'] * self::SPINE_AUTHOR_RATIO * 2 ) / 2;
+
+		return '<span class="pf-spine-authors" style="font-size:' . $fs_a . 'px;">'
+			. esc_html( $layout['authors'] ) . '</span>'
+			. '<span class="pf-spine-title" style="font-size:' . $layout['size'] . 'px;">'
+			. esc_html( $layout['title'] ) . '</span>';
+	}
+
+	/**
+	 * « A & B », « A, B & C ».
+	 * $key vaut 'full' (Prénom Nom) ou 'last' (patronyme seul).
+	 */
+	private function spine_authors_label( $authors, $key ) {
+		$names = [];
+		foreach ( $authors as $a ) {
+			if ( ! empty( $a[ $key ] ) ) $names[] = $a[ $key ];
+		}
+		if ( ! $names ) return '';
+		if ( 1 === count( $names ) ) return $names[0];
+		$last = array_pop( $names );
+		return implode( ', ', $names ) . ' & ' . $last;
+	}
+
+	/**
+	 * Corps du texte et forme des auteurs, contraints par les DEUX dimensions.
+	 *
+	 * - Hauteur : hauteur interne du dos (padding 8+6 déduit), moins la place
+	 *   du logo, moins une respiration. Le coût d'un texte vaut
+	 *   caractères x em/caractère (constantes SPINE_EM_*, mesurées au canvas),
+	 *   les auteurs comptant pour SPINE_AUTHOR_RATIO de moins.
+	 * - Largeur : la ligne couchée occupe `line-height` (1,15) x le corps, dans
+	 *   la largeur du dos moins 2 px de padding de chaque côté. C'est ce qui
+	 *   fait grossir le texte sur les livres épais et le contient sur les
+	 *   minces, au lieu d'un corps uniforme.
+	 *
+	 * ÉCHELLE DE REPLI quand tout ne rentre pas — le titre est l'identifiant
+	 * principal d'un dos, c'est donc toujours lui qu'on protège :
+	 *   1. Prénom Nom  ->  2. patronymes seuls  ->  3. « Nom & al. » (2 auteurs
+	 *   et plus)  ->  4. titre seul, auteurs abandonnés.
+	 * On descend d'un cran tant que le corps calculé passe sous SPINE_FONT_MIN.
+	 * Filet ultime côté CSS : `overflow:hidden` + `text-overflow:ellipsis`.
+	 *
+	 * Simple arithmétique (pas de traitement d'image), donc calculé au rendu
+	 * sans cache — contrairement à la couleur.
+	 */
+	private function spine_layout( $b ) {
+		$title = $this->spine_label( $b['title'] );
+		$em_t  = ( 'serif' === ( $b['spine_font'] ?? '' ) ) ? self::SPINE_EM_SERIF : self::SPINE_EM_SANS;
+		$cost_title = mb_strlen( $title ) * $em_t;
+
+		// Le logo fait 70 % de la largeur du dos, plafonné à 24 px, et son
+		// ratio hauteur/largeur vaut ~1,04.
+		$logo_h  = min( 24, (int) $b['spine_w_px'] * 0.7 ) * 1.04;
+		$budget  = ( (int) $b['height_px'] - self::SPINE_PAD_Y ) - $logo_h - 8;
+		$fit_w   = ( (int) $b['spine_w_px'] - 4 ) / 1.15;
+
+		$authors = isset( $b['authors'] ) && is_array( $b['authors'] ) ? $b['authors'] : [];
+		$forms   = [];
+		if ( $authors ) {
+			// Le prénom n'est conservé que pour un auteur SEUL. À partir de deux,
+			// la forme complète est toujours au moins le double de la forme
+			// patronymes (mesuré sur le catalogue : 30 à 52 caractères contre 15
+			// à 28), souvent plus longue que le titre — les prénoms composés
+			// français y sont pour beaucoup. C'est aussi l'usage typographique
+			// sur un dos à plusieurs auteurs.
+			if ( 1 === count( $authors ) ) {
+				$forms[] = $this->spine_authors_label( $authors, 'full' );
+			}
+			$forms[] = $this->spine_authors_label( $authors, 'last' );
+			if ( count( $authors ) > 1 && ! empty( $authors[0]['last'] ) ) {
+				$forms[] = $authors[0]['last'] . ' & al.';
+			}
+		}
+		$forms[] = '';                       // titre seul
+		$forms   = array_values( array_unique( $forms ) );
+
+		$last_i = count( $forms ) - 1;
+		foreach ( $forms as $i => $auth ) {
+			$cost = $cost_title;
+			if ( '' !== $auth ) {
+				// +2 caractères : l'espace entre le bloc auteurs et le titre.
+				$cost += mb_strlen( $auth ) * self::SPINE_EM_AUTHOR * self::SPINE_AUTHOR_RATIO
+					+ 2 * $em_t;
+			}
+			$fs = min( $cost > 0 ? $budget / $cost : self::SPINE_FONT_MAX, $fit_w, self::SPINE_FONT_MAX );
+			// Sur un dos très mince c'est la largeur qui plafonne, et aucune
+			// forme d'auteur n'y changera rien : on ne dégrade pas pour ça.
+			$ok = min( self::SPINE_FONT_OK, $fit_w );
+			if ( $fs >= $ok || $i === $last_i ) {
+				return [
+					'title'   => $title,
+					'authors' => $auth,
+					'size'    => round( max( $fs, self::SPINE_FONT_MIN ) * 2 ) / 2,
+				];
+			}
+		}
+	}
+
+	/**
+	 * Logo rond Passiflore (site icon) en bas des dos générés et dans
 	 * le menton des liseuses. Repli sur le pictogramme SVG embarqué si le
 	 * site icon n'est pas configuré.
 	 */
-	private function spine_icon_html() {
+	private function spine_icon_html( $light = false ) {
+		// Dos sombre : macaron blanc détouré (asset du thème, servi en 96px —
+		// l'original fait 520px pour un affichage à 24px). Dos clair : site
+		// icon, qui est un carré sombre recadré en disque par le CSS.
+		if ( ! $light ) {
+			return '<img class="pf-spine-icon pf-spine-icon--white" src="'
+				. esc_url( get_stylesheet_directory_uri() . '/assets/img/macaron_logo_blanc-96.png' )
+				. '" alt="" loading="lazy" draggable="false" />';
+		}
 		static $url = null;
 		if ( $url === null ) {
 			$url = (string) get_site_icon_url( 96 );

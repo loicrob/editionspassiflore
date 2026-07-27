@@ -370,7 +370,7 @@ body.tax-product_cat .entry-hero.product-hero-section {
     border-bottom-left-radius: 0;
 }
 
-/* Option tranches grisée quand le format peut afficher des liseuses. */
+/* Option dos grisée quand le format peut afficher des liseuses. */
 .pf-cat-display button:disabled {
 	opacity: 0.35;
 	cursor: not-allowed;
@@ -404,7 +404,6 @@ body.tax-product_cat .entry-hero.product-hero-section {
 	border-radius: var(--pf-radius);
 }
 .pf-cat-pdf-link:hover { background: var(--pf-red-soft); color: var(--pf-accent); }
-.pf-cat-pdf-link svg { width: 14px; height: 14px; flex-shrink: 0; }
 
 /* ─── Chips ─────────────────────────────────────────────────────── */
 
@@ -699,7 +698,7 @@ body.tax-product_cat .entry-hero.product-hero-section {
    champ a le focus ou du texte) : on replie ce qui empêche le champ de s'étendre,
    comme le bouton « Tri » sur desktop. Repli animé (max-width → 0) ; la recherche
    grandit ensuite par flex.
-   — Mobile + tablette : le bouton « Tri et filtres ».
+   — Mobile + tablette : le bouton « Tris et filtres ».
    — Tablette (rayon sur la même ligne) : + le rayon (Littérature / Culture Sud-Ouest). */
 @media (max-width: 1023px) {
 	.pf-catalogue.pf-cat-js .pf-cat-filter-trigger {
@@ -952,7 +951,7 @@ body.tax-product_cat .entry-hero.product-hero-section {
 		justify-content: space-between;
 	}
 	/* Affichage : deux segments égaux, libellés texte (« Vue couvertures / Vue
-	   tranches ») à la place des icônes de la barre. */
+	   dos ») à la place des icônes de la barre. */
 	.pf-cat-filter-panel .pf-cat-display { display: flex; }
 	.pf-cat-filter-panel .pf-cat-display button { flex: 1 1 auto; padding: 8px 12px; }
 	.pf-cat-filter-panel .pf-cat-display svg { display: none; }

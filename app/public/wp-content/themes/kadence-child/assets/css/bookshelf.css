@@ -1,11 +1,38 @@
 /* ═══════════════════════════════════════════════════════════════
    Passiflore Bookshelf — Étagère de livres
-   Modes : covers (couverture face) | spines (tranche face)
+   Modes : covers (couverture face) | spines (dos face)
    ═══════════════════════════════════════════════════════════════ */
 
 /* ─── Container ──────────────────────────────────────────────── */
 
 .pf-bookshelf {
+	/* Tangente de l'angle de fuite, PARTAGÉE PAR LES DEUX MODES. Le mode
+	   covers est une projection cavalière : reculer d'une profondeur d
+	   décale de (-d, -[--pf-obl] x d) à l'écran — d'où le skewY(18deg) du
+	   dos (tan 18° = 0.3249) et le parallélogramme du bandeau. Le
+	   mode spines règle sa perspective-origin sur la même valeur pour que
+	   le livre posé retrouve le même angle de fuite (même construction, PAS
+	   la même taille : le mode spines dessine tout 1,5x plus grand). Une seule
+	   valeur à changer pour incliner l'étagère (cf. le 0.2309 / skewY(13deg)
+	   sous 768px).
+
+	   ⚠️ --pf-obl et le skewY de .pf-bookshelf--covers .pf-book-spine sont
+	   LA MÊME grandeur écrite deux fois (tan). Les changer ensemble. */
+	--pf-obl: 0.3249;
+
+	/* Épaisseur des plats (1re et 4e de couverture), dans les MÊMES unités
+	   que --spine-w : c'est une profondeur, pas une hauteur écran. Le
+	   bandeau de pages en peint le plat arrière sur son arête du fond —
+	   côté haut en covers, côté gauche en spines : c'est la même arête
+	   physique dans les deux modes (cf. .pf-book-pages).
+
+	   4px = 3,3 mm à l'échelle du site (SCALE = 1.2 px/mm), soit un carton
+	   de reliure plutôt qu'une couverture souple. Exagération assumée : au
+	   vrai ratio (0,3 mm) le plat se projetterait sur 0,1 px, invisible.
+	   La projection étant linéaire, une profondeur constante donne bien un
+	   trait d'épaisseur constante quel que soit le livre — exactement ce
+	   qu'on veut, un carton ne s'épaississant pas avec le nombre de pages. */
+	--pf-backcover: 4px;
 	--plank-h: 44px;
 	--plank-front: 8px;
 	--plank-color-top: #d4c4a8;
@@ -27,6 +54,7 @@
 .pf-bookshelf--shelves {
 	display: flex;
 	flex-direction: column;
+	justify-content: center;
 }
 
 /* ─── Shelf ──────────────────────────────────────────────────── */
@@ -89,10 +117,10 @@
    l'inner à la largeur des couvertures), la planche s'arrêtait au dernier
    livre en laissant un mur nu à droite. */
 
-/* Mode spines : chaque tranche porte un .pf-pages-ghost décoratif dont la
-   boîte fait (cover-w-base + spine-w) de large, masqué au repos par son
-   clip-path. Mais clip-path ne réduit pas la boîte de mise en page : ces
-   fantômes débordent .pf-shelf-inner à droite et gonflent le scrollWidth du
+/* Mode spines : le .pf-book ne fait qu'une largeur de dos, mais il porte
+   une .pf-book-cover repliée à 90° dont la BOÎTE de mise en page fait
+   --cover-w-base de large (une rotation 3D ne réduit pas la boîte). Ces
+   boîtes débordent .pf-shelf-inner à droite et gonflent le scrollWidth du
    .pf-shelf de ~200-300px → zone de défilement morte à droite (mur sans
    planche) au-delà du dernier livre. On rogne ce débordement décoratif
    horizontal au niveau de l'inner (l'axe vertical reste visible : le pop-up
@@ -164,11 +192,10 @@
 
 /* The DOM is identical in both modes. Each book has:
    - .pf-book-inside     (white interior — visible when the cover swings open)
-   - .pf-book-spine      (spine: tranche image, generated, or device edge)
+   - .pf-book-spine      (spine: dos image, generated, or device edge)
    - .pf-book-cover      (front cover image / e-reader screen)
-   - .pf-book-pages      (top face: page-edges band — covers mode)
-   - .pf-book-held-deco  (spines only: covers-anatomy ghost spine + pages,
-                          shown once the grabbed book lands face-on)
+   - .pf-book-pages      (top face: page edges — 2D parallelogram in covers
+                          mode, real horizontal plane in spines mode)
    CSS below dispatches the positioning per mode. */
 
 .pf-book {
@@ -221,9 +248,21 @@
 	position: absolute;
 }
 
+/* Teinte du plat arrière (4e de couverture) : couleur dominante de la
+   couverture — posée en --cover-color par le PHP sur chaque .pf-book, la
+   même que celle des dos générés — assombrie comme le reste du fond du
+   bandeau, le carton y étant dans l'ombre du livre.
+
+   ⚠️ Déclarée ICI, sous .pf-book, et non sur .pf-bookshelf : la valeur
+   d'une custom property est substituée sur l'élément où elle est DÉCLARÉE.
+   Écrit sur le conteneur, le var(--cover-color) imbriqué se résoudrait
+   contre le conteneur — qui ne la porte pas — et jamais contre le livre. */
+.pf-book-pages {
+	--pf-backcover-ink: color-mix(in srgb, var(--cover-color, #8a7a6a) 85%, #000);
+}
+
 .pf-book-cover img,
-.pf-book-spine > img,
-.pf-spine-ghost > img {
+.pf-book-spine > img {
 	display: block;
 	width: 100%;
 	height: 100%;
@@ -296,19 +335,18 @@
 /* Spine rendered as a thin skewed parallelogram on the left. Whatever
    sits inside (.pf-spine-generated or an <img>) follows the skew. The
    ::before overlay restores a hand-drawn depth gradient on top of the
-   custom background so spines without a tranche image still feel 3D. */
+   custom background so spines without a dos image still feel 3D. */
 .pf-bookshelf--covers .pf-book-spine {
 	top: 0;
 	left: 0;
 	width: var(--spine-w);
 	height: 100%;
-	transform: skewY(14deg);
+	transform: skewY(18deg);   /* tan 18° = --pf-obl */
 	transform-origin: right center;
 	background-color: #4a3f35;
 	overflow: hidden;
 	box-shadow: -1px 0 3px rgba(0, 0, 0, 0.15);
 	z-index: 1;
-	border-radius: 2px 0 0 2px;
 }
 
 .pf-bookshelf--covers .pf-book-spine::before {
@@ -321,12 +359,30 @@
 }
 
 /* Page edges seen from above — parallelogram on top of the book,
-   in continuity with the spine's top edge. Always visible. */
+   in continuity with the spine's top edge. Always visible.
+
+   L'arête HAUTE du parallélogramme — du coin haut-gauche du dos au coin
+   haut-droit du bandeau — est le fond du livre : c'est là que se trouve le
+   plat arrière (4e de couverture), peint par le border-top. Le border-box
+   le fait mordre DANS le bandeau plutôt que s'y ajouter : le carton fait
+   partie de l'épaisseur du livre, il ne s'ajoute pas à elle. Le clip-path
+   rabote la bordure aux mêmes obliques que le reste, donc le trait est
+   parallèle au bord haut de la couverture, sans réglage supplémentaire.
+
+   La boîte épouse EXACTEMENT le livre (left: 0, largeur dos + couverture) :
+   les quatre sommets du clip tombent alors sur des points réels du volume —
+   (0,0) et (--spine-w, 100%) sont les deux coins hauts du dos biseauté,
+   (--cover-w, 0) et (100%, 100%) les deux coins hauts des plats. Elle a
+   longtemps été rentrée de 1px à gauche pour se cacher derrière l'arrondi
+   du dos ; l'arrondi retiré, ce décalage laissait un liseré blanc diagonal
+   d'1px sur toute l'arête haute du dos (vu au zoom 24x). */
 .pf-bookshelf--covers .pf-book-pages {
-	top: calc(-1 * var(--spine-w) * 0.249);
-	left: 1px;
-	width: calc(var(--cover-w) + var(--spine-w) - 1px);
-	height: calc(var(--spine-w) * 0.249);
+	top: calc(-1 * var(--spine-w) * var(--pf-obl));
+	left: 0;
+	width: calc(var(--cover-w) + var(--spine-w));
+	height: calc(var(--spine-w) * var(--pf-obl));
+	box-sizing: border-box;
+	border-top: calc(var(--pf-backcover) * var(--pf-obl)) solid var(--pf-backcover-ink);
 	clip-path: polygon(0 0, var(--cover-w) 0, 100% 100%, var(--spine-w) 100%);
 	background:
 		linear-gradient(to bottom, rgba(0, 0, 0, 0.18), rgba(0, 0, 0, 0)),
@@ -350,44 +406,62 @@
 	transform: rotateY(var(--cover-angle, -25deg));
 }
 
-/* Pas de déco fantôme en covers (elle réplique l'anatomie déjà là). */
-.pf-bookshelf--covers .pf-book-held-deco {
-	display: none;
-}
-
 /* ─── Mode SPINES — livre 3D rigide, saisi puis tourné face au lecteur ─
 
-   Au repos le livre est un vrai volume : la tranche (face avant) dans le
-   plan de l'étagère, la couverture accrochée au bord droit de la tranche
+   Au repos le livre est un vrai volume : le dos (face avant) dans le
+   plan de l'étagère, la couverture accrochée au bord droit du dos
    et repliée à 90° vers le fond du rayonnage (invisible de face), le
-   bloc pages blanc (.pf-book-inside) 1.5px derrière la couverture dans
-   le même plan.
+   bloc pages blanc (.pf-book-inside) dans le même plan derrière elle, et
+   la face supérieure (.pf-book-pages) couchée à plat sur l'arête haute.
 
    Survol (étape 1) : le livre se déboîte — simple translation vers le
-   lecteur, comme un doigt qui tire la tranche.
+   lecteur, comme un doigt qui tire le dos.
 
    Saisie (étape 2, classe .pf-book--cover-revealed posée par JS, sans
    :hover pour fonctionner aussi au tap) : le volume ENTIER pivote de
    -90° autour de son arête avant-gauche et atterrit sur le plan z=0
-   (translateZ(-spine-w)) : la couverture finit face au lecteur, au
-   pixel près sur le plan 2D. À ce moment la déco .pf-book-held-deco
-   (tranche biseautée + bandeau de pages, l'anatomie covers exacte) se
-   fond par-dessus — sans couture possible puisque tout est à z=0. Le
-   livre saisi a alors la même apparence qu'un livre covers survolé,
-   et --cover-angle (curseur) ouvre la couverture à l'identique.
+   (translateZ(-spine-w)) : la couverture finit face au lecteur.
+
+   RIEN N'EST FANTÔME ICI. Dos, couverture et face supérieure sont
+   les faces d'un même volume rigide : elles suivent la rotation par
+   construction, à chaque image, sans resynchronisation possible. C'est la
+   CAMÉRA qui bouge (perspective-origin, plus bas) pour que le livre posé
+   retrouve l'angle de fuite d'un livre covers — d'où l'absence de la vieille
+   déco plate .pf-book-held-deco, qui répliquait l'anatomie covers en 2D et
+   ne pouvait pas suivre la perspective en vol.
 
    La largeur du wrapper reste --spine-w-base en permanence : les
    voisins ne bougent jamais, le livre saisi les recouvre simplement.
-   --reveal-dx (posé par JS) recentre la couverture sur la tranche et
-   la recale quand le livre est trop près d'un bord du container.
-   L'inner et la déco partagent le même préfixe de transformation
-   (translateX(--reveal-dx) scale(1.1), origine left bottom) pour
-   rester rigoureusement alignés. */
+   --reveal-dx (posé par JS) recentre la couverture sur le dos et
+   la recale quand le livre est trop près d'un bord du container. */
 
 .pf-bookshelf--spines .pf-book {
+	/* Distance de l'œil. N'AFFECTE PAS l'atterrissage : la formule de caméra
+	   (perspective-origin, plus bas) est exacte pour toute valeur, les termes
+	   (--persp + --spine-w) s'y annulant — vérifié de 1200 à 40000, épaisseur
+	   du bandeau et largeur de dos projetée identiques au centième.
+
+	   Elle règle en revanche la CONVERGENCE des arêtes de profondeur. Le mode
+	   covers étant une projection parallèle (arêtes du dos rigoureusement
+	   parallèles, pentes mesurées -0.3249 en haut ET en bas), plus --persp est
+	   grand, plus le livre saisi s'en rapproche. Écart de pente haut/bas du
+	   dos mesuré : 0.3725 à 1200px, 0.1534 à 3000, 0.0775 à 6000, 0.0389 à
+	   12000. À 1200 l'arête basse filait deux fois plus raide que la haute,
+	   ce qui se voyait ; 6000 est le compromis retenu (2026-07-27).
+
+	   Ce qu'on paie en montant : la profondeur ressentie pendant les ~150
+	   premières ms de la saisie (rapprochement des bords de la couverture en
+	   rotation : 0.876 à 1200px, 0.973 à 6000). Au-delà l'easing a fini de
+	   tourner le livre et les valeurs sont indiscernables. */
+	--persp: 6000px;
 	width: var(--spine-w-base);
 	min-width: 0;
-	perspective: 1200px;
+	perspective: var(--persp);
+	/* CAMÉRA MOBILE. Au repos l'œil est pile à hauteur du dessus du livre :
+	   la face supérieure est rasante, donc invisible — l'étagère au repos
+	   est inchangée, alors que le livre est bien un volume complet. */
+	perspective-origin: 50% 0%;
+	transition: perspective-origin 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
 }
 
 .pf-bookshelf--spines .pf-book-inner {
@@ -405,13 +479,35 @@
 	box-shadow:
 		inset -2px 0 4px -2px rgba(0, 0, 0, 0.25),
 		1px 1px 4px rgba(0, 0, 0, 0.18);
-	border-radius: 2px;
+}
+
+/* Une fois le livre tourné, le dos n'est plus la face éclairée de face
+   mais un flanc : on y fond le même assombrissement qu'en mode covers
+   (.pf-bookshelf--covers .pf-book-spine::before, posé en permanence là-bas
+   puisque le livre y est toujours de face). */
+.pf-bookshelf--spines .pf-book-spine::before {
+	content: '';
+	position: absolute;
+	inset: 0;
+	background: rgba(0, 0, 0, 0.1);
+	pointer-events: none;
+	z-index: 2;
+	opacity: 0;
+	transition: opacity 0.3s linear;
+}
+
+.pf-bookshelf--spines .pf-book.pf-book--cover-revealed .pf-book-spine::before {
+	opacity: 1;
+	transition: opacity 0.5s linear;
 }
 
 /* Couverture : pleine largeur dès le départ, simplement repliée à 90°
    vers le fond (edge-on → projection nulle). `visibility: hidden` évite
    le liseré de projection à exactement 90° et masque l'<img> tant que
-   son data-src n'est pas chargé. */
+   son data-src n'est pas chargé.
+
+   Cette boîte est la FACE RIGIDE du volume — elle ne porte plus l'ouverture
+   au curseur, qui vit dans .pf-cover-leaf (voir plus bas). */
 .pf-bookshelf--spines .pf-book-cover {
 	top: 0;
 	left: var(--spine-w);
@@ -425,13 +521,53 @@
 	transform: rotateY(90deg);
 	visibility: hidden;
 	pointer-events: none;
+	z-index: 2;
 	transition:
 		transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94),
 		visibility 0s 0.45s;
 }
 
-/* Bloc pages : même plan que la couverture au repos, 1.5px en retrait
-   pour éviter le z-fighting quand la couverture est fermée dessus. */
+/* ─── Couverture qui s'ouvre au curseur (spines) ─────────────────
+   L'ouverture ne peut PAS se jouer dans l'espace 3D du volume : la caméra
+   y est déportée de ~45° à gauche (cf. perspective-origin), donc la
+   profondeur prise par la couverture qui bascule vers le lecteur se
+   traduit en décalage latéral — mesuré : +53 % de largeur à -25°, la
+   couverture s'étirait vers la droite au lieu de pivoter.
+
+   D'où ce sous-bloc : .pf-book-cover reste la face rigide du volume et
+   devient l'hôte d'une SCÈNE 3D LOCALE (`perspective` + `transform-style`
+   plat par défaut → le pivot de la feuille est aplati dans le plan de la
+   face avant que la caméra du volume n'entre en jeu). La feuille pivote
+   donc comme en mode covers, hors de portée de la caméra.
+
+   Perspective proportionnelle à la couverture (et non 1500px fixe) : le
+   livre saisi est rendu plus grand qu'en mode covers, et ce ratio — repris
+   du 1500/288 de covers — rend l'ouverture identique quelle que soit la
+   taille d'affichage. Vérifié : largeur à -25° = 0,942 x la largeur au
+   repos, contre 0,943 en mode covers. */
+.pf-bookshelf--spines .pf-book-cover:has(> .pf-cover-leaf) {
+	overflow: visible;
+	background: none;
+	box-shadow: none;
+	perspective: calc(var(--cover-w-base) * 5.2);
+}
+
+.pf-cover-leaf {
+	position: absolute;
+	inset: 0;
+	overflow: hidden;
+	background: #fff;
+	box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.15);
+	border-radius: 0 2px 2px 0;
+	transform-origin: left center;
+	transform: rotateY(var(--cover-angle, 0deg));
+	transition: transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+/* Bloc pages : même plan que la couverture. Le z-fighting est arbitré par
+   l'ordre de peinture (z-index) et NON par un retrait en profondeur : avec
+   la caméra décalée à gauche, un retrait de 1.5px se projetterait de 1.5px
+   sur le côté et laisserait un liseré blanc le long du dos. */
 .pf-bookshelf--spines .pf-book-inside {
 	top: 0;
 	left: var(--spine-w);
@@ -441,13 +577,44 @@
 	box-shadow: inset 6px 0 10px -4px rgba(0, 0, 0, 0.12);
 	border-radius: 0 2px 2px 0;
 	transform-origin: left center;
-	transform: rotateY(90deg) translateZ(-1.5px);
+	transform: rotateY(90deg);
 	visibility: hidden;
+	z-index: 1;
 }
 
-/* Le volume en perspective rend le bandeau pages-dessus inutile au repos. */
+/* Face supérieure : VRAI plan horizontal, enfant du volume (donc solidaire
+   de sa rotation — pas de bandeau plat à resynchroniser). Le rectangle fait
+   l'épaisseur du dos (largeur) par la profondeur du livre (hauteur), et
+   rotateX(-90deg) le couche à plat sur l'arête haute.
+
+   Les stries sont espacées de 1.4px / --pf-obl : une fois la face projetée
+   (facteur --pf-obl, cf. la caméra ci-dessous), on retrouve exactement la
+   densité de lignes du bandeau covers. */
 .pf-bookshelf--spines .pf-book-pages {
-	display: none;
+	top: 0;
+	left: 0;
+	width: var(--spine-w);
+	height: var(--cover-w-base);
+	box-sizing: border-box;
+	/* Plat arrière — MÊME arête physique qu'en covers, mais le plan est ici
+	   à plat dans l'espace : sa largeur locale est l'épaisseur du livre (la
+	   couverture est charnée à droite, en x = --spine-w), donc le fond est
+	   à gauche. Une fois le livre saisi et la caméra en place, ce bord se
+	   projette exactement sur le border-top du bandeau covers — d'où la
+	   profondeur brute ici, et la même multipliée par --pf-obl là-bas. */
+	border-left: var(--pf-backcover) solid var(--pf-backcover-ink);
+	transform-origin: 0 0;
+	transform: rotateX(-90deg);
+	background:
+		linear-gradient(to bottom, rgba(0, 0, 0, 0), rgba(0, 0, 0, 0.18)),
+		repeating-linear-gradient(
+			to right,
+			#f6f1e2 0px,
+			#f6f1e2 calc(0.7px / var(--pf-obl)),
+			#d8d0bd calc(0.7px / var(--pf-obl)),
+			#d8d0bd calc(1.4px / var(--pf-obl))
+		);
+	z-index: 3;
 }
 
 /* Étape 1 — déboîtage au survol : le livre sort légèrement du rang. */
@@ -460,6 +627,30 @@
 .pf-bookshelf--spines .pf-book:focus-visible,
 .pf-bookshelf--spines .pf-book.pf-book--cover-revealed {
 	z-index: 10;
+}
+
+/* La caméra monte et se décale à gauche en même temps que le livre pivote,
+   pour atterrir pile sur la cavalière du mode covers.
+
+   Un point à la profondeur p se projette avec le décalage
+   (px - x0) x p/(persp+p). En posant px = x0 - (persp + --spine-w), le
+   décalage à p = --spine-w vaut exactement -(--spine-w) : le dos
+   réapparaît à gauche à sa vraie largeur, comme le skewY de covers. Idem
+   en y avec le facteur --pf-obl pour l'épaisseur du bandeau de pages.
+
+   x0 / y0 = le coin haut-gauche du volume une fois posé, d'où la reprise de
+   --reveal-dx / --reveal-dy (recentrage JS) et du -0.1 x --book-h (le
+   scale(1.1), d'origine left bottom, remonte le haut du livre). Sans ces
+   termes le bandeau perdrait ~10 % de son épaisseur. */
+.pf-bookshelf--spines .pf-book.pf-book--cover-revealed {
+	perspective-origin:
+		calc(var(--reveal-dx, 0px) - (var(--persp) + var(--spine-w)))
+		calc(
+			var(--reveal-dy, 0px)
+			- 0.1 * var(--book-h)
+			- var(--pf-obl) * (var(--persp) + var(--spine-w))
+		);
+	transition: perspective-origin 0.5s cubic-bezier(0.22, 0.61, 0.36, 1);
 }
 
 /* Étape 2 — saisie : rotation rigide du volume autour de l'arête
@@ -475,11 +666,11 @@
 	transition: transform 0.5s cubic-bezier(0.22, 0.61, 0.36, 1);
 }
 
-/* Une fois saisi, la couverture se manipule comme en mode covers :
-   l'angle net vu du lecteur vaut exactement var(--cover-angle)
-   (-90° du volume + 90° de pli + angle curseur). */
+/* Une fois saisi, la face du volume ne bouge plus : l'ouverture au curseur
+   est portée par .pf-cover-leaf, dans sa propre scène 3D. (Sans feuille —
+   liseuse — l'ancien pli reste sur la face elle-même, sans ouverture.) */
 .pf-bookshelf--spines .pf-book.pf-book--cover-revealed .pf-book-cover {
-	transform: rotateY(calc(90deg + var(--cover-angle, 0deg)));
+	transform: rotateY(90deg);
 	visibility: visible;
 	pointer-events: auto;
 	transition:
@@ -496,136 +687,9 @@
 	opacity: 0;
 }
 
-/* ─── Déco « livre en main » (spines) ────────────────────────────
-   Boîte alignée sur l'inner (même géométrie, même origine, même préfixe
-   de transformation — sans la rotation 3D). Au repos, la tranche fantôme
-   recouvre exactement la tranche réelle et le bandeau de pages est replié
-   sur l'arête supérieure : la déco apparaît dès le début de la saisie
-   (crossfade invisible) puis ses enfants MORPHENT vers l'anatomie covers
-   — la tranche glisse à gauche en prenant son biseau, le bandeau se
-   déploie — pendant que le volume réel pivote. Pas d'apparition brusque :
-   à l'atterrissage tout est déjà en place. */
-
-/* Les transitions de FERMETURE (règles repos, ci-dessous) doivent copier
-   exactement celles du retour de l'inner — 0.3s easeOutQuad — sinon le
-   fantôme traîne derrière le volume déjà rangé et les deux tranches
-   apparaissent côte à côte. Celles d'OUVERTURE (règles saisies) gardent
-   leurs 0.5s. */
-.pf-book-held-deco {
-	position: absolute;
-	top: 0;
-	left: 0;
-	width: var(--spine-w);
-	height: var(--book-h);
-	transform-origin: left bottom;
-	transform: none;
-	opacity: 0;
-	pointer-events: none;
-	/* Le fondu s'achève avec l'atterrissage (0.2s + 0.1s = 0.3s), et le
-	   z-index remonte immédiatement : le fantôme recouvre la tranche
-	   réelle pendant tout le retour. */
-	transition:
-		transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94),
-		opacity 0.1s linear 0.2s,
-		z-index 0s;
-	z-index: 2;
-}
-
-.pf-bookshelf--spines .pf-book.pf-book--cover-revealed .pf-book-held-deco {
-	transform:
-		translateX(var(--reveal-dx, 0px))
-		translateY(var(--reveal-dy, 0px))
-		scale(1.1);
-	opacity: 1;
-	/* Une fois le livre posé (fin du vol), la déco passe SOUS l'inner :
-	   le bandeau de pages se retrouve derrière la couverture, qui passe
-	   donc devant quand le curseur l'ouvre — comme en mode covers. */
-	z-index: -1;
-	transition:
-		transform 0.5s cubic-bezier(0.22, 0.61, 0.36, 1),
-		opacity 0.1s linear 0s,
-		z-index 0s 0.45s;
-}
-
-/* Tranche fantôme. Au repos : un cran à droite (sur la tranche réelle),
-   sans biseau. Saisie : glisse sur [-spine-w, 0] et prend le biseau
-   covers. Le léger ease-in suit la projection du volume qui pivote (en
-   cos θ : elle s'attarde près du repos avant de filer). */
-.pf-spine-ghost {
-	position: absolute;
-	top: 0;
-	left: calc(-1 * var(--spine-w));
-	width: var(--spine-w);
-	height: 100%;
-	transform: translateX(var(--spine-w)) skewY(0deg);
-	transform-origin: right center;
-	background-color: #4a3f35;
-	overflow: hidden;
-	box-shadow: -1px 0 3px rgba(0, 0, 0, 0.15);
-	border-radius: 2px 0 0 2px;
-	transition: transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-}
-
-.pf-bookshelf--spines .pf-book.pf-book--cover-revealed .pf-spine-ghost {
-	transform: translateX(0px) skewY(14deg);
-	transition: transform 0.5s cubic-bezier(0.5, 0, 0.3, 1);
-}
-
-/* L'assombrissement covers n'apparaît qu'avec le biseau. */
-.pf-spine-ghost::before {
-	content: '';
-	position: absolute;
-	inset: 0;
-	background: rgba(0, 0, 0, 0.1);
-	pointer-events: none;
-	z-index: 2;
-	opacity: 0;
-	transition: opacity 0.3s linear;
-}
-
-.pf-bookshelf--spines .pf-book.pf-book--cover-revealed .pf-spine-ghost::before {
-	opacity: 1;
-	transition: opacity 0.5s linear;
-}
-
-/* Bandeau de pages. Au repos : replié sur l'arête supérieure de la
-   tranche (clip-path écrasé sur la ligne du haut du livre). Saisie : se
-   déploie vers la droite et le haut — le clip révèle le motif de pages
-   sans l'étirer. Il reste toujours en retrait du bord droit de la
-   couverture en vol (les sommets progressent linéairement, la projection
-   de la couverture en sin θ va plus vite). */
-.pf-pages-ghost {
-	position: absolute;
-	top: calc(-1 * var(--spine-w) * 0.249);
-	left: calc(-1 * var(--spine-w) + 1px);
-	width: calc(var(--cover-w-base) + var(--spine-w) - 1px);
-	height: calc(var(--spine-w) * 0.249);
-	clip-path: polygon(
-		calc(var(--spine-w) - 1px) 100%,
-		calc(2 * var(--spine-w) - 1px) 100%,
-		calc(2 * var(--spine-w) - 1px) 100%,
-		calc(var(--spine-w) - 1px) 100%
-	);
-	background:
-		linear-gradient(to bottom, rgba(0, 0, 0, 0.18), rgba(0, 0, 0, 0)),
-		repeating-linear-gradient(
-			to bottom,
-			#f6f1e2 0px,
-			#f6f1e2 0.7px,
-			#d8d0bd 0.7px,
-			#d8d0bd 1.4px
-		);
-	transition: clip-path 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-}
-
-.pf-bookshelf--spines .pf-book.pf-book--cover-revealed .pf-pages-ghost {
-	clip-path: polygon(0 0, var(--cover-w-base) 0, 100% 100%, var(--spine-w) 100%);
-	transition: clip-path 0.5s cubic-bezier(0.22, 0.61, 0.36, 1);
-}
-
 /* ─── Liseuse (livres numériques) ────────────────────────────────
    L'appareil remplace le livre : une ardoise plate aux coins arrondis,
-   sans tranche papier ni bandeau de pages (le PHP n'émet ni spine ni
+   sans dos papier ni bandeau de pages (le PHP n'émet ni spine ni
    pages en covers). L'écran épouse le ratio de la couverture (largeur
    calculée côté PHP : écran = hauteur − bezels, padding 7px/20px
    ci-dessous), donc la couverture s'affiche en entier. La couverture
@@ -666,12 +730,13 @@
 
 /* Bouton d'accueil simulé : pastille ronde blanche, logo Passiflore. */
 .pf-ereader-brand {
+	--pf-ereader-brand-size: 16px;
 	position: absolute;
 	bottom: 6px;
 	left: 50%;
 	transform: translateX(-50%);
-	width: 14px;
-	height: 14px;
+	width: var(--pf-ereader-brand-size);
+	height: var(--pf-ereader-brand-size);
 	border-radius: 50%;
 	background: #fff;
 	display: flex;
@@ -681,9 +746,9 @@
 
 .pf-ereader-brand .pf-spine-icon,
 .pf-ereader-brand img {
-	width: 10px;
+	width: var(--pf-ereader-brand-size);
 	max-width: none;
-	height: 10px;
+	height: var(--pf-ereader-brand-size);
 	display: block;
 }
 
@@ -698,8 +763,8 @@
 	transform: rotateY(90deg);
 }
 
-/* Chant de liseuse (mode spines, hors catalogue) : version sombre de la
-   tranche générée, coins arrondis. */
+/* Chant de liseuse (mode spines, hors catalogue) : version sombre du
+   dos généré, coins arrondis. */
 .pf-spine-generated--device {
 	border-radius: 4px;
 	color: #c8c8cc;
@@ -713,7 +778,7 @@
    Boîtier cristal aux dimensions standard (142×125×10 mm) : jaquette
    sous un couvercle plastique brillant, charnière striée sur le bord
    gauche du couvercle, plateau sombre visible quand la jaquette ne
-   remplit pas la face. Toute l'anatomie (tranche biseautée — l'insert
+   remplit pas la face. Toute l'anatomie (dos biseauté — l'insert
    papier du dos —, bandeau supérieur, saisie spines) est conservée. */
 
 .pf-book--cd .pf-book-cover {
@@ -752,15 +817,16 @@
 	pointer-events: none;
 }
 
-/* Épaisseur du boîtier : plastique sombre, pas de papier. */
-.pf-book--cd .pf-book-pages,
-.pf-book--cd .pf-pages-ghost {
+/* Épaisseur du boîtier : plastique sombre, pas de papier — et pas de plat
+   cartonné non plus, le dos du boîtier est du même plastique que le reste. */
+.pf-book--cd .pf-book-pages {
 	background:
 		linear-gradient(to bottom, rgba(0, 0, 0, 0.30), rgba(0, 0, 0, 0.05)),
 		#35353a;
+	border-color: #2a2a2e;
 }
 
-/* ─── Generated spine (no tranche image) ─────────────────────── */
+/* ─── Generated spine (no dos image) ─────────────────────── */
 
 .pf-spine-generated {
 	width: 100%;
@@ -771,7 +837,10 @@
 	flex-direction: column;
 	justify-content: space-between;
 	align-items: center;
-	padding: 8px 2px 6px;
+	/* ⚠️ Le total vertical (14 + 12) DOIT rester synchronisé avec
+	   Passiflore_Bookshelf::SPINE_PAD_Y : c'est ce que le PHP déduit du
+	   budget de texte pour calculer le corps du titre. */
+	padding: 14px 2px 12px;
 	box-sizing: border-box;
 	color: #fff;
 	overflow: hidden;
@@ -797,19 +866,44 @@
 	background: linear-gradient(to left, rgba(0, 0, 0, 0.15), transparent);
 }
 
-.pf-spine-title {
+/* Auteurs (haut) et titre (milieu) d'un dos généré. Le corps est calculé en
+   PHP (spine_layout()) et posé en inline : ces valeurs ne sont que le repli.
+   Pas de `max-height` : les deux blocs sont `flex: 0 1 auto` et le logo
+   `flex-shrink: 0`, donc en cas de dépassement ce sont les textes qui se
+   rognent (avec ellipsis), jamais le logo qui saute. */
+.pf-spine-title,
+.pf-spine-authors {
 	writing-mode: sideways-lr;
 	text-orientation: mixed;
-	font-weight: 600;
-	font-size: 11px;
 	letter-spacing: 0.02em;
 	line-height: 1.15;
-	max-height: 75%;
+	min-height: 0;
 	overflow: hidden;
 	white-space: nowrap;
 	text-overflow: ellipsis;
 	text-shadow: 0 1px 1px rgba(0, 0, 0, 0.2);
 	flex: 0 1 auto;
+}
+
+.pf-spine-title {
+	font-family: Inter, system-ui, sans-serif;
+	font-weight: 700;
+	font-size: 11px;
+}
+
+/* Littérature : titre en Newsreader (serif). Culture Sud-Ouest : Inter, donc
+   rien à surcharger. Kadence ne charge Newsreader QU'EN 700 — d'où le poids
+   fixé ici, sinon le navigateur synthétiserait une graisse. */
+.pf-spine-generated--serif .pf-spine-title {
+	font-family: Newsreader, Georgia, serif;
+	font-weight: 700;
+}
+
+/* Les auteurs restent en Inter dans les deux cas, un cran plus léger. */
+.pf-spine-authors {
+	font-family: Inter, system-ui, sans-serif;
+	font-weight: 400;
+	font-size: 9px;
 }
 
 .pf-spine-icon {
@@ -823,6 +917,31 @@
 
 img.pf-spine-icon {
 	border-radius: 50%;
+}
+
+/* Le macaron blanc est déjà détouré : pas de disque à recadrer. */
+img.pf-spine-icon--white {
+	border-radius: 0;
+}
+
+/* ─── Dos clair ──────────────────────────────────────────────────
+   Quand la couleur dominante de la couverture est trop pâle pour porter du
+   texte blanc (contraste < 4.5:1, calculé en PHP par spine_is_light()), on
+   garde la couleur exacte — un livre pâle a un dos pâle — et on inverse
+   l'encre. Sans ça, 39 % des dos générés avaient un titre illisible. */
+.pf-spine-generated--light {
+	color: var(--pf-heading);
+}
+
+.pf-spine-generated--light .pf-spine-title,
+.pf-spine-generated--light .pf-spine-authors {
+	/* L'ombre portée sombre du cas général salirait un fond clair. */
+	text-shadow: 0 1px 1px rgba(255, 255, 255, 0.5);
+}
+
+.pf-spine-generated--light .pf-spine-icon {
+	color: var(--pf-heading);
+	opacity: 1;
 }
 
 /* ─── Price Chevalet (paper tent card) — mode covers uniquement ─ */
@@ -1247,23 +1366,17 @@ img.pf-spine-icon {
 /* ─── Responsive ─────────────────────────────────────────────── */
 
 @media (max-width: 768px) {
+	/* Angle de fuite radouci (13° au lieu de 18°). Une seule valeur : le
+	   bandeau covers, la caméra du mode spines, l'écart des stries de la
+	   face supérieure et la projection du plat arrière suivent tous
+	   --pf-obl. */
+	.pf-bookshelf {
+		--pf-obl: 0.2309;
+	}
+
 	.pf-bookshelf--covers .pf-book-spine {
-		transform: skewY(10deg);
+		transform: skewY(13deg);   /* tan 13° = --pf-obl */
 		transform-origin: right center;
-	}
-
-	.pf-bookshelf--covers .pf-book-pages {
-		top: calc(-1 * var(--spine-w) * 0.176);
-		height: calc(var(--spine-w) * 0.176);
-	}
-
-	.pf-bookshelf--spines .pf-book.pf-book--cover-revealed .pf-spine-ghost {
-		transform: translateX(0px) skewY(10deg);
-	}
-
-	.pf-pages-ghost {
-		top: calc(-1 * var(--spine-w) * 0.176);
-		height: calc(var(--spine-w) * 0.176);
 	}
 
 	.pf-bookshelf--covers .pf-book:hover .pf-book-cover {
@@ -1282,11 +1395,9 @@ img.pf-spine-icon {
 	.pf-book,
 	.pf-book-inner,
 	.pf-book-cover,
+	.pf-cover-leaf,
 	.pf-book-inside,
-	.pf-book-held-deco,
-	.pf-spine-ghost,
-	.pf-spine-ghost::before,
-	.pf-pages-ghost,
+	.pf-book-spine::before,
 	.pf-chevalet {
 		transition-duration: 0.01s !important;
 		transition-delay: 0s !important;

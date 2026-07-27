@@ -293,6 +293,15 @@
        média à rogner, et le badge titre a besoin de déborder du coin. */
     overflow: visible;
     border: 1px solid var(--pf-accent);
+    /* .pf-card (style.css) transitionne déjà box-shadow ; on y ajoute
+       border-color plutôt que d'écraser la déclaration (shorthand non additif). */
+    transition: box-shadow var(--pf-transition), border-color var(--pf-transition);
+}
+
+.pf-hero-cat:hover,
+.pf-hero-cat:focus,
+.pf-hero-cat:focus-within {
+    border-color: var(--pf-accent-dark);
 }
 
 .pf-hero-cat .pf-card-content {
@@ -316,21 +325,20 @@
     top: -0.7rem;
     left: 0.6rem;
     z-index: 2;
-    background: var(--pf-surface);
-    color: var(--pf-accent);
+    background: var(--pf-accent);
+    color: var(--pf-surface);
     border: 1px solid var(--pf-accent);
     font-size: 0.6rem;
-    transition: background var(--pf-transition), color var(--pf-transition);
+    transition: background var(--pf-transition), border-color var(--pf-transition);
 }
 
-/* Survol de la card : badge inversé (plein accent) — même logique que
-   .pf-card:hover .pf-card-title (style.css), mais en inversion de couleurs
-   plutôt qu'un simple changement de teinte. */
+/* Survol de la card : badge assombri (accent-dark) — même teinte que le
+   contour de .pf-hero-cat, pas une inversion texte/fond. */
 .pf-hero-cat:hover .pf-hero-cat-badge,
 .pf-hero-cat:focus .pf-hero-cat-badge,
 .pf-hero-cat:focus-within .pf-hero-cat-badge {
-    background: var(--pf-accent);
-    color: var(--pf-surface);
+    background: var(--pf-accent-dark);
+    border-color: var(--pf-accent-dark);
 }
 
 /* Encart « descendre » sous les catégories — même style que .pf-hero-cat,
@@ -748,13 +756,23 @@ Workaround: stack two pseudo-elements. ::before is the base gradient (always vis
     align-items: center;
 }
 
-/* Slide centré, hauteur contrainte */
+/* Slide centré, hauteur contrainte. Le padding-bottom de 3rem réserve la bande
+   du bas pour la rangée flèches + pagination. */
 .pf-en-ce-moment-actualites .pf-actualite-slide {
     display: flex;
     align-items: center;
     justify-content: center;
     min-height: 0;
     padding: 0.2rem 0.2rem 3rem 0.2rem;
+}
+
+/* Carousel sans flèches ni pagination (classe posée par accueil.js sur appareil
+   tactile) : plus rien à réserver en bas. Piloté par la classe et non par une
+   media query, pour que la réserve suive TOUJOURS la présence réelle des
+   contrôles — c'est aussi ce padding que lit initActualiteFit() pour calculer la
+   hauteur de la carte et de la boîte du carousel. */
+.pf-actualites-carousel--sans-controles .pf-actualite-slide {
+    padding-bottom: 0.2rem;
 }
 
 /* Polaroid stylé, taille NATURELLE plafonnée (≠ imposée) : height:100% a été
@@ -929,7 +947,7 @@ Workaround: stack two pseudo-elements. ::before is the base gradient (always vis
     transform: scale(1.1);
 }
 
-/* Spines : dos penché à droite (pivot bas-droit de la tranche) */
+/* Spines : dos penché à droite (pivot bas-droit du dos) */
 .pf-bookshelf-armed.pf-bookshelf--spines .pf-book {
     transform: rotate(8deg);
     transform-origin: right bottom;

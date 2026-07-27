@@ -63,7 +63,12 @@
 		if (!sec) return;
 		stopAnchorPin();
 		sec.scrollIntoView({ behavior: 'smooth' });
-		history.pushState(null, '', '#' + id);
+		// replaceState, PAS pushState : parcourir les sections d'une fiche ne doit
+		// pas empiler d'entrées d'historique (sinon « retour » remonte les ancres
+		// une par une au lieu de revenir à la page d'où l'on vient — catalogue,
+		// recherche…). L'URL reste à jour (copie/partage/rechargement au bon
+		// endroit), seul l'empilement disparaît.
+		history.replaceState(null, '', '#' + id);
 	}
 
 	// Liens hors nav (donc sans le scrollspy/suivi de piste, propre à la nav)

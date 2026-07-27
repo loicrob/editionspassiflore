@@ -25,10 +25,18 @@ class Passiflore_Reading_List {
 	const ICON_ADD_PATH    = 'm480-240-168 72q-40 17-76-6.5T200-241v-519q0-33 23.5-56.5T280-840h200q17 0 28.5 11.5T520-800q0 17-11.5 28.5T480-760H280v518l200-86 200 86v-238q0-17 11.5-28.5T720-520q17 0 28.5 11.5T760-480v239q0 43-36 66.5t-76 6.5l-168-72Zm0-520H280h240-40Zm200 80h-40q-17 0-28.5-11.5T600-720q0-17 11.5-28.5T640-760h40v-40q0-17 11.5-28.5T720-840q17 0 28.5 11.5T760-800v40h40q17 0 28.5 11.5T840-720q0 17-11.5 28.5T800-680h-40v40q0 17-11.5 28.5T720-600q-17 0-28.5-11.5T680-640v-40Z';
 	const ICON_REMOVE_PATH = 'M640-680q-17 0-28.5-11.5T600-720q0-17 11.5-28.5T640-760h160q17 0 28.5 11.5T840-720q0 17-11.5 28.5T800-680H640ZM480-240l-168 72q-40 17-76-6.5T200-241v-519q0-33 23.5-56.5T280-840h200q17 0 28.5 11.5T520-800q0 17-11.5 28.5T480-760H280v518l200-86 200 86v-238q0-17 11.5-28.5T720-520q17 0 28.5 11.5T760-480v239q0 43-36 66.5t-76 6.5l-168-72Zm0-520H280h240-40Z';
 
+	/* Icônes des toasts d'ajout / de retrait (Material Symbols Rounded, viewBox
+	   0 -960 960 960). L'ajout est le glyphe `bookmark_check` tel quel ; le retrait
+	   reprend le MÊME contour de signet avec une croix à la place de la coche. */
+	const TOAST_ICON_ADDED    = 'm438-513-29-29q-12-11-28-11t-28 12q-12 12-12 28t12 28l56 57q12 12 28.5 12t28.5-12l141-142q12-12 12-28t-12-28q-12-12-28-12t-28 12L438-513Zm42 273-168 72q-40 17-76-6.5T200-241v-519q0-33 23.5-56.5T280-840h400q33 0 56.5 23.5T760-760v519q0 43-36 66.5t-76 6.5l-168-72Zm0-88 200 86v-518H280v518l200-86Zm0-432H280h400-200Z';
+	const TOAST_ICON_BOOKMARK = 'M480-240l-168 72q-40 17-76-6.5T200-241v-519q0-33 23.5-56.5T280-840h400q33 0 56.5 23.5T760-760v519q0 43-36 66.5t-76 6.5l-168-72Zm0-88 200 86v-518H280v518l200-86Zm0-432H280h400-200Z';
+
 	public function __construct() {
 		add_action( 'init', [ $this, 'maybe_flush' ], 99 );
 		add_action( 'wp_ajax_pf_reading_list_toggle', [ $this, 'ajax_toggle' ] );
-		add_action( 'wp_enqueue_scripts', [ $this, 'enqueue_assets' ] );
+		// Priorité 20 : enqueue_assets() tire le script des signets, ENREGISTRÉ par
+		// Passiflore_Bookshelf::register_assets() sur ce même hook en priorité 10.
+		add_action( 'wp_enqueue_scripts', [ $this, 'enqueue_assets' ], 20 );
 
 		// Endpoint « Mon compte » /liste-de-lecture. En passant par le filtre WC
 		// `woocommerce_get_query_vars`, WooCommerce enregistre lui-même la règle
@@ -73,9 +81,14 @@ class Passiflore_Reading_List {
 		$title_in   = 'Retirer de ma liste de lecture';
 
 		if ( ! is_user_logged_in() ) {
+			// Le clic lève une invitation à se connecter (toast, shelf-bookmarks.js).
+			// Le lien reste un vrai lien vers /connexion (cf. inc/account-auth.php),
+			// pas la page compte : sans JS le visiteur tombe sur le formulaire annoncé.
+			$login_url = function_exists( 'pf_auth_url' ) ? pf_auth_url( 'login' ) : wc_get_page_permalink( 'myaccount' );
 			return sprintf(
-				'<a class="bs-hero__readlist bs-hero__readlist--guest pf-btn pf-btn--outline pf-btn--icon" href="%s" title="%s">%s<span class="bs-hero__readlist-label">%s</span></a>',
-				esc_url( wc_get_page_permalink( 'myaccount' ) ),
+				'<a class="bs-hero__readlist bs-hero__readlist--guest pf-btn pf-btn--outline pf-btn--icon" href="%s" data-title="%s" title="%s">%s<span class="bs-hero__readlist-label">%s</span></a>',
+				esc_url( $login_url ),
+				esc_attr( get_the_title( $product_id ) ),
 				esc_attr( 'Connectez-vous pour enregistrer ce livre dans votre liste de lecture' ),
 				self::icon( false ),
 				esc_html( $label_add )
@@ -84,9 +97,10 @@ class Passiflore_Reading_List {
 
 		$in = self::is_in_list( $product_id );
 		return sprintf(
-			'<button type="button" class="bs-hero__readlist pf-btn pf-btn--outline pf-btn--icon%s" data-product-id="%d" data-in-list="%s" data-label-add="%s" data-label-in="%s" data-title-add="%s" data-title-in="%s" data-icon-add="%s" data-icon-in="%s" title="%s" aria-pressed="%s">%s<span class="bs-hero__readlist-label">%s</span></button>',
+			'<button type="button" class="bs-hero__readlist pf-btn pf-btn--outline pf-btn--icon%s" data-product-id="%d" data-title="%s" data-in-list="%s" data-label-add="%s" data-label-in="%s" data-title-add="%s" data-title-in="%s" data-icon-add="%s" data-icon-in="%s" title="%s" aria-pressed="%s">%s<span class="bs-hero__readlist-label">%s</span></button>',
 			$in ? ' is-in-list' : '',
 			$product_id,
+			esc_attr( get_the_title( $product_id ) ),
 			$in ? '1' : '0',
 			esc_attr( $label_add ),
 			esc_attr( $label_in ),
@@ -105,6 +119,23 @@ class Passiflore_Reading_List {
 	private static function icon( $in ) {
 		$path = $in ? self::ICON_REMOVE_PATH : self::ICON_ADD_PATH;
 		return '<svg class="bs-hero__readlist-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 -960 960 960" fill="currentColor" aria-hidden="true"><path d="' . esc_attr( $path ) . '"/></svg>';
+	}
+
+	/**
+	 * Icônes de tête des toasts « ajouté » / « retiré » (opts.icon de pfToast),
+	 * localisées pour le JS. La croix du retrait est tracée en `stroke` (80 unités,
+	 * l'épaisseur exacte de la coche qu'elle remplace) plutôt qu'en contour rempli :
+	 * même rendu, sans recalculer un tracé de 12 sommets.
+	 *
+	 * @return array{added:string,removed:string}
+	 */
+	public static function toast_icons() {
+		$open  = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960" fill="currentColor" aria-hidden="true">';
+		$cross = '<path d="M400-607L560-447M560-607L400-447" fill="none" stroke="currentColor" stroke-width="80" stroke-linecap="round"/>';
+		return [
+			'added'   => $open . '<path d="' . esc_attr( self::TOAST_ICON_ADDED ) . '"/></svg>',
+			'removed' => $open . '<path d="' . esc_attr( self::TOAST_ICON_BOOKMARK ) . '"/>' . $cross . '</svg>',
+		];
 	}
 
 	/* ─── AJAX toggle ────────────────────────────────────────────── */
@@ -292,18 +323,12 @@ class Passiflore_Reading_List {
 			filemtime( $dir . '/assets/css/reading-list.css' )
 		);
 
-		if ( is_user_logged_in() ) {
-			wp_enqueue_script(
-				'pf-reading-list',
-				$uri . '/assets/js/reading-list.js',
-				[ 'pf-session-toast' ],
-				filemtime( $dir . '/assets/js/reading-list.js' ),
-				true
-			);
-			wp_localize_script( 'pf-reading-list', 'pfRL', [
-				'ajax_url' => admin_url( 'admin-ajax.php' ),
-				'nonce'    => wp_create_nonce( self::NONCE ),
-			] );
+		// Le bouton de la fiche livre est piloté par le MÊME contrôleur que les
+		// signets d'étagère (shelf-bookmarks.js) : bascule, toasts d'ajout/retrait
+		// avec « Annuler », sérialisation des écritures. Chargé aussi pour un
+		// invité — le contrôleur y lève l'invitation à se connecter.
+		if ( class_exists( 'Passiflore_Bookshelf' ) ) {
+			Passiflore_Bookshelf::enqueue_bookmark_assets();
 		}
 	}
 }

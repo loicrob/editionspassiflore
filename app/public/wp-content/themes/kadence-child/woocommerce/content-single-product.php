@@ -244,9 +244,15 @@ $description     = $product->get_description(); // même source que la section �
 			echo do_shortcode( $etagere_shortcode );
 			?>
 			<noscript><style>.pf-bookshelf--hero .pf-book { visibility: visible; }</style></noscript>
-			<?php if ( $nouveaute || $dispo ) : ?>
+			<?php
+			// Priorité : À paraître > Nouveauté (même règle que l'étiquette de
+			// planche de l'étagère, class-bookshelf.php) — un livre à paraître
+			// n'affiche pas aussi « Nouveauté ».
+			$show_nouveaute = $nouveaute && $dispo_val !== 'a-paraitre';
+			?>
+			<?php if ( $show_nouveaute || $dispo ) : ?>
 			<div class="bs-dispo-line">
-				<?php if ( $nouveaute ) : ?>
+				<?php if ( $show_nouveaute ) : ?>
 				<span class="pf-badge pf-badge--accent">Nouveauté</span>
 				<?php endif; ?>
 				<?php if ( $dispo ) : ?>

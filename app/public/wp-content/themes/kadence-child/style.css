@@ -346,15 +346,30 @@ a.pf-value:hover, .pf-value-container a:hover, a.pf-value-highlight:hover, .pf-v
     box-shadow: none;
 }
 
-/* Lien-bouton qui ouvre dans un nouvel onglet → flèche indicatrice après le texte,
-   posée automatiquement via [target="_blank"] (pas besoin de l'ajouter à la main dans
-   chaque libellé). Couvre les trois conventions de bouton-lien du site : .pf-btn (custom
-   design system), .button (Woo/thème) et .wp-element-button (boutons de bloc WP créés en
-   Gutenberg). Caractère ➜ (pointe vers l'est) tourné de -45deg pour pointer vers le
-   nord-est ; inline-block requis pour que la rotation s'applique proprement. */
-a.pf-btn[target="_blank"]::after,
-a.button[target="_blank"]::after,
-a.wp-element-button[target="_blank"]::after {
+/* Lien de TEXTE qui ouvre un nouvel onglet → flèche indicatrice après le libellé,
+   posée automatiquement via [target="_blank"] : rien à ajouter à la main, et les liens
+   saisis en back-office (contenu Gutenberg : pages Contact, Présentation…) sont couverts
+   d'office. Vaut pour un lien inline comme pour les trois conventions de bouton-lien du
+   site — .pf-btn (design system), .button (Woo/thème), .wp-element-button (bloc Gutenberg).
+   Pendant accessibilité : pf_new_window_note() / pf_new_window_label() (inc/a11y.php), le
+   contenu généré n'étant pas restitué de façon fiable par les lecteurs d'écran.
+   Deux exclusions :
+   — .pf-card-link : lien étiré VIDE couvrant toute une carte, la flèche atterrirait dans
+     son coin haut-gauche invisible → traité par la règle .pf-card juste en dessous ;
+   — .social-button : liens-icônes (réseaux sociaux Kadence), aucun libellé visible auquel
+     accoler la flèche → mention pour lecteurs d'écran seule (cf. inc/a11y.php).
+   Caractère ➜ (U+279C, pointe vers l'est) tourné de -45deg pour pointer vers le nord-est ;
+   inline-block requis pour que la rotation s'applique (une transformation ne s'applique
+   pas à une boîte inline non remplacée).
+   ⚠️ Conséquence à connaître : cet inline-block est une BOÎTE ATOMIQUE (équivalente à
+   U+FFFC pour l'algorithme de coupure, UAX #14), donc une coupure de ligne reste possible
+   juste avant la flèche — et une espace insécable placée DANS le content n'y change rien,
+   elle est enfermée dans la boîte. Sur un libellé qui boucle, la flèche peut donc partir
+   seule en début de ligne suivante. Le seul cas rencontré sur le site est le menu
+   « S'abonner » de TEC, réglé localement en `white-space: nowrap` (events.css). Si le cas
+   se reproduit ailleurs, c'est le même correctif local qu'il faut appliquer — ne pas
+   changer ce glyphe, qui est la convention visuelle du site. */
+a[target="_blank"]:not(.pf-card-link):not(.social-button)::after {
     content: "➜";
     display: inline-block;
     margin-left: 0.4em;
@@ -573,6 +588,23 @@ input[type="number"]:focus:not(:read-only), textarea:focus:not(:read-only), sele
     background: var(--pf-surface);
     outline: none;
 }
+/* WooCommerce fait DISPARAÎTRE le placeholder au focus : fondu retardé d'une
+   demi-seconde puis opacity:0, sur tout `form .form-row` (règle identique dans
+   `woocommerce.css` ET `woocommerce.min.css` de Kadence, toutes deux en 0,4,2).
+   C'est le seul endroit du site où un placeholder s'efface avant la saisie —
+   partout ailleurs il tient jusqu'à ce que le champ contienne du texte. On
+   neutralise donc globalement, pour tous les formulaires WooCommerce classiques
+   (compte, connexion/inscription, adresses, mot de passe perdu).
+   `body` en tête porte la spécificité à (0,4,3) : l'emporte quel que soit
+   l'ordre de chargement des feuilles, sans !important.
+   ⚠️ Règle ISOLÉE, à ne jamais grouper avec la version standard `::placeholder` :
+   un navigateur qui ne connaît pas l'un des pseudo-éléments d'une liste de
+   sélecteurs invalide la règle ENTIÈRE (Firefox perdrait la neutralisation). */
+body .woocommerce form .form-row [placeholder]:focus::-webkit-input-placeholder {
+    opacity: 1;
+    transition: none;
+}
+
 /* iOS/Android zooment au focus sur tout champ dont la police affichée est < 16px
    (reset Kadence `input { font-size: 90% }`, composants de recherche compacts
    .pf-search-input/.pf-cat-search-input en 13-14px). Ciblé sur les écrans tactiles
@@ -1304,6 +1336,26 @@ body.admin-bar { --pf-adminbar: 32px; }
     opacity: 0;
     transform: translateY(8px);
     transition: opacity 0.2s ease, transform 0.2s ease;
+}
+/* Ligne icône + message : l'icône se centre sur la hauteur du SEUL bloc de texte.
+   D'où ce niveau intermédiaire — placée directement dans .pf-toast, l'icône se
+   centrerait sur texte + boutons et descendrait dès qu'une action est présente. */
+.pf-toast__main {
+    display: flex;
+    align-items: center;
+    gap: var(--pf-space-3);
+}
+/* Icône de tête (opts.icon) : gouttière à gauche du message. */
+.pf-toast__icon {
+    flex: none;
+    width: 30px;
+    height: 30px;
+    color: var(--pf-accent);
+}
+.pf-toast__icon svg {
+    display: block;
+    width: 100%;
+    height: 100%;
 }
 /* Colonne texte + actions : les boutons passent SOUS le texte, centrés par
    rapport à lui ; le bouton × reste en haut à droite (frère de .pf-toast__body). */

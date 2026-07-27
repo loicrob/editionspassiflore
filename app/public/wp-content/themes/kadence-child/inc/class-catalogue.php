@@ -27,8 +27,11 @@ class Passiflore_Catalogue {
 	];
 
 	// URL values for `affichage` use French labels; map to internal slugs.
+	// `tranches` reste accepté en alias legacy (anciens liens partagés/marque-pages) ;
+	// `dos` est la valeur produite désormais.
 	const DISPLAY_URL_TO_INTERNAL = [
 		'couvertures' => 'covers',
+		'dos'         => 'spines',
 		'tranches'    => 'spines',
 	];
 
@@ -148,9 +151,9 @@ class Passiflore_Catalogue {
 		ob_start();
 		?>
 		<div class="pf-cat-filter-backdrop"></div>
-		<div class="pf-cat-filter-panel" role="dialog" aria-modal="true" aria-label="Tri et filtres">
+		<div class="pf-cat-filter-panel" role="dialog" aria-modal="true" aria-label="Tris et filtres">
 			<div class="pf-cat-filter-panel__head">
-				<span class="pf-cat-filter-panel__title">Tri et filtres</span>
+				<span class="pf-cat-filter-panel__title">Tris et filtres</span>
 				<button type="button" class="pf-cat-filter-close" aria-label="Fermer les filtres">&times;</button>
 			</div>
 			<div class="pf-cat-filter-panel__body"></div>
@@ -183,7 +186,7 @@ class Passiflore_Catalogue {
 	}
 
 	/**
-	 * L'affichage tranches n'a pas de sens pour les liseuses (livres
+	 * L'affichage dos n'a pas de sens pour les liseuses (livres
 	 * numériques) : quand le format sélectionné peut en afficher
 	 * (« numerique » ou « tous »), on force les couvertures. Le JS grise
 	 * l'option spines du switch en miroir.
@@ -344,8 +347,9 @@ class Passiflore_Catalogue {
 				<div class="pf-cat-menu pf-dropdown__menu" role="menu">
 					<?php foreach ( $pdf_catalogues as $cat ) : ?>
 					<a class="pf-cat-pdf-link" href="<?php echo esc_url( $cat['url'] ); ?>" target="_blank" rel="noopener">
-						<span><?php echo esc_html( $cat['libelle'] ); ?></span>
-						<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h6v6"/><path d="M10 14L21 3"/><path d="M21 14v7H3V3h7"/></svg>
+						<?php // Pas d'icône « lien externe » dédiée : la flèche ➜ est posée globalement
+						      // sur [target="_blank"] (style.css) — une seule convention sur tout le site. ?>
+						<span><?php echo esc_html( $cat['libelle'] ); ?><?php echo pf_new_window_note(); ?></span>
 					</a>
 					<?php endforeach; ?>
 				</div>
@@ -463,7 +467,7 @@ class Passiflore_Catalogue {
 
 		ob_start();
 		?>
-		<div class="pf-catalogue-bar pf-sub-header <?php echo $is_searching ? 'is-searching' : ''; ?>" role="toolbar" aria-label="Tri et filtres du catalogue">
+		<div class="pf-catalogue-bar pf-sub-header <?php echo $is_searching ? 'is-searching' : ''; ?>" role="toolbar" aria-label="Tris et filtres du catalogue">
 
 			<?php /* Single row that flexes: [search + sort wrapper] [scroll container] */ ?>
 			<div class="pf-cat-bar-row pf-cat-bar-row-primary">
@@ -535,7 +539,7 @@ class Passiflore_Catalogue {
 					[ 'value' => 'a-paraitre',       'label' => 'À paraître' ],
 				], $atts['decouvrir'], false, $counts['decouvrir'] ?? [], $global_counts['decouvrir'] ?? [] ); ?>
 
-				<?php /* Display segmented control. L'option tranches est grisée
+				<?php /* Display segmented control. L'option dos est grisée
 				       quand le format courant peut afficher des liseuses
 				       (cf. normalize_display). */ ?>
 				<?php $spines_blocked = in_array( $atts['format'], [ 'tous', 'numerique' ], true ); ?>
@@ -550,7 +554,7 @@ class Passiflore_Catalogue {
 						</svg>
 						<span class="pf-cat-display-label">Vue couvertures</span>
 					</button>
-					<button type="button" data-value="spines" aria-label="Vue tranches"
+					<button type="button" data-value="spines" aria-label="Vue dos"
 					        <?php echo $spines_blocked ? 'disabled ' : ''; ?>class="pf-switch__btn <?php echo $atts['display'] === 'spines' ? 'is-active' : ''; ?>">
 						<svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
 							<rect x="1"  y="1" width="4" height="18" rx="1.5"/>
@@ -558,7 +562,7 @@ class Passiflore_Catalogue {
 							<rect x="11" y="1" width="4" height="18" rx="1.5"/>
 							<rect x="16" y="1" width="4" height="18" rx="1.5"/>
 						</svg>
-						<span class="pf-cat-display-label">Vue tranches</span>
+						<span class="pf-cat-display-label">Vue dos</span>
 					</button>
 				</div>
 

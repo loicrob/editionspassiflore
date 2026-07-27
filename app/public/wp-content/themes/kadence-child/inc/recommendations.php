@@ -437,9 +437,17 @@ function pf_account_menu_reorder( $items ) {
 
 	$uid = get_current_user_id();
 
-	// « Commandes » seulement s'il y a au moins une commande.
+	// « Commandes » seulement s'il y a au moins une commande réelle. Même filtre que
+	// woocommerce_account_orders() (core) : exclut les brouillons wc-checkout-draft
+	// (commande auto-créée par le tunnel de commande en blocs, souvent abandonnée),
+	// que wc_get_orders() sans ce filtre compterait à tort comme une vraie commande.
 	if ( isset( $items['orders'] ) && $uid && function_exists( 'wc_get_orders' ) ) {
-		$has_orders = ! empty( wc_get_orders( [ 'customer_id' => $uid, 'limit' => 1, 'return' => 'ids' ] ) );
+		$orders_query = apply_filters( 'woocommerce_my_account_my_orders_query', [
+			'customer_id' => $uid,
+			'limit'       => 1,
+			'return'      => 'ids',
+		] );
+		$has_orders = ! empty( wc_get_orders( $orders_query ) );
 		if ( ! $has_orders ) {
 			unset( $items['orders'] );
 		}
@@ -538,12 +546,12 @@ function pf_register_name_fields() {
 	// phpcs:enable
 	?>
 	<p class="woocommerce-form-row woocommerce-form-row--first form-row form-row-first">
-		<label for="reg_first_name">Prénom</label>
-		<input type="text" class="woocommerce-Input woocommerce-Input--text input-text" name="first_name" id="reg_first_name" autocomplete="given-name" value="<?php echo esc_attr( $first ); ?>" />
+		<label class="screen-reader-text" for="reg_first_name">Prénom</label>
+		<input type="text" class="woocommerce-Input woocommerce-Input--text input-text" name="first_name" id="reg_first_name" placeholder="Prénom" autocomplete="given-name" autocapitalize="words" value="<?php echo esc_attr( $first ); ?>" />
 	</p>
 	<p class="woocommerce-form-row woocommerce-form-row--last form-row form-row-last">
-		<label for="reg_last_name">Nom</label>
-		<input type="text" class="woocommerce-Input woocommerce-Input--text input-text" name="last_name" id="reg_last_name" autocomplete="family-name" value="<?php echo esc_attr( $last ); ?>" />
+		<label class="screen-reader-text" for="reg_last_name">Nom</label>
+		<input type="text" class="woocommerce-Input woocommerce-Input--text input-text" name="last_name" id="reg_last_name" placeholder="Nom" autocomplete="family-name" autocapitalize="words" value="<?php echo esc_attr( $last ); ?>" />
 	</p>
 	<div class="clear"></div>
 	<?php

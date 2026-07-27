@@ -67,9 +67,9 @@ function passiflore_newsletter_render() {
 
 	$privacy     = get_page_by_path( 'politique-de-confidentialite' );
 	$privacy_url = $privacy ? get_permalink( $privacy ) : '';
-	$consent_label = 'J\'accepte de recevoir la newsletter des Éditions Passiflore';
+	$consent_label = 'J’accepte de recevoir la newsletter des Éditions Passiflore';
 	if ( $privacy_url ) {
-		$consent_label .= ' et j\'ai pris connaissance de la <a href="' . esc_url( $privacy_url ) . '" target="_blank" rel="noopener">politique de confidentialité</a>';
+		$consent_label .= ' et j’ai pris connaissance de la <a href="' . esc_url( $privacy_url ) . '" target="_blank" rel="noopener">politique de confidentialité' . pf_new_window_note() . '</a>';
 	}
 	$consent_label .= '.';
 
@@ -82,7 +82,7 @@ function passiflore_newsletter_render() {
 	?>
 	<section class="pf-newsletter" aria-labelledby="pf-newsletter-titre">
 		<div class="pf-newsletter__inner">
-			<h2 id="pf-newsletter-titre" class="pf-newsletter__titre">S'abonner à la newsletter</h2>
+			<h2 id="pf-newsletter-titre" class="pf-newsletter__titre">S’abonner à la newsletter</h2>
 			<p class="pf-newsletter__intro">Recevez nos actualités, nouveautés et rencontres.</p>
 			<p class="pf-newsletter__note">Connaître votre code postal nous permettra de vous envoyer uniquement les infos les plus pertinentes.</p>
 
@@ -117,7 +117,7 @@ function passiflore_newsletter_render() {
 				</p>
 				<input type="hidden" name="pf_ts" value="<?php echo esc_attr( $sig ); ?>">
 
-				<button type="submit" class="button pf-newsletter__btn">S'abonner</button>
+				<button type="submit" class="button pf-newsletter__btn">S’abonner</button>
 
 				<p class="pf-newsletter__message" role="status" aria-live="polite"></p>
 			</form>
@@ -130,10 +130,19 @@ function passiflore_newsletter_render() {
 // Shortcode (page /contact).
 add_shortcode( 'passiflore_newsletter', 'passiflore_newsletter_render' );
 
-// Bande site-wide avant le footer (présente sur toutes les pages).
-add_action( 'kadence_before_footer', function () {
+// Bande site-wide en tête du pied de page (présente sur toutes les pages).
+//
+// Accrochée à `kadence_top_footer` (priorité 5, avant la première rangée de
+// footer de Kadence) et NON à `kadence_before_footer` : ce dernier s'exécute
+// entre `</main>` et `<footer>`, la bande n'appartenait donc à AUCUN repère de
+// navigation — un lecteur d'écran parcourant la page par landmarks la sautait
+// purement et simplement. `kadence_top_footer` est rendu à l'intérieur de
+// `<footer id="colophon" role="contentinfo">` (cf. template-parts/footer/base.php
+// du thème parent), ce qui est bien la place d'un formulaire d'abonnement
+// présent sur toutes les pages.
+add_action( 'kadence_top_footer', function () {
 	echo passiflore_newsletter_render();
-} );
+}, 5 );
 
 
 /* ─── Handler AJAX ────────────────────────────────────────────────────── */

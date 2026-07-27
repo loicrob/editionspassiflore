@@ -420,8 +420,17 @@
 .pf-events-header-bar__right .tribe-events-c-subscribe-dropdown__content {
     position: absolute;
     top: calc(100% + 6px);
-    left: 0;
-    width: 100%;
+    /* Ancré à DROITE (et non à gauche en width:100%) : les libellés étant passés en
+       nowrap (cf. plus bas, flèche « nouvel onglet »), le menu doit pouvoir s'élargir
+       au-delà du bouton — sinon le libellé le plus long déborde du panneau blanc. Il
+       grandit donc vers la gauche, du côté où il y a de la place (le bouton est calé
+       à droite du header, y compris en mobile). min-width : jamais plus étroit que le
+       bouton ; max-width : filet sur écran très étroit. */
+    left: auto;
+    right: 0;
+    width: max-content;
+    min-width: 100%;
+    max-width: 90vw;
     z-index: var(--tec-z-index-dropdown, 1000);
     animation: pf-dd-in 0.18s ease;
 }
@@ -447,6 +456,15 @@
     color: var(--pf-text);
     text-decoration: none;
     font-size: 14px;
+    /* Libellé jamais coupé. Motivation : la flèche « nouvel onglet » (::after global sur
+       [target="_blank"], style.css) est un inline-block — donc une boîte atomique, devant
+       laquelle une coupure de ligne reste possible (cf. commentaire détaillé dans
+       style.css). Sur « Exporter le fichier .ics », qui remplissait exactement la ligne,
+       la flèche partait seule sur une 2e ligne. nowrap supprime le problème à la racine
+       en interdisant toute coupure ici ; le menu (largeur auto, cf. __content plus haut)
+       s'élargit simplement à son libellé le plus long. C'est LE correctif à reproduire si
+       un autre libellé venait à boucler — pas un changement du glyphe global. */
+    white-space: nowrap;
 }
 .pf-events-header-bar__right .tribe-events-c-subscribe-dropdown__list-item:hover,
 .pf-events-header-bar__right .tribe-events-c-subscribe-dropdown__list-item:focus-within {

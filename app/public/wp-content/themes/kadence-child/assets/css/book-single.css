@@ -219,16 +219,6 @@
 	opacity: 0;
 }
 
-/* Flèche pointant vers le nord-est : même technique que le composant global
-   a.pf-btn/.button/.wp-element-button[target="_blank"]::after (style.css),
-   reprise ici car .bs-hero__libraires est un lien texte simple (pas un bouton). */
-.bs-hero__libraires::after {
-	content: "➜";
-	display: inline-block;
-	margin-left: 0.1em;
-	transform: rotate(-45deg);
-}
-
 /* ─── Résumé (aperçu, hero) ──────────────────────────────────── */
 
 /* Aperçu tronqué du résumé complet (section « Résumé » plus bas sur la page,
@@ -509,6 +499,10 @@
 	gap: 0.4em;
 	padding: 0.35em 0;
 	border-bottom: 1px solid var(--pf-border);
+}
+
+.bs-distinctions-icon {
+	flex: none;
 }
 
 .bs-distinctions li:last-child {
@@ -946,10 +940,18 @@
 }
 
 .bs-auteur-meta {
+	margin: var(--pf-space-3) 0 0;
+}
+
+.bs-auteur-meta .pf-label {
+	font-size: var(--pf-text-xs);
+	margin-bottom: 0;
+}
+
+.bs-auteur-meta-value {
 	font-size: 0.88rem;
 	color: var(--pf-text);
-	font-style: italic;
-	margin: var(--pf-space-3) 0 0;
+	margin: 0.2rem 0 0;
 }
 
 /* ─── Onglet Auteur(s) / Autrice(s) ─────────────────────────── */

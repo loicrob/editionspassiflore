@@ -310,7 +310,7 @@ class Passiflore_Events_Map {
 			if ( '' === $search_q ) $search_q = $lat . ',' . $lng;
 			$maps_url = 'https://www.google.com/maps/search/?api=1&query=' . rawurlencode( $search_q );
 			echo '<a class="button pf-btn pf-btn--outline pf-btn--sm pf-event-venue__go" href="' . esc_url( $maps_url )
-				. '" target="_blank" rel="noopener noreferrer">' . esc_html__( 'Google Maps', 'kadence-child' ) . '</a>';
+				. '" target="_blank" rel="noopener noreferrer">' . esc_html__( 'Google Maps', 'kadence-child' ) . pf_new_window_note() . '</a>';
 		}
 
 		echo '</div>'; // .pf-event-venue__info

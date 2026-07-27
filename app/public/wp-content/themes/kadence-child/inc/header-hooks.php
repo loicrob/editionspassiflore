@@ -24,7 +24,13 @@ add_filter( 'nav_menu_css_class', function( $classes, $item ) {
 }, 10, 2 );
 
 add_shortcode( 'passiflore_account_btn', function() {
-    $url = wc_get_page_permalink( 'myaccount' );
+    // Déconnecté, le bouton promet « Connexion » → il doit mener à /connexion,
+    // pas à /mon-compte (cf. inc/account-auth.php). Connecté, c'est bien la page
+    // compte elle-même. pf_auth_url() retombe sur la page compte si le fichier
+    // d'authentification n'est pas chargé.
+    $url = ( ! is_user_logged_in() && function_exists( 'pf_auth_url' ) )
+        ? pf_auth_url( 'login' )
+        : wc_get_page_permalink( 'myaccount' );
     // .pf-btn--sm pour la TAILLE (padding/texte/radius, cf. style.css) ; les
     // couleurs restent portées par button-style-outline/secondary (Kadence).
     // button-size-small retiré : sa règle de padding (0,2,0) battrait sinon
@@ -71,7 +77,10 @@ function passiflore_mobile_menu_account( $items, $args ) {
     if ( ! isset( $args->menu_id ) || $args->menu_id !== 'mobile-menu' || ! function_exists( 'wc_get_page_permalink' ) ) {
         return $items;
     }
-    $url   = wc_get_page_permalink( 'myaccount' );
+    // Même cible que le bouton du header (cf. [passiflore_account_btn] plus haut).
+    $url   = ( ! is_user_logged_in() && function_exists( 'pf_auth_url' ) )
+        ? pf_auth_url( 'login' )
+        : wc_get_page_permalink( 'myaccount' );
     $label = is_user_logged_in() ? 'Mon compte' : 'Connexion';
     return $items . '<li class="menu-item menu-item-pf-account"><a href="' . esc_url( $url ) . '">' . esc_html( $label ) . '</a></li>';
 }
