@@ -165,6 +165,25 @@ function pf_auth_guards() {
 }
 
 /**
+ * Après déconnexion : atterrir sur /connexion, pas sur la page compte.
+ *
+ * WooCommerce renvoie par défaut sur « Mon compte » — où le visiteur, désormais
+ * déconnecté, voit le formulaire de connexion sous une adresse qui annonce son
+ * espace client. On corrige la **destination** à la source, via le filtre
+ * officiel, plutôt que d'ajouter une redirection conditionnelle sur /mon-compte :
+ * celle-ci porterait sur le chemin qui sert aussi la récupération de mot de
+ * passe (endpoint `mot-de-passe-perdu`, cible du lien envoyé par e-mail), pour
+ * un bénéfice purement cosmétique. Ici, un seul filtre, aucun cas limite.
+ *
+ * Couvre tous les chemins de déconnexion du front (entrée « Déconnexion » du
+ * menu compte incluse) : ils passent tous par wc_logout_url() → wc_get_logout_redirect_url().
+ */
+add_filter( 'woocommerce_logout_default_redirect_url', 'pf_auth_logout_redirect' );
+function pf_auth_logout_redirect( $url ) {
+	return function_exists( 'pf_auth_url' ) ? pf_auth_url( 'login' ) : $url;
+}
+
+/**
  * Script de bascule connexion ↔ création de compte.
  *
  * Chargé uniquement là où les deux panneaux existent : page compte, visiteur
