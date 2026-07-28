@@ -67,11 +67,30 @@
 			'</span><span class="pf-numerique-tip__bubble" id="' + id + '" role="tooltip">' + escapeHtml( tipText ) + '</span></span>';
 	}
 
-	function addCompanion( physicalId, btn ) {
+	function addCompanion( offer, btn ) {
 		btn.disabled = true;
-		ajax( 'pf_numerique_add_companion', { physical_id: physicalId } ).then( function ( res ) {
+		ajax( 'pf_numerique_add_companion', { physical_id: offer.physical_id } ).then( function ( res ) {
 			if ( res && res.success ) {
-				window.location.reload();
+				// Le retour visuel est confié au contrôleur des toasts panier, pour
+				// que cet ajout ressemble à tous les autres (caddie, titre en
+				// semibold italique). Il ne peut pas être affiché ici : la page
+				// recharge dans la foulée. On lui passe donc le relais par
+				// sessionStorage, qu'il relève au chargement suivant.
+				try {
+					sessionStorage.setItem( 'pfCartToast', JSON.stringify( {
+						added: offer.added_title || offer.title
+					} ) );
+				} catch ( e ) {}
+				// ⚠️ Pas `reload()` : il rejouerait l'URL courante telle quelle, donc
+				// un `?add-to-cart=` encore présent dans la barre d'adresse (le
+				// client peut être arrivé ici par ce lien) — le livre papier serait
+				// ajouté une deuxième fois. On recharge l'URL nettoyée de ces
+				// paramètres. `replace` plutôt que `href` : pas d'entrée
+				// supplémentaire dans l'historique, comme le faisait `reload()`.
+				var url = new URL( window.location.href );
+				url.searchParams.delete( 'add-to-cart' );
+				url.searchParams.delete( 'quantity' );
+				window.location.replace( url.toString() );
 			} else {
 				btn.disabled = false;
 			}
@@ -123,7 +142,7 @@
 			btn.className = 'pf-btn pf-btn--primary pf-btn--sm pf-numerique-nudge__btn';
 			btn.textContent = cfg.addLabel;
 			btn.addEventListener( 'click', function () {
-				addCompanion( o.physical_id, btn );
+				addCompanion( o, btn );
 			} );
 
 			row.appendChild( text );

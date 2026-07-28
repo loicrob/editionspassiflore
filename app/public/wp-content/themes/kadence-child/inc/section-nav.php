@@ -49,8 +49,8 @@ function pf_sectionnav_bar( array $sections ) {
 	/* Primer --pf-sticky-offset / --pf-sectionnav-h : posé AVANT que le navigateur ne
 	 * traite l'ancre de l'URL (#slug), qui peut faire défiler la page vers une section
 	 * dès le chargement, avant que recherche-globale.js (footer) n'ait rien calculé.
-	 * ⚠ Garder la liste de sélecteurs synchronisée avec recherche-globale.js. */
-	echo '<script>(function(){var SEL=[".site-header-inner-wrap.kadence-sticky-header",".site-header-wrap.kadence-sticky-header",".kadence-sticky-header","#masthead"];var best=0;SEL.forEach(function(sel){document.querySelectorAll(sel).forEach(function(el){if(!el.offsetHeight)return;var b=el.getBoundingClientRect().bottom;if(b>best)best=b;});});var ab=document.getElementById("wpadminbar");if(ab&&best===0){var r=ab.getBoundingClientRect();if(r.bottom>0)best=r.bottom;}document.documentElement.style.setProperty("--pf-sticky-offset",Math.max(0,best)+"px");var nav=document.querySelector(".pf-sectionnav");if(nav)document.documentElement.style.setProperty("--pf-sectionnav-h",nav.offsetHeight+"px");})();</script>';
+	 * ⚠ Garder la mesure synchronisée avec recherche-globale.js. */
+	echo '<script>(function(){var best=0;var h=document.getElementById("masthead");if(h&&h.offsetHeight)best=h.getBoundingClientRect().bottom;var ab=document.getElementById("wpadminbar");if(ab&&best===0){var r=ab.getBoundingClientRect();if(r.bottom>0)best=r.bottom;}document.documentElement.style.setProperty("--pf-sticky-offset",Math.max(0,best)+"px");var nav=document.querySelector(".pf-sectionnav");if(nav)document.documentElement.style.setProperty("--pf-sectionnav-h",nav.offsetHeight+"px");})();</script>';
 	return ob_get_clean();
 }
 

@@ -658,49 +658,166 @@ Workaround: stack two pseudo-elements. ::before is the base gradient (always vis
     flex-direction: column;
 }
 
-/* ── En ce moment ───────────────────────────────────────────────────────────── */
+/* ── En-tête d'un bloc étagère ───────────────────────────────────────────────
+   Rangée 1 : titre · filet · « Tout voir ➜ ». Rangée 2 : l'accroche, pleine
+   largeur. Auparavant le titre était seul à gauche et la largeur restante
+   (~1000 px) était morte ; la barre donne une pulsation horizontale répétée à
+   chaque étagère.
+   Le filet est un ::after (pas un nœud de plus dans le markup) : un
+   pseudo-élément d'un conteneur grid EST un élément de grille, et le
+   grid-area explicite le place en colonne 2 malgré sa position en fin d'ordre. */
+.pf-etagere-head {
+    display: grid;
+    grid-template-columns: auto minmax(var(--pf-space-8), 1fr) auto;
+    align-items: center;
+    row-gap: var(--pf-space-2);
+}
 
-.pf-en-ce-moment-section {
-    padding-bottom: 0;
+.pf-etagere-head > .pf-titre-3 {
+    grid-area: 1 / 1;
+    margin: 0;
+}
+
+.pf-etagere-head::after {
+    content: '';
+    grid-area: 1 / 2;
+    margin: 0 var(--pf-space-4);
+    border-top: 1px solid var(--pf-border);
+}
+
+/* Petite capitale espacée, plus discrète que le titre : c'est une sortie, pas
+   un intitulé. La flèche ➜ et son glissement au survol viennent de
+   .pf-section-titre a (style.css), d'où la classe portée par l'ENVELOPPE du
+   lien — le sélecteur vise un `a` descendant.
+   ⚠️ Cette enveloppe DOIT rester un <div>, jamais un <span>. style.css impose
+   à tout lien `color` + `text-decoration: underline` en !important via une
+   règle à trois branches — `p a`, `span a`, `.entry-content a`. L'accueil n'a
+   pas de .entry-content et le lien n'est pas dans un <p> : avec un <div>,
+   aucune branche ne matche et rien n'a besoin d'être battu. En <span> il
+   faudrait un !important, interdit entre fichiers du thème enfant (le seul
+   recours propre serait d'ajouter .pf-etagere-voir à la liste :not(), comme
+   .pf-card et .pf-value).
+   Le rouge est donc posé ici, et hérité par le lien via
+   `.pf-section-titre a { color: inherit }`. */
+.pf-etagere-voir {
+    grid-area: 1 / 3;
+    font-family: var(--pf-font-body);
+    font-size: var(--pf-text-sm);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    white-space: nowrap;
+    color: var(--pf-accent);
+}
+
+.pf-etagere-accroche {
+    grid-area: 2 / 1 / 3 / -1;
+    margin: 0;
+    max-width: 70ch;
+    font-size: var(--pf-text-sm);
+    line-height: var(--pf-leading-snug);
+    color: var(--pf-muted);
+}
+
+/* ── Rythme vertical des deux sections ───────────────────────────────────────
+   Échelle : 20 (titre d'étagère → son étagère) / 32 (titre de section → son
+   1er bloc) / 56 (bloc → bloc) / 80 (section → section).
+   Règle : un titre est TOUJOURS plus près de ce qu'il annonce que du bloc
+   précédent. C'était le défaut d'origine — 48 après le h2 contre 32 entre
+   blocs — qui faisait flotter le titre de section, détaché de sa section.
+
+   Les écarts vivent en margin-top sur l'élément QUI SUIT, jamais en
+   margin-bottom sur le titre : c'est ce qui permet une valeur différente après
+   le h2 (32) et entre deux blocs (56). La hiérarchie est portée par la
+   SPÉCIFICITÉ (0,2,0 pour le cas « après le h2 » contre 0,1,0 pour le cas
+   général), pas par l'ordre des règles.
+   ⚠️ Corollaire : aucune règle d'étagère ne doit reposer une margin verticale
+   propre — elle battrait le cas général (0,1,0) et casserait l'échelle. */
+
+.pf-en-ce-moment-section > * + *,
+.pf-au-catalogue-section > * + * {
+    margin-top: var(--pf-space-14);   /* 56 — d'un bloc au suivant */
+}
+
+.pf-en-ce-moment-section > .pf-section-header + *,
+.pf-au-catalogue-section > .pf-section-header + * {
+    margin-top: var(--pf-space-8);    /* 32 — le titre de section se lie à sa section */
 }
 
 .pf-en-ce-moment-section > .pf-section-header,
 .pf-au-catalogue-section > .pf-section-header {
-    position: sticky;
-    top: var(--pf-sticky-offset, 0px);
-    z-index: 3;
-    background: var(--pf-surface-alt);
-    margin-top: var(--pf-space-6);
-    /* Pas de margin-bottom ici : sur un en-tête sticky, la marge fait partie de la
-       « boîte » contrainte par la section → l'en-tête se décolle d'autant plus tôt.
-       L'écart sous le titre est porté par l'élément suivant (voir « + * » ci-dessous). */
-    padding-top: var(--pf-space-6);
-    padding-bottom: var(--pf-space-6);
+    margin: 0;
+    padding: 0;
     text-align: center;
 }
 
-/* Écart sous le titre de section, déplacé du header vers le bloc qui le suit
-   (.pf-en-ce-moment-cols n'avait pas de margin-top ; les .pf-etagere-bloc l'ont déjà
-   → visuellement identique, mais l'en-tête sticky garde une boîte plus courte). */
-.pf-en-ce-moment-section > .pf-section-header + *,
-.pf-au-catalogue-section > .pf-section-header + * {
-    margin-top: var(--pf-space-6);
+/* Les 80 px entre les deux sections sont répartis de part et d'autre de la
+   frontière des bandes de fond (40 + 40) : une bande colorée doit se fermer
+   sur du vide, pas s'arrêter net au ras de la dernière étagère. */
+.pf-en-ce-moment-section {
+    padding-top: var(--pf-space-12);     /* 48 au-dessus du h2 (inchangé) */
+    padding-bottom: var(--pf-space-10);  /* 40 ─┐ */
 }
 
-.pf-en-ce-moment-section > .pf-section-header.pf-header-stuck,
-.pf-au-catalogue-section > .pf-section-header.pf-header-stuck {
-    box-shadow: var(--pf-shadow-stuck);
-    clip-path: inset(0 0 -12px 0);
+.pf-au-catalogue-section {
+    padding-top: var(--pf-space-10);     /* 40 ─┘ = 80 entre les deux sections */
+    padding-bottom: var(--pf-space-12);  /* 48 */
 }
 
-/* Effet « aéro » au scroll — voir le bloc « Éléments sticky » de style.css. */
-@supports ((backdrop-filter: blur(2px)) or (-webkit-backdrop-filter: blur(2px))) {
-    .pf-en-ce-moment-section > .pf-section-header.pf-header-stuck,
-    .pf-au-catalogue-section > .pf-section-header.pf-header-stuck {
-        background: color-mix(in srgb, var(--pf-surface-alt) 90%, transparent);
-        -webkit-backdrop-filter: blur(var(--pf-aero-blur));
-        backdrop-filter: blur(var(--pf-aero-blur));
-    }
+/* Accroche sous le titre de section (centrée avec lui). */
+.pf-section-accroche {
+    margin: var(--pf-space-3) auto 0;
+    max-width: 60ch;
+    font-size: var(--pf-text-base);
+    line-height: var(--pf-leading-snug);
+    color: var(--pf-muted);
+}
+
+/* « En ce moment… » : l'accroche cite les actualités uniquement quand l'encart
+   est effectivement DANS la section. C'est initRelocateActualites() qui l'y
+   reloge, sur (min-width: 769px) → hero, sinon → section. PHP ne peut pas le
+   savoir : les deux phrases sont rendues et la coupure choisit.
+   ⚠️ Ce point de rupture DOIT rester le complément exact du matchMedia de
+   accueil.js — les désynchroniser afficherait la mauvaise phrase, ou les deux. */
+.pf-section-accroche--actus-dedans {
+    display: none;
+}
+
+/* ── Bandes de fond alternées (pleine largeur) ───────────────────────────────
+   « En ce moment » sur crème soutenu, « Au catalogue » sur le fond de page :
+   au défilement, la structure se lit par bandes au lieu d'une nappe uniforme.
+   Le fond va jusqu'aux bords de l'écran alors que le contenu reste tenu par
+   .site-container → pseudo-élément en 100vw recentré, plutôt qu'un wrapper de
+   plus dans le markup. Le débordement horizontal (100vw inclut la barre de
+   défilement) est absorbé par #wrapper, en overflow:clip.
+   z-index:-1 : la section ne pose pas de z-index, donc ne crée pas de contexte
+   d'empilement — le pseudo passe derrière le contenu de la section sans passer
+   derrière le fond de page. */
+.pf-en-ce-moment-section {
+    position: relative;
+}
+
+.pf-en-ce-moment-section::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 50%;
+    width: 100vw;
+    transform: translateX(-50%);
+    background: var(--pf-cream-dark);
+    z-index: -1;
+}
+
+/* Ces deux titres de section passent au noir de titre, alors que le composant
+   .pf-titre-2 reste en gris chaud ailleurs (page compte) — écart voulu, propre
+   à l'accueil, d'où la surcharge ici plutôt que dans style.css. Le sélecteur
+   suffit à passer devant .pf-titre-2 (0,3,0 contre 0,1,0) : pas d'!important.
+   Le « > » n'a plus de .pf-section-header imbriqué à exclure (les en-têtes de
+   bloc sont passés à .pf-etagere-head) : il ne fait plus que borner la règle
+   aux deux en-têtes de section, ce qui reste le bon périmètre. */
+.pf-en-ce-moment-section > .pf-section-header .pf-titre-2,
+.pf-au-catalogue-section > .pf-section-header .pf-titre-2 {
+    color: var(--pf-heading);
 }
 
 /* ── Colonnes côte à côte (desktop) ── */
@@ -709,7 +826,6 @@ Workaround: stack two pseudo-elements. ::before is the base gradient (always vis
     display: flex;
     gap: 2.5rem;
     align-items: stretch;
-    margin-bottom: 1rem;
 }
 
 .pf-en-ce-moment-cols > * {
@@ -736,8 +852,9 @@ Workaround: stack two pseudo-elements. ::before is the base gradient (always vis
     border-radius: var(--pf-radius-card);
 }
 
-/* Dans le hero : pas de titre « Actualités » au-dessus de l'encart. */
-.pf-hero .pf-en-ce-moment-actualites .pf-section-header {
+/* Dans le hero : pas de titre « Actualités » au-dessus de l'encart. Il ne sert
+   que lorsque initRelocateActualites() a relogé l'encart dans la section. */
+.pf-hero .pf-en-ce-moment-actualites .pf-etagere-head {
     display: none;
 }
 
@@ -881,6 +998,15 @@ Workaround: stack two pseudo-elements. ::before is the base gradient (always vis
     padding-bottom: 0;
 }
 
+/* Même retrait haut que la marge de .pf-etagere-bloc .pf-bookshelf (20/12/12) :
+   la rangée de tuiles se décolle de son en-tête exactement comme une étagère de
+   la sienne, alors que le composant partagé se contente de 12 sur les 4 côtés.
+   (0,2,0) : events.css pose le padding de base en (0,1,0) et peut être chargé
+   après accueil.css — la spécificité tranche, pas l'ordre. */
+.pf-en-ce-moment-events .pf-event-tiles-scroll {
+    padding: var(--pf-space-5) var(--pf-space-3) var(--pf-space-3);
+}
+
 .pf-etagere-emoji {
     line-height: 1;
     font-style: normal;
@@ -889,25 +1015,18 @@ Workaround: stack two pseudo-elements. ::before is the base gradient (always vis
 
 /* ── Au catalogue ────────────────────────────────────────────────────────────── */
 
-.pf-au-catalogue-section {
-    padding-bottom: 1rem;
-}
-
-.pf-au-catalogue-section .pf-etagere-bloc {
-    margin-top: var(--pf-space-6);
-    margin-bottom: var(--pf-space-8);
-}
-
-/* Étagères dans "En ce moment" — fond identique à la section */
+/* Étagères dans "En ce moment" — fond identique à la section.
+   ⚠️ Pas de margin verticale ici : le rythme des blocs est posé une seule fois,
+   plus haut (« Rythme vertical des deux sections »). */
 .pf-en-ce-moment-section .pf-etagere-bloc {
-    margin-top: var(--pf-space-6);
-    margin-bottom: var(--pf-space-8);
     background: transparent;
 }
 
-/* L'étagère s'étend sur toute la hauteur disponible dans le bloc */
+/* L'étagère s'étend sur toute la hauteur disponible dans le bloc.
+   La margin HAUTE (20) est l'écart titre d'étagère → étagère de l'échelle ; les
+   trois autres côtés gardent leur valeur d'origine. */
 .pf-etagere-bloc .pf-bookshelf {
-    margin: var(--pf-space-3);
+    margin: var(--pf-space-5) var(--pf-space-3) var(--pf-space-3);
     flex: 1;
     min-height: 0;
     display: flex;
@@ -937,14 +1056,31 @@ Workaround: stack two pseudo-elements. ::before is the base gradient (always vis
 /* ── Animation d'entrée des étagères ─────────────────────────────────────────── */
 
 /* Pose de départ, posée par JS (classe `pf-bookshelf-armed`) → jamais active en
-   reduced-motion. Visible dès le chargement, avant le scroll de déclenchement. */
+   reduced-motion. Tenue dès le chargement, avant le scroll de déclenchement :
+   les dos (spines) y sont visibles, les livres en covers non (ils apparaissent
+   un à un au déclenchement, cf. `pf-book-appear`). */
 
-/* Covers : couverture ouverte (pose de survol) + livre agrandi */
+/* Échelle de départ des livres en covers — seul réglage à toucher pour les
+   rendre plus/moins grands. Plafond pratique ~1,25 : le livre grandit depuis son
+   centre, or le rayon ne laisse que ~32 px au-dessus de la plus haute couverture
+   du catalogue (356 px) et le scroller rogne au-delà (`.pf-bookshelf--scroll
+   .pf-shelf` est overflow-y:hidden, imposé par le défilement horizontal). À 1,2
+   ce livre déborde de 4 px, résorbés en ~0,12 s alors qu'il est encore à 0,2
+   d'opacité → invisible ; au-delà de ~1,25 le sommet aplati se voit. */
+.pf-bookshelf-armed.pf-bookshelf--covers,
+.pf-bookshelf-intro.pf-bookshelf--covers {
+    --pf-intro-scale: 1.2;
+}
+
+/* Covers : livre absent (visibility) + couverture ouverte (pose de survol) + agrandi */
+.pf-bookshelf-armed.pf-bookshelf--covers .pf-book {
+    visibility: hidden;
+}
 .pf-bookshelf-armed.pf-bookshelf--covers .pf-book-cover {
     transform: rotateY(-25deg);
 }
 .pf-bookshelf-armed.pf-bookshelf--covers .pf-book-inner {
-    transform: scale(1.1);
+    transform: scale(var(--pf-intro-scale));
 }
 
 /* Spines : dos penché à droite (pivot bas-droit du dos) */
@@ -959,8 +1095,17 @@ Workaround: stack two pseudo-elements. ::before is the base gradient (always vis
     to   { transform: rotateY(0); }
 }
 @keyframes pf-cover-inner-settle {
-    from { transform: scale(1.1); }
+    from { transform: scale(var(--pf-intro-scale)); }
     to   { transform: scale(1); }
+}
+/* Apparition du livre. `visibility` est une propriété discrète : entre deux
+   keyframes elle bascule à mi-chemin, d'où le palier à 1% pour que le livre
+   soit visible dès le début du fondu. Tenue en `hidden` pendant le délai par
+   `backwards` → un livre pas encore apparu n'est ni visible ni survolable. */
+@keyframes pf-book-appear {
+    from { visibility: hidden; opacity: 0; }
+    1%   { visibility: visible; }
+    to   { opacity: 1; }
 }
 @keyframes pf-spine-settle {
     from { transform: rotate(8deg); }
@@ -971,6 +1116,10 @@ Workaround: stack two pseudo-elements. ::before is the base gradient (always vis
    backwards = la pose de départ (keyframe `from`) reste tenue pendant le délai, puis on
    revient à l'état natif → le survol refonctionne (pas de transform figé). Le JS retire
    `pf-bookshelf-armed` au même instant : l'anim prend le relais sans à-coup. */
+.pf-bookshelf-intro.pf-bookshelf--covers .pf-book {
+    animation: pf-book-appear 1.5s cubic-bezier(0.22, 0.61, 0.36, 1) backwards;
+    animation-delay: var(--pf-intro-delay, 0s);
+}
 .pf-bookshelf-intro.pf-bookshelf--covers .pf-book-cover {
     animation: pf-cover-settle 1.5s cubic-bezier(0.22, 0.61, 0.36, 1) backwards;
     animation-delay: var(--pf-intro-delay, 0s);
@@ -998,6 +1147,60 @@ Workaround: stack two pseudo-elements. ::before is the base gradient (always vis
 /* ── 6. Responsive ──────────────────────────────────────────────────────────── */
 
 @media ( max-width: 768px ) {
+    /* Complément exact du matchMedia de initRelocateActualites() : ici l'encart
+       actualités est dans la section, l'accroche les mentionne donc. */
+    .pf-section-accroche--actus-dedans { display: block; }
+    .pf-section-accroche--actus-dehors { display: none; }
+
+    /* Sur mobile, l'ordre devient : titre, accroche, CONTENU (étagère, rangée
+       de tuiles), puis « Tout voir ➜ » calé à droite tout en bas.
+       « Tout voir » vit dans .pf-etagere-head, donc dans un autre contexte de
+       mise en forme que l'étagère — `order` seul ne peut pas les entrelacer,
+       il ne classe qu'entre frères. display:contents efface la boîte de
+       l'en-tête : ses enfants deviennent des items du bloc lui-même, où
+       `order` les range enfin avec le contenu. Aucun changement de markup,
+       l'en-tête desktop reste intact. Le <div> effacé ne porte aucune
+       sémantique, rien ne quitte l'arbre d'accessibilité.
+       Le filet n'a de toute façon plus la largeur de vouloir dire quoi que ce
+       soit à cette taille.
+       ⚠️ Son ::after DOIT rester en display:none : sous display:contents il
+       serait généré comme un enfant de plus, deviendrait item du bloc à
+       l'order 0 par défaut, et s'intercalerait juste devant le contenu. */
+    .pf-etagere-head {
+        display: contents;
+    }
+
+    .pf-etagere-head::after {
+        display: none;
+    }
+
+    /* Seul de ces trois conteneurs à être en display:block : sans contexte flex,
+       `order` n'aurait aucune prise sur ses enfants une fois l'en-tête effacé.
+       (.pf-etagere-bloc et .pf-en-ce-moment-actualites sont déjà flex-column.) */
+    .pf-en-ce-moment-events {
+        display: flex;
+        flex-direction: column;
+    }
+
+    /* Ordres NÉGATIFS pour le titre et l'accroche, positif pour la sortie : le
+       contenu garde son order 0 par défaut et se place de lui-même entre les
+       deux. Pas besoin d'énumérer étagère / rangée de tuiles / carousel, ni de
+       reprendre cette liste si un bloc d'un autre type apparaît. */
+    .pf-etagere-head > .pf-titre-3 {
+        order: -2;
+    }
+
+    .pf-etagere-accroche {
+        order: -1;
+        /* Remplace le row-gap de la grille, disparu avec sa boîte. */
+        margin-top: var(--pf-space-2);
+    }
+
+    .pf-etagere-voir {
+        order: 1;
+        align-self: flex-end;
+    }
+
     .pf-hero-sous-titre-wrap {
         gap: var(--pf-space-1);
     }
@@ -1011,8 +1214,19 @@ Workaround: stack two pseudo-elements. ::before is the base gradient (always vis
         gap: 0;
     }
 
+    /* Relogé dans la section, l'encart actualités est un bloc comme les autres :
+       même écart jusqu'au bloc suivant (56) que d'une étagère à la suivante.
+       Il vit dans .pf-en-ce-moment-cols (flex, gap 0), donc hors de portée de la
+       règle générale `> * + *` qui ne vise que les enfants directs de section. */
     .pf-en-ce-moment-actualites {
-        margin-bottom: 1rem;
+        margin-bottom: var(--pf-space-14);
+    }
+
+    /* Et son carousel se décolle de son titre des mêmes 20 px qu'une étagère du
+       sien. Scopé au mobile : dans le hero l'en-tête est masqué, un écart au-
+       dessus du carousel n'y serait qu'un trou. */
+    .pf-en-ce-moment-actualites .pf-actualites-carousel {
+        margin-top: var(--pf-space-5);
     }
 
     /* Même plafond que desktop (slot hero = max-width 460px) : sans lui le

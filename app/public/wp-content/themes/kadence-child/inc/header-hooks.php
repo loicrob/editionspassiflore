@@ -36,7 +36,13 @@ add_shortcode( 'passiflore_account_btn', function() {
     // button-size-small retiré : sa règle de padding (0,2,0) battrait sinon
     // .pf-btn--sm (0,1,0).
     if ( is_user_logged_in() ) {
-        $label = 'Mon compte';
+        // Espace INSÉCABLE : « Mon compte » est le seul libellé du header en deux
+        // mots, donc le seul sécable — il se coupait en deux lignes quand la rangée
+        // manquait de place (« Connexion », mot unique, ne l'a jamais fait, d'où un
+        // symptôme visible uniquement connecté). Le logo fluide (style.css) évite
+        // désormais la compression, ceci en est la ceinture : même si la rangée
+        // devenait plus dense (entrée de menu en plus), le libellé reste d'un bloc.
+        $label = "Mon\u{00A0}compte";
         $class = 'button header-button button-style-outline passiflore-account-btn is-logged-in pf-btn--sm';
     } else {
         $label = 'Connexion';

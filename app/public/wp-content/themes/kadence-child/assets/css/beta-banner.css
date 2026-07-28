@@ -15,13 +15,23 @@ html.pf-beta-collapsed .pf-beta-banner { display: none; }
 .pf-beta-dot { display: none; }
 html.pf-beta-collapsed .pf-beta-dot { display: inline-flex; }
 
+/* Repli SANS JavaScript de --pf-banner-h (le header collant se cale dessus, cf.
+   style.css). Sans JS le primer inline de inc/beta-banner.php ne tourne pas : la
+   variable retomberait sur son 0px et le header se collerait à top:0, donc DERRIÈRE
+   ce bandeau (z-index supérieur) — il disparaîtrait. On déclare donc la plus grande
+   hauteur observée du bandeau (85px, à 390px de large ; 68 à 72px au-delà) : sans JS
+   le header se cale au pire quelques pixels trop bas, laissant voir un filet de
+   contenu, au lieu de se cacher. Le primer écrase cette valeur dès que JS tourne. */
+:root { --pf-banner-h: 85px; }
+
 .pf-beta-banner {
-    /* Sticky au-dessus du header : le bandeau reste en flux au-dessus de #wrapper,
-       Kadence mesure alors sa hauteur dans l'offset du header sticky (.item-is-fixed)
-       et colle celui-ci juste en dessous — aucune modif du JS Kadence nécessaire. */
+    /* Sticky au-dessus du header : le bandeau reste en flux au-dessus de #wrapper.
+       Le header (#masthead, position:sticky — cf. style.css) se cale en dessous via
+       --pf-banner-h, mesuré par le primer inline de inc/beta-banner.php et tenu à
+       jour par beta-banner.js. */
     position: sticky;
     top: 0;
-    z-index: 1201; /* juste au-dessus du header sticky Kadence (.item-is-fixed z-index:1200) */
+    z-index: 1201; /* au-dessus du contexte d'empilement de #masthead (z-index:20) */
     background: var(--pf-surface-alt);
     color: var(--pf-accent);
     border-bottom: 1px solid var(--pf-border);

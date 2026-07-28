@@ -60,6 +60,34 @@ function passiflore_enqueue_auteurs_styles() {
         true
     );
 
+    // Toasts d'ajout / de retrait du panier. Site-wide : le mini-panier du header
+    // est sur toutes les pages, et son bouton × doit donner le même retour qu'un
+    // ajout. jquery en dépendance — `added_to_cart` / `removed_from_cart` sont des
+    // événements jQuery custom du cœur WooCommerce.
+    if ( function_exists( 'wc_get_cart_url' ) ) {
+        wp_enqueue_script(
+            'pf-cart-toast',
+            get_stylesheet_directory_uri() . '/assets/js/cart-toast.js',
+            [ 'jquery', 'pf-toast' ],
+            filemtime( get_stylesheet_directory() . '/assets/js/cart-toast.js' ),
+            true
+        );
+        wp_localize_script( 'pf-cart-toast', 'PassifloreCartToast', [
+            // Seule la fiche livre porte un bouton d'ajout AJAX : ailleurs, le titre
+            // est inconnu et le script retombe sur le message que WooCommerce pose
+            // lui-même sur le bouton (`data-success_message`).
+            'title'    => is_product() ? get_the_title() : '',
+            // Espace insécable avant le « ! » (convention typographique française,
+            // cf. inc/class-reading-list.php). Le message est injecté en innerHTML
+            // par pf-toast.js → l'entité est bien interprétée.
+            'added'    => '%s a bien été ajouté au panier&nbsp;!',
+            'removed'  => '%s a bien été retiré du panier.',
+            'cart_cta' => 'Voir le panier',
+            'cart_url' => wc_get_cart_url(),
+            'close'    => 'Fermer',
+        ] );
+    }
+
     // Composant partagé « section-nav » (fiche livre + fiche événement).
     if ( is_product() || is_singular( 'tribe_events' ) ) {
         wp_enqueue_script(
@@ -95,6 +123,17 @@ function passiflore_enqueue_auteurs_styles() {
             get_stylesheet_directory_uri() . '/assets/js/scroll-fade.js',
             [],
             filemtime( get_stylesheet_directory() . '/assets/js/scroll-fade.js' ),
+            true
+        );
+
+        // Vol du livre vers le panier à l'ajout. Propre à la fiche livre (il clone
+        // le livre du hero) ; le toast qui le suit, lui, vit au niveau du panier
+        // et attend l'atterrissage via window.pfCartFlight.
+        wp_enqueue_script(
+            'pf-add-to-cart-flight',
+            get_stylesheet_directory_uri() . '/assets/js/add-to-cart-flight.js',
+            [],
+            filemtime( get_stylesheet_directory() . '/assets/js/add-to-cart-flight.js' ),
             true
         );
     }
@@ -336,6 +375,7 @@ require_once get_stylesheet_directory() . '/inc/search.php';
 require_once get_stylesheet_directory() . '/inc/modifier-produit.php';
 require_once get_stylesheet_directory() . '/inc/catalogues.php';
 require_once get_stylesheet_directory() . '/inc/header-hooks.php';
+require_once get_stylesheet_directory() . '/inc/header-sticky.php';
 require_once get_stylesheet_directory() . '/inc/newsletter.php';
 require_once get_stylesheet_directory() . '/inc/admin.php';
 require_once get_stylesheet_directory() . '/inc/book-sheet.php';
@@ -346,6 +386,7 @@ require_once get_stylesheet_directory() . '/inc/class-events-feed.php';
 require_once get_stylesheet_directory() . '/inc/class-events-search.php';
 require_once get_stylesheet_directory() . '/inc/class-events-map.php';
 require_once get_stylesheet_directory() . '/inc/event-admin.php';
+require_once get_stylesheet_directory() . '/inc/event-duplicate.php';
 require_once get_stylesheet_directory() . '/inc/venue-admin.php';
 require_once get_stylesheet_directory() . '/inc/book-groups-admin.php';
 require_once get_stylesheet_directory() . '/inc/event-hours.php';
@@ -366,8 +407,8 @@ require_once get_stylesheet_directory() . '/inc/shipping.php';
 require_once get_stylesheet_directory() . '/inc/boxtal-perf.php';
 require_once get_stylesheet_directory() . '/inc/numerique-offer.php';
 require_once get_stylesheet_directory() . '/inc/checkout.php';
+require_once get_stylesheet_directory() . '/inc/wc-notices-toast.php';
 require_once get_stylesheet_directory() . '/inc/mini-cart.php';
 require_once get_stylesheet_directory() . '/inc/shortcodes.php';
 require_once get_stylesheet_directory() . '/inc/privacy-cookies.php';
 require_once get_stylesheet_directory() . '/inc/beta-banner.php'; // TEMPORAIRE — bandeau phase bêta
-require_once get_stylesheet_directory() . '/inc/sticky-debug.php'; // DIAGNOSTIC TEMPORAIRE — header sticky

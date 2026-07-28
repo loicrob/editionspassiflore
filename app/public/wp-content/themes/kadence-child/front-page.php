@@ -33,6 +33,69 @@ $litterature_link = get_term_link( 'litterature', 'product_cat' );
 $litterature_url  = is_wp_error( $litterature_link ) ? '' : $litterature_link;
 $culture_link     = get_term_link( 'culture-sud-ouest', 'product_cat' );
 $culture_url      = is_wp_error( $culture_link ) ? '' : $culture_link;
+
+/**
+ * En-tête d'un bloc étagère : titre à gauche, filet, « Tout voir ➜ » à droite,
+ * puis l'accroche sur une seconde ligne. Closure locale plutôt que fonction du
+ * thème — ce markup ne sert que sur cette page.
+ * Le titre n'est plus un lien : c'est « Tout voir » qui porte la cible, sinon
+ * la flèche de .pf-section-titre s'afficherait deux fois sur la même ligne.
+ */
+$etagere_head = static function ( $titre, $url = '', $accroche = '' ) {
+	ob_start(); ?>
+	<div class="pf-etagere-head">
+		<h3 class="pf-titre-3"><?php echo esc_html( $titre ); ?></h3>
+		<?php if ( $url ) : ?>
+		<div class="pf-section-titre pf-etagere-voir"><a href="<?php echo esc_url( $url ); ?>">Tout voir</a></div>
+		<?php endif; ?>
+		<?php if ( $accroche ) : ?>
+		<?php /* nl2br APRÈS esc_html : on échappe le texte, puis on n'ajoute que
+		         les <br>. L'inverse laisserait esc_html échapper nos propres
+		         balises. Un \n dans l'accroche = un retour à la ligne voulu. */ ?>
+		<p class="pf-etagere-accroche"><?php echo nl2br( esc_html( $accroche ) ); ?></p>
+		<?php endif; ?>
+	</div>
+	<?php return ob_get_clean();
+};
+
+// Accroche de la section « Au catalogue » : le compte est DÉDUPLIQUÉ par
+// format_groupe (une œuvre, pas une édition) — c'est le nombre que le catalogue
+// affiche lui-même en mode format par défaut.
+$nb_oeuvres         = class_exists( 'Passiflore_Bookshelf' ) ? Passiflore_Bookshelf::count_oeuvres() : 0;
+$accroche_catalogue = $nb_oeuvres
+	? sprintf(
+		'%s %s, de la littérature au patrimoine régional.',
+		number_format_i18n( $nb_oeuvres ),
+		$nb_oeuvres > 1 ? 'ouvrages' : 'ouvrage'
+	)
+	: '';
+
+// Accroche de « En ce moment… ». Elle dépend de la présence de l'encart
+// actualités DANS la section — or ce déplacement est fait en JS par
+// initRelocateActualites() selon la largeur d'écran, que PHP ignore. Les deux
+// formulations sont donc rendues quand il y a des diapos, et c'est le CSS qui
+// tranche sur le même point de rupture (cf. accueil.css).
+$accroche_ecm_avec_actus = 'Nos actualités récentes, événements à venir et les dernières nouveautés de nos rayons.';
+$accroche_ecm_sans_actus = 'Nos événements à venir et les dernières nouveautés de nos rayons.';
+
+// Accroches des étagères de « Au catalogue ». Les deux premières reprennent le
+// texte des cartes de catégorie du hero (même promesse, même voix).
+$accroche_litterature = 'Des romans exigeants et accessibles, générateurs d’émotions.';
+$accroche_culture     = 'Des beaux livres et des ouvrages sur nos sports et notre patrimoine.';
+$accroche_prix        = 'Des autrices et des auteurs récompensés pour la qualité de leur ouvrage.';
+$accroche_gc          = 'Plus de confort de lecture pour celles et ceux qui peinent parfois à lire des textes resserrés.';
+$accroche_numerique   = 'Pour avoir votre lecture partout avec vous, sur votre liseuse, smartphone ou tablette.';
+
+// Seconde phrase ajoutée seulement si l'offre « version numérique » est active
+// (elle est dormante par défaut → l'accroche se réduit d'elle-même).
+// Sur sa propre ligne : elle parle d'une promotion datée, pas de la nature du
+// format — les deux ne se lisent pas d'une traite.
+if ( function_exists( 'pf_numerique_offer_teaser' ) ) {
+	$offre_numerique = pf_numerique_offer_teaser();
+	if ( $offre_numerique ) {
+		$accroche_numerique .= "\n" . $offre_numerique;
+	}
+}
 ?>
 
 <?php /*
@@ -47,23 +110,12 @@ $culture_url      = is_wp_error( $culture_link ) ? '' : $culture_link;
  load — PAS au scroll (le header ne change pas de hauteur ; s'abstenir au scroll évite le
  jiggle iOS où getBoundingClientRect suit la barre d'outils Safari). svh (≠ dvh) rend par
  ailleurs la hauteur du hero stable face au repli de cette barre.
- ⚠ Garder la liste de sélecteurs synchronisée avec recherche-globale.js. */ ?>
+ ⚠ Garder la mesure synchronisée avec recherche-globale.js. */ ?>
 <script>
 (function () {
-	var SEL = [
-		'.site-header-inner-wrap.kadence-sticky-header',
-		'.site-header-wrap.kadence-sticky-header',
-		'.kadence-sticky-header',
-		'#masthead'
-	];
 	var best = 0;
-	SEL.forEach( function ( sel ) {
-		document.querySelectorAll( sel ).forEach( function ( el ) {
-			if ( ! el.offsetHeight ) return;
-			var b = el.getBoundingClientRect().bottom;
-			if ( b > best ) best = b;
-		} );
-	} );
+	var header = document.getElementById( 'masthead' );
+	if ( header && header.offsetHeight ) best = header.getBoundingClientRect().bottom;
 	var ab = document.getElementById( 'wpadminbar' );
 	if ( ab && best === 0 ) {
 		var r = ab.getBoundingClientRect();
@@ -149,9 +201,11 @@ $culture_url      = is_wp_error( $culture_link ) ? '' : $culture_link;
                 <div class="pf-hero-actualites-slot">
                     <?php if ( $has_slides ) : ?>
                     <div class="pf-en-ce-moment-actualites">
-                        <header class="pf-section-header">
-                            <h3 class="pf-section-titre pf-titre-3">Actualités</h3>
-                        </header>
+                        <?php /* Même en-tête que les autres blocs : sous 769px, initRelocateActualites()
+                                 reloge cet encart dans la section, où son titre doit s'aligner sur les
+                                 leurs. Dans le hero il est masqué en CSS. Pas d'URL « Tout voir » : les
+                                 actualités ne sont pas une archive. */ ?>
+                        <?php echo $etagere_head( 'Actualités' ); ?>
                         <div class="splide pf-actualites-carousel" aria-label="<?php esc_attr_e( 'Actualités', 'kadence-child' ); ?>">
                             <div class="splide__track">
                                 <ul class="splide__list">
@@ -247,6 +301,12 @@ $culture_url      = is_wp_error( $culture_link ) ? '' : $culture_link;
 
             <header class="pf-section-header">
                 <h2 class="pf-section-titre pf-titre-2">En ce moment chez Passiflore…</h2>
+                <?php if ( $has_slides ) : ?>
+                <p class="pf-section-accroche pf-section-accroche--actus-dedans"><?php echo esc_html( $accroche_ecm_avec_actus ); ?></p>
+                <p class="pf-section-accroche pf-section-accroche--actus-dehors"><?php echo esc_html( $accroche_ecm_sans_actus ); ?></p>
+                <?php else : ?>
+                <p class="pf-section-accroche"><?php echo esc_html( $accroche_ecm_sans_actus ); ?></p>
+                <?php endif; ?>
             </header>
 
             <?php if ( $has_slides || ! empty( $events ) ) : ?>
@@ -255,9 +315,7 @@ $culture_url      = is_wp_error( $culture_link ) ? '' : $culture_link;
             <?php if ( ! empty( $events ) ) : ?>
             <div class="pf-en-ce-moment-events">
 
-                <header class="pf-section-header">
-                    <h3 class="pf-section-titre pf-titre-3"><?php if ( $events_url ) : ?><a href="<?php echo esc_url( $events_url ); ?>">Événements à venir</a><?php else : ?>Événements à venir<?php endif; ?></h3>
-                </header>
+                <?php echo $etagere_head( 'Événements à venir', $events_url ); ?>
 
                 <?php echo Passiflore_Event_Tiles::render_row( $events ); ?>
 
@@ -267,13 +325,18 @@ $culture_url      = is_wp_error( $culture_link ) ? '' : $culture_link;
             </div><!-- .pf-en-ce-moment-cols -->
             <?php endif; ?>
 
+            <?php /* « Tout voir » mène au rayon ENTIER, pas au même filtre que l'étagère :
+                     l'étagère montre déjà toutes les nouveautés du rayon, un lien qui n'ouvre
+                     que ces mêmes titres ne mènerait nulle part. Mêmes URL que les cartes de
+                     catégorie du hero, d'où la réutilisation de leurs variables (déjà gardées
+                     contre un WP_Error : une URL vide n'affiche simplement pas la sortie). */ ?>
             <div class="pf-etagere-bloc">
-                <h3 class="pf-section-titre pf-titre-3"><a href="<?php echo esc_url( add_query_arg( 'decouvrir', 'nouveautes', get_term_link( 'litterature', 'product_cat' ) ) ); ?>">Nouveautés littérature</a></h3>
+                <?php echo $etagere_head( 'Nouveautés littérature', $litterature_url ); ?>
                 <?php echo do_shortcode( '[passiflore_etagere mode="scroll" display="covers" decouvrir="nouveautes" category="litterature"]' ); ?>
             </div>
 
             <div class="pf-etagere-bloc">
-                <h3 class="pf-section-titre pf-titre-3"><a href="<?php echo esc_url( add_query_arg( 'decouvrir', 'nouveautes', get_term_link( 'culture-sud-ouest', 'product_cat' ) ) ); ?>">Nouveautés Culture Sud-Ouest</a></h3>
+                <?php echo $etagere_head( 'Nouveautés Culture Sud-Ouest', $culture_url ); ?>
                 <?php echo do_shortcode( '[passiflore_etagere mode="scroll" display="covers" decouvrir="nouveautes" category="culture-sud-ouest"]' ); ?>
             </div>
 
@@ -284,25 +347,36 @@ $culture_url      = is_wp_error( $culture_link ) ? '' : $culture_link;
 
             <header class="pf-section-header">
                 <h2 class="pf-section-titre pf-titre-2">Au catalogue</h2>
+                <?php if ( $accroche_catalogue ) : ?>
+                <p class="pf-section-accroche"><?php echo esc_html( $accroche_catalogue ); ?></p>
+                <?php endif; ?>
             </header>
 
             <div class="pf-etagere-bloc">
-                <h3 class="pf-section-titre pf-titre-3"><a href="<?php echo esc_url( get_term_link( 'litterature-generale', 'product_cat' ) ); ?>">Littérature générale</a></h3>
+                <?php echo $etagere_head( 'Littérature générale', get_term_link( 'litterature-generale', 'product_cat' ), $accroche_litterature ); ?>
                 <?php echo do_shortcode( '[passiflore_etagere mode="scroll" display="spines" category="litterature-generale" format="classique"]' ); ?>
             </div>
 
             <div class="pf-etagere-bloc">
-                <h3 class="pf-section-titre pf-titre-3"><a href="<?php echo esc_url( get_term_link( 'culture-sud-ouest', 'product_cat' ) ); ?>">Culture Sud-Ouest</a></h3>
+                <?php echo $etagere_head( 'Culture Sud-Ouest', get_term_link( 'culture-sud-ouest', 'product_cat' ), $accroche_culture ); ?>
                 <?php echo do_shortcode( '[passiflore_etagere mode="scroll" display="spines" category="culture-sud-ouest" orderby="hauteur"]' ); ?>
             </div>
 
+            <?php /* Pas de `format` : la dédup par défaut ne montre chaque œuvre primée
+                     qu'une fois, quelle que soit l'édition qui porte la distinction.
+                     `display="covers"` — un prix se lit sur la couverture (bandeau). */ ?>
             <div class="pf-etagere-bloc">
-                <h3 class="pf-section-titre pf-titre-3"><a href="<?php echo esc_url( add_query_arg( 'format', 'grands-caracteres', $catalogue_url ) ); ?>">Grands caractères</a></h3>
+                <?php echo $etagere_head( 'Prix et distinctions', add_query_arg( 'decouvrir', 'prix-litteraires', $catalogue_url ), $accroche_prix ); ?>
+                <?php echo do_shortcode( '[passiflore_etagere mode="scroll" display="covers" decouvrir="prix-litteraires"]' ); ?>
+            </div>
+
+            <div class="pf-etagere-bloc">
+                <?php echo $etagere_head( 'Grands caractères', add_query_arg( 'format', 'grands-caracteres', $catalogue_url ), $accroche_gc ); ?>
                 <?php echo do_shortcode( '[passiflore_etagere mode="scroll" display="covers" format="grands-caracteres"]' ); ?>
             </div>
 
             <div class="pf-etagere-bloc">
-                <h3 class="pf-section-titre pf-titre-3"><a href="<?php echo esc_url( add_query_arg( 'format', 'numerique', $catalogue_url ) ); ?>">Formats numériques</a></h3>
+                <?php echo $etagere_head( 'Formats numériques', add_query_arg( 'format', 'numerique', $catalogue_url ), $accroche_numerique ); ?>
                 <?php echo do_shortcode( '[passiflore_etagere mode="scroll" display="covers" format="numerique"]' ); ?>
             </div>
 

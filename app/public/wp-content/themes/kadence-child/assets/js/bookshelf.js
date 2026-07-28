@@ -36,6 +36,15 @@
 		return parseFloat(getComputedStyle(el).getPropertyValue(name)) || 0;
 	}
 
+	// Angle de fuite, lu sur l'étagère plutôt que recopié ici : il change au
+	// point de rupture 768px (cf. --pf-obl dans bookshelf.css), et une copie
+	// figée dans ce fichier a déjà sous-estimé la hauteur du bandeau de pages
+	// après un changement d'angle — donc sous-corrigé les débordements.
+	function oblique(book) {
+		var shelf = book.closest('.pf-bookshelf');
+		return (shelf && cssVarPx(shelf, '--pf-obl')) || 0.3249;
+	}
+
 	/* ─── Re-packing adaptatif (mode shelves) ─────────────────────
 	   Le PHP répartit les livres pour une étagère de 1100px ; ici on
 	   re-répartit pour la largeur réelle du container, au chargement,
@@ -62,16 +71,19 @@
 		);
 		if (!books.length) return;
 
+		// Toutes les largeurs d'abord, AVANT la moindre écriture (cf. les trois
+		// phases plus bas) : une seule passe de layout pour tout le catalogue.
+		var widths = books.map(function (b) { return b.offsetWidth; });
+
 		var rows = [];
 		var row  = [];
 		var w    = 0;
-		books.forEach(function (b) {
-			var bw   = b.offsetWidth;
-			var next = w + (row.length ? gap : 0) + bw;
+		books.forEach(function (b, i) {
+			var next = w + (row.length ? gap : 0) + widths[i];
 			if (row.length && next > avail) {
 				rows.push(row);
 				row = [b];
-				w   = bw;
+				w   = widths[i];
 			} else {
 				row.push(b);
 				w = next;
@@ -85,6 +97,15 @@
 		});
 		if (same) return;
 
+		// ⚠️ Trois phases strictement séparées — écritures, puis lectures, puis
+		// écritures. Lire une géométrie (offsetHeight) juste après avoir touché
+		// au DOM force le navigateur à recalculer le layout séance tenante ;
+		// intercalées dans la boucle de déplacement, ces lectures coûtaient un
+		// layout PAR LIVRE. Mesuré sur le catalogue (146 livres, 78 rangées) :
+		// ~950 ms de reconstruction, contre ~75 ms une fois les passes séparées.
+
+		// 1) Écritures seules : créer les rayons manquants, déplacer les livres.
+		var used = [];
 		rows.forEach(function (r, i) {
 			var shelf = shelves[i];
 			if (!shelf) {
@@ -99,17 +120,29 @@
 				bookshelf.appendChild(shelf);
 			}
 			var target = shelf.querySelector('.pf-shelf-books');
-			var maxH   = 0;
 			r.forEach(function (b) {
 				target.appendChild(b); // appendChild déplace le nœud (handlers conservés)
-				if (b.offsetHeight > maxH) maxH = b.offsetHeight;
 			});
-			shelf.style.setProperty('--shelf-inner', (maxH + 20) + 'px');
+			used.push(shelf);
 		});
 
 		for (var i = rows.length; i < shelves.length; i++) {
 			shelves[i].remove();
 		}
+
+		// 2) Lectures seules : hauteur du plus grand livre de chaque rangée.
+		var heights = rows.map(function (r) {
+			var maxH = 0;
+			r.forEach(function (b) {
+				if (b.offsetHeight > maxH) maxH = b.offsetHeight;
+			});
+			return maxH;
+		});
+
+		// 3) Écritures seules : hauteur intérieure de chaque rayon.
+		used.forEach(function (shelf, i) {
+			shelf.style.setProperty('--shelf-inner', (heights[i] + 20) + 'px');
+		});
 	}
 
 	/* ─── Ajustement à la largeur visible (anti-débordement mobile) ───
@@ -266,12 +299,18 @@
 		// Recaler la hauteur de chaque rayon sur le plus grand livre (après
 		// réduction éventuelle), même méthode que repackShelves : sans ça un
 		// livre réduit laisserait un vide au-dessus de lui (livre calé en bas).
-		bookshelf.querySelectorAll('.pf-shelf').forEach(function (shelf) {
+		// Lectures et écritures séparées, même raison que dans repackShelves :
+		// écrire --shelf-inner entre deux mesures relance un layout par rayon.
+		var shelfEls = Array.prototype.slice.call(bookshelf.querySelectorAll('.pf-shelf'));
+		var shelfHeights = shelfEls.map(function (shelf) {
 			var maxH = 0;
 			shelf.querySelectorAll('.pf-book').forEach(function (b) {
 				if (b.offsetHeight > maxH) maxH = b.offsetHeight;
 			});
-			if (maxH) shelf.style.setProperty('--shelf-inner', (maxH + 20) + 'px');
+			return maxH;
+		});
+		shelfEls.forEach(function (shelf, i) {
+			if (shelfHeights[i]) shelf.style.setProperty('--shelf-inner', (shelfHeights[i] + 20) + 'px');
 		});
 
 		// Révèle le(s) livre(s) hero une fois la bonne taille appliquée (voir
@@ -285,8 +324,15 @@
 		// 1) Ajuster chaque livre à la largeur visible AVANT le re-packing,
 		//    qui mesure ensuite des largeurs déjà réduites.
 		document.querySelectorAll('.pf-bookshelf').forEach(fitBookshelf);
-		// 2) Re-répartir les rangées (mode shelves uniquement).
-		document.querySelectorAll('.pf-bookshelf--shelves').forEach(repackShelves);
+		// 2) Re-répartir les rangées (mode shelves uniquement), puis lever le
+		//    voile qui masquait la répartition théorique du PHP (cf.
+		//    .pf-shelves-js dans bookshelf.css). Posée inconditionnellement :
+		//    repackShelves peut sortir tôt (data-fixed-rows, largeur nulle) et
+		//    une étagère ne doit jamais rester invisible.
+		document.querySelectorAll('.pf-bookshelf--shelves').forEach(function (bookshelf) {
+			repackShelves(bookshelf);
+			bookshelf.classList.add('is-packed');
+		});
 	}
 
 	var resizeTimer = null;
@@ -337,7 +383,7 @@
 			var bookH    = cssVarPx(book, '--book-h');
 			var topAfter = rect.top
 				- (HOVER_SCALE - 1) * bookH
-				- spineW * 0.249 * HOVER_SCALE;
+				- spineW * oblique(book) * HOVER_SCALE;
 			var overshoot = (box.top + EDGE_MARGIN_PX) - topAfter;
 			if (overshoot > 0) {
 				dy = Math.min(overshoot, Math.max(0, box.bottom - 2 - rect.bottom));
@@ -380,7 +426,7 @@
 				var spineW   = cssVarPx(book, '--spine-w');
 				var topAfter = rect.top
 					- (HOVER_SCALE - 1) * 0.5 * bookH
-					- spineW * 0.249 * HOVER_SCALE;
+					- spineW * oblique(book) * HOVER_SCALE;
 				var overshoot = (box.top + EDGE_MARGIN_PX) - topAfter;
 				if (overshoot > 0) {
 					var maxDy = box.bottom - 2

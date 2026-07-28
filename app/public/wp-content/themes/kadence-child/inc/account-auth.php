@@ -165,6 +165,43 @@ function pf_auth_guards() {
 }
 
 /**
+ * Après connexion / inscription depuis /connexion ou /creer-un-compte :
+ * aller DIRECTEMENT à la page compte.
+ *
+ * `wp_nonce_field()` ajoute d'office un champ `_wp_http_referer`, et WooCommerce
+ * s'en sert comme destination après authentification
+ * (`WC_Form_Handler::process_login()` et `::process_registration()`). Par défaut
+ * on repart donc vers /connexion, puis le garde-fou « déjà connecté » plus bas
+ * renvoie vers la page compte : deux redirections, et surtout une destination
+ * finale qui **dépend de ce garde-fou**. S'il ne s'exécute pas (plugin sortant
+ * plus tôt sur template_redirect, page servie depuis un cache…), le visiteur
+ * reste sur /connexion tout en étant connecté. On coupe la dépendance : un seul
+ * saut, destination correcte par construction.
+ *
+ * Ne touche QUE nos deux URL d'authentification : une connexion déclenchée
+ * depuis une fiche livre continue de ramener sur la fiche livre.
+ */
+add_filter( 'woocommerce_login_redirect', 'pf_auth_post_auth_redirect' );
+add_filter( 'woocommerce_registration_redirect', 'pf_auth_post_auth_redirect' );
+function pf_auth_post_auth_redirect( $redirect ) {
+	if ( ! is_string( $redirect ) || '' === $redirect ) {
+		return $redirect;
+	}
+
+	// $redirect peut être absolu ou relatif à la racine : on normalise avant de comparer.
+	$target = ( 0 === strpos( $redirect, 'http' ) ) ? $redirect : home_url( $redirect );
+	$target = untrailingslashit( strtok( $target, '?' ) );
+
+	foreach ( array_keys( pf_auth_aliases() ) as $slug ) {
+		if ( $target === untrailingslashit( home_url( $slug ) ) ) {
+			return wc_get_page_permalink( 'myaccount' );
+		}
+	}
+
+	return $redirect;
+}
+
+/**
  * Après déconnexion : atterrir sur /connexion, pas sur la page compte.
  *
  * WooCommerce renvoie par défaut sur « Mon compte » — où le visiteur, désormais

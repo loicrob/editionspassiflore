@@ -61,10 +61,16 @@ class Passiflore_Bookshelf {
 	// couverture pour que l'écran l'affiche en entier, sans letterbox.
 	const EREADER_HEIGHT_MM = 210;
 	const EREADER_SPINE_MM  = 9;
-	// Bezels de l'appareil en px — doivent refléter le padding CSS de
-	// .pf-book--ereader .pf-book-cover (7px côtés/haut, 20px de menton).
-	const EREADER_BEZEL_PX  = 7;
-	const EREADER_CHIN_PX   = 24;
+	// Bezels de l'appareil, en FRACTION DE SA HAUTEUR — doivent refléter le
+	// padding CSS de .pf-book--ereader .pf-book-cover (--pf-ereader-bezel /
+	// --pf-ereader-chin, écrits avec les mêmes fractions). Proportionnels et
+	// non figés en px : bookshelf.js redimensionne le livre (hero de la fiche
+	// livre, anti-débordement mobile) en multipliant --book-h / --cover-w, et
+	// un bezel qui ne suivrait pas ce facteur ferait dériver le ratio de
+	// l'écran de celui de la couverture → bandes blanches d'object-fit:contain
+	// (haut/bas quand l'appareil grandit, côtés quand il rétrécit).
+	const EREADER_BEZEL_RATIO = 7 / 252;  // 7px sur l'appareil de base (210mm × SCALE)
+	const EREADER_CHIN_RATIO  = 24 / 252; // 24px de menton sur ce même appareil
 	// Les livres audio sont rendus comme un boîtier CD cristal.
 	const CD_HEIGHT_MM      = 125;
 	const CD_WIDTH_MM       = 142;
@@ -661,7 +667,7 @@ class Passiflore_Bookshelf {
 		if ( $format === '' ) {
 			// Default mode: dedupe — keep all standalone books (no format_groupe)
 			// plus one representative per format_groupe.
-			$ids = $this->get_default_format_ids();
+			$ids = self::get_default_format_ids();
 			$this->intersect_post_in( $args, $ids );
 			return;
 		}
@@ -716,7 +722,27 @@ class Passiflore_Bookshelf {
 
 	/* ─── Format dedupe ──────────────────────────────────────────── */
 
-	private function get_default_format_ids() {
+	/**
+	 * Nombre d'OUVRAGES publiés, dédupliqué par format_groupe : une œuvre compte
+	 * pour une, quel que soit son nombre d'éditions (classique, grands
+	 * caractères, numérique…). Exactement l'ensemble que [passiflore_etagere] et
+	 * le catalogue servent en mode `format` par défaut — c'est le même
+	 * get_default_format_ids(), pas un comptage parallèle qui pourrait diverger.
+	 *
+	 * Mémoïsé sur la version de cache des compteurs de filtres, donc invalidé par
+	 * les mêmes hooks produit (cf. register_counts_cache_hooks).
+	 */
+	public static function count_oeuvres() {
+		$key    = 'pf_shelf_oeuvres_' . (int) get_option( self::COUNTS_VERSION_OPTION, 1 );
+		$cached = get_transient( $key );
+		if ( false !== $cached ) return (int) $cached;
+
+		$count = count( self::get_default_format_ids() );
+		set_transient( $key, $count, 6 * HOUR_IN_SECONDS );
+		return $count;
+	}
+
+	private static function get_default_format_ids() {
 		static $cache = null;
 		if ( $cache !== null ) return $cache;
 
@@ -735,7 +761,7 @@ class Passiflore_Bookshelf {
 		// One representative per format_groupe — résolus en UNE requête
 		// (get_group_representatives_batch) au lieu d'un get_group_representative()
 		// par terme (jusqu'à 5 get_posts chacun). Même règle de sélection.
-		$representants = $this->get_group_representatives_batch();
+		$representants = self::get_group_representatives_batch();
 
 		return $cache = array_merge( $sans_groupe, $representants );
 	}
@@ -749,7 +775,7 @@ class Passiflore_Bookshelf {
 	 * défaut). Un groupe sans représentant publié éligible est ignoré (identique
 	 * à l'ancien `if ( $rep )`).
 	 */
-	private function get_group_representatives_batch() {
+	private static function get_group_representatives_batch() {
 		global $wpdb;
 
 		// Toutes les appartenances format_groupe des produits publiés, avec le
@@ -1166,8 +1192,9 @@ class Passiflore_Bookshelf {
 					}
 				}
 				$ratio      = max( 0.5, min( 1.0, $ratio ) );
-				$screen_h   = $height_px - self::EREADER_BEZEL_PX - self::EREADER_CHIN_PX;
-				$cover_w_px = (int) round( $screen_h * $ratio ) + 2 * self::EREADER_BEZEL_PX;
+				$bezel      = $height_px * self::EREADER_BEZEL_RATIO;
+				$screen_h   = $height_px - $bezel - $height_px * self::EREADER_CHIN_RATIO;
+				$cover_w_px = (int) round( $screen_h * $ratio + 2 * $bezel );
 			}
 
 			$thumb_url = $thumb_id ? wp_get_attachment_image_url( $thumb_id, $cover_size ) : '';
@@ -1613,6 +1640,29 @@ class Passiflore_Bookshelf {
 		// le re-packing adaptatif JS (bookshelf.js) ignore ces étagères.
 		$fixed = $per_shelf > 0 ? ' data-fixed-rows="1"' : '';
 		$html  = '<div class="pf-bookshelf pf-bookshelf--shelves' . $hero_class . $cat_class . $price_class . ' pf-bookshelf--' . esc_attr( $display ) . '"' . $fixed . '>';
+
+		// Voile anti-saut. La répartition calculée plus bas vise une étagère de
+		// 1100px ; bookshelf.js la recalcule pour la largeur réelle du
+		// conteneur au DOMContentLoaded. Sans voile, la première peinture
+		// montre donc la répartition théorique — rangées en `nowrap` centrées,
+		// donc livres débordant à gauche ET à droite — avant de sauter à la
+		// bonne. Ce script, exécuté par le parseur ICI (pas au chargement),
+		// pose la classe qui active le voile avant le premier paint ; le JS la
+		// lève une fois le re-packing fait (cf. .pf-shelves-js / .is-packed
+		// dans bookshelf.css). Idiome maison, cf. .pf-cat-js du catalogue.
+		//
+		// Sans JavaScript la classe n'existe pas → l'étagère s'affiche
+		// normalement, à sa répartition théorique. Le setTimeout est un filet
+		// pour le cas inverse (classe posée mais bookshelf.js jamais exécuté —
+		// asset manquant après un déploiement partiel) : l'étagère se dévoile
+		// quand même plutôt que de rester invisible.
+		//
+		// Inerte lors des swaps AJAX (innerHTML n'exécute pas les scripts), et
+		// c'est très bien : l'appelant y rappelle init() dans la même tâche que
+		// l'insertion, donc aucune peinture intermédiaire à masquer.
+		$html .= '<script>(function(s){s.classList.add(\'pf-shelves-js\');'
+			. 'setTimeout(function(){s.classList.add(\'is-packed\');},1500);'
+			. '})(document.currentScript.parentNode);</script>';
 
 		if ( $per_shelf > 0 ) {
 			$shelves = array_chunk( $books, $per_shelf );

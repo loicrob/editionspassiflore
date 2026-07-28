@@ -40,15 +40,11 @@ function pf_beta_a_verifier() {
  */
 function pf_beta_bugs_connus() {
 	return [
-		'Temps de chargement parfois assez longs',
-		'Si le menu du haut (celui avec le logo Passiflore) ne reste pas collé au haut de l’écran, merci de m’envoyer un SMS, c’est déjà arrivé et je n’ai pas réussi à reproduire le bug',
-		'Accueil : titres "En ce moment…", "Événements à venir" etc. un peu moches',
 		'Sur mobile, pour les étagères en général, pas assez d’espaces autour des livres au sein des étagères',
 		'Événements : bordure rouge quand on clique sur un événement',
 		'"Mon compte" : design pas top des adresses',
 		'Sur mobile, design pas top des "petits" sous-menus dans la page d’un livre, d’un événement et de "Mon compte"',
 		'Design pas top pages de connexion, de panier, commande et commande passée',
-		'Il peut y avoir des marges blanches en haut et en bas de couverture des formats numériques',
 	];
 }
 
@@ -89,6 +85,15 @@ function pf_beta_mises_a_jour() {
 				'Baisse significative des temps de chargement',
 				'Amélioration de l’affichage des livres dans les étagères',
 				'Séparation de Connexion / Création de compte en deux pages',
+			],
+		],
+		[
+			'date'  => '28 juillet 2026 - 17h',
+			'items' => [
+				'Accueil : meilleur affichage du contenu (après la vue d’arrivée) ; ajout de petits textes synthétiques et d’une étagère "Prix et distinctions"',
+				'Menu du haut "collant" plus fiable',
+				'Amélioration de l’affichage des livres dans les étagères',
+				'Admin : on peut désormais dupliquer un événement',
 			],
 		],
 	];
@@ -170,6 +175,19 @@ function pf_beta_banner_render() {
 	</div>
 </div>
 HTML;
+
+	// Primer --pf-banner-h : le header colle SOUS ce bandeau (style.css, #masthead
+	// en position:sticky avec top = adminbar + hauteur du bandeau). La hauteur
+	// dépend de la largeur (le texte se replie) → seule une mesure la donne.
+	// Ici, juste après le bandeau : il est dans le DOM, le premier paint n'a pas eu
+	// lieu. Sans ce primer, un rechargement AVEC scroll restauré peindrait une image
+	// avec le header 1 bandeau trop haut, à cheval dessus.
+	// beta-banner.js (ResizeObserver) prend le relais ensuite : repli du bandeau,
+	// changement de largeur, arrivée des polices web.
+	// TEMPORAIRE, part avec le bandeau : le repli `var(--pf-banner-h, 0px)` de
+	// style.css redevient alors exact tout seul.
+	echo "<script>(function(){var b=document.querySelector('.pf-beta-banner');"
+		. "document.documentElement.style.setProperty('--pf-banner-h',(b?b.getBoundingClientRect().height:0)+'px');})();</script>\n";
 
 	// Pavé à deux onglets (fixed, positionné en JS ; commun aux deux états).
 	echo <<<HTML

@@ -57,6 +57,21 @@
 	justify-content: center;
 }
 
+/* Voile jusqu'au re-packing (cf. render_shelves() et relayoutAll()) : le PHP
+   répartit les livres pour une étagère de 1100px, bookshelf.js re-répartit
+   pour la largeur réelle. Sans ça, la répartition théorique est peinte
+   d'abord — rangées en `nowrap` centrées, donc livres débordant des deux
+   côtés — puis saute à la bonne.
+
+   `visibility` et NON `display:none` : le re-packing mesure des largeurs de
+   livres, qui seraient toutes nulles dans un conteneur non rendu.
+
+   Gaté par .pf-shelves-js, posée par un script inline en tête de conteneur →
+   sans JavaScript la règle ne s'applique jamais. */
+.pf-bookshelf--shelves.pf-shelves-js:not(.is-packed) {
+	visibility: hidden;
+}
+
 /* ─── Shelf ──────────────────────────────────────────────────── */
 
 .pf-shelf {
@@ -349,11 +364,17 @@
 	z-index: 1;
 }
 
+/* Assombrissement de PROFONDEUR, aligné sur celui du bandeau de pages : nul
+   sur l'arête avant (à droite, contre la couverture), maximal sur l'arête du
+   fond (à gauche). Le dos fuit vers l'arrière comme la face supérieure, il
+   s'assombrit donc de la même façon — un voile uniforme l'aplatissait.
+   Même amplitude que le bandeau (0.18), donc même moyenne (0.09) que l'ancien
+   voile à 0.1 : c'est la répartition qui change, pas la quantité d'ombre. */
 .pf-bookshelf--covers .pf-book-spine::before {
 	content: '';
 	position: absolute;
 	inset: 0;
-	background: rgba(0, 0, 0, 0.1);
+	background: linear-gradient(to left, rgba(0, 0, 0, 0), rgba(0, 0, 0, 0.18));
 	pointer-events: none;
 	z-index: 2;
 }
@@ -461,7 +482,21 @@
 	   la face supérieure est rasante, donc invisible — l'étagère au repos
 	   est inchangée, alors que le livre est bien un volume complet. */
 	perspective-origin: 50% 0%;
-	transition: perspective-origin 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+	/* ⚠️ `perspective` n'est JAMAIS interpolée dans le cycle de survol, elle
+	   est commutée à un instant où elle ne se voit pas — c'est-à-dire livre à
+	   plat. Deux raisons :
+	   1. Livre non basculé, tout est à z = 0 et le facteur de projection vaut
+	      P/(P-0) = 1 quelle que soit P : changer d'œil est alors strictement
+	      invisible (vérifié : 0 pixel d'écart au repos entre 600 et 6000px).
+	   2. Interpolée, elle arrive en retard sur son effet : celui-ci varie en
+	      1/(P-z), donc l'essentiel se joue en fin de course. De 6000 à 600px,
+	      à mi-transition on n'a que ~16 % de l'évasement final — d'où
+	      l'impression que la perspective s'applique À LA FIN de la bascule.
+	   Ici, au RETOUR : durée nulle mais retardée de 0.3s, le temps que le
+	   livre se redresse. La pose à l'aller est dans la règle :hover. */
+	transition:
+		perspective 0s 0.3s,
+		perspective-origin 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
 }
 
 .pf-bookshelf--spines .pf-book-inner {
@@ -489,7 +524,11 @@
 	content: '';
 	position: absolute;
 	inset: 0;
-	background: rgba(0, 0, 0, 0.1);
+	/* Même dégradé de profondeur qu'en covers, et pour la même raison : une
+	   fois le livre saisi, son arête gauche est la plus lointaine (elle se
+	   projette à z = -1.1 x --spine-w) et son arête droite touche la
+	   couverture, au premier plan. */
+	background: linear-gradient(to left, rgba(0, 0, 0, 0), rgba(0, 0, 0, 0.18));
 	pointer-events: none;
 	z-index: 2;
 	opacity: 0;
@@ -499,6 +538,37 @@
 .pf-bookshelf--spines .pf-book.pf-book--cover-revealed .pf-book-spine::before {
 	opacity: 1;
 	transition: opacity 0.5s linear;
+}
+
+/* Ombre de bascule — renforce le sentiment que le HAUT se rapproche.
+   Nulle en haut, elle s'accentue vers le bas : le pied reste au fond du rayon
+   quand le haut vient au lecteur, donc c'est lui qui garde l'ombre. Sans elle
+   la rotation se lit surtout à l'apparition du bandeau ; avec, le dos lui-même
+   raconte le geste.
+
+   ::after et non ::before, déjà pris par le voile de saisie (le flanc
+   assombri) : les deux coexistent, l'::after passe au-dessus par ordre du DOM
+   à z-index égal. Elle s'éteint dès la saisie — le livre n'est alors plus
+   basculé, c'est le voile de ::before qui prend le relais. La règle de saisie
+   a la MÊME spécificité que celle de survol : c'est l'ordre ici qui tranche. */
+.pf-bookshelf--spines .pf-book-spine::after {
+	content: '';
+	position: absolute;
+	inset: 0;
+	background: linear-gradient(to bottom, rgba(0, 0, 0, 0) 35%, rgba(0, 0, 0, 0.3) 100%);
+	pointer-events: none;
+	z-index: 2;
+	opacity: 0;
+	transition: opacity 0.3s linear;
+}
+
+.pf-bookshelf--spines .pf-book:hover .pf-book-spine::after,
+.pf-bookshelf--spines .pf-book:focus-visible .pf-book-spine::after {
+	opacity: 1;
+}
+
+.pf-bookshelf--spines .pf-book.pf-book--cover-revealed .pf-book-spine::after {
+	opacity: 0;
 }
 
 /* Couverture : pleine largeur dès le départ, simplement repliée à 90°
@@ -603,10 +673,24 @@
 	   projette exactement sur le border-top du bandeau covers — d'où la
 	   profondeur brute ici, et la même multipliée par --pf-obl là-bas. */
 	border-left: var(--pf-backcover) solid var(--pf-backcover-ink);
+	/* Plat AVANT (1re de couverture) sur l'autre bord. Il n'a d'intérêt que
+	   dans la bascule de survol (ci-dessous), où la face supérieure est vue
+	   quasi de face : elle se lit alors [plat | pages | plat], ce qui la ferme
+	   même si la couverture n'est pas encore chargée. La saisie le RETIRE (cf.
+	   plus bas) : le livre y montre sa vraie couverture, ce trait ferait
+	   doublon avec son bord haut.
+	   Retiré en `color: transparent` et non en `width: 0` : la largeur entre
+	   dans le border-box, la remettre à zéro élargirait le bloc de pages de
+	   4px en pleine animation. Le fond (peint jusqu'au border-box) reprend
+	   alors la main sans le moindre décalage. */
+	border-right: var(--pf-backcover) solid var(--pf-backcover-ink);
+	transition:
+		border-right-color 0.15s linear,
+		border-left-width 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+		border-right-width 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
 	transform-origin: 0 0;
 	transform: rotateX(-90deg);
 	background:
-		linear-gradient(to bottom, rgba(0, 0, 0, 0), rgba(0, 0, 0, 0.18)),
 		repeating-linear-gradient(
 			to right,
 			#f6f1e2 0px,
@@ -617,10 +701,158 @@
 	z-index: 3;
 }
 
-/* Étape 1 — déboîtage au survol : le livre sort légèrement du rang. */
+/* Ombrage du bloc de pages — même cycle de vie que l'ombre de bascule du dos
+   (.pf-book-spine::after) : il monte avec la bascule et s'éteint à la saisie.
+
+   Porté par un pseudo-élément en opacité, et non par une couche de `background`
+   comme avant : un dégradé ne s'interpole pas, il serait apparu d'un bloc.
+   L'`inset: 0` se cale sur la boîte de padding, donc l'ombre couvre le papier
+   sans mordre sur les deux plats — qui gardent leur teinte propre. */
+/* Bandeau de pages, état SAISI : assombrissement de profondeur, celui du mode
+   covers. Il lui faut son propre pseudo-élément car son axe n'est PAS celui de
+   l'ombre de bascule ci-dessous — la profondeur change d'axe entre les deux
+   états. Livre basculé, on regarde le dessus depuis l'avant : le fond est la
+   gouttière, donc l'axe local y (`to bottom`). Livre saisi, la caméra est
+   partie sur la gauche : le fond devient le plat arrière, donc l'axe local x
+   (`to left`). Un seul dégradé ne peut pas servir les deux, et un `background`
+   ne s'interpole pas — d'où deux couches qui se croisent en opacité. */
+.pf-bookshelf--spines .pf-book-pages::before {
+	content: '';
+	position: absolute;
+	inset: 0;
+	background: linear-gradient(to left, rgba(0, 0, 0, 0), rgba(0, 0, 0, 0.18));
+	pointer-events: none;
+	opacity: 0;
+	transition: opacity 0.5s cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.pf-bookshelf--spines .pf-book.pf-book--cover-revealed .pf-book-pages::before {
+	opacity: 1;
+}
+
+.pf-bookshelf--spines .pf-book-pages::after {
+	content: '';
+	position: absolute;
+	inset: 0;
+	background: linear-gradient(to bottom, rgba(0, 0, 0, 0), rgba(0, 0, 0, 0.18));
+	pointer-events: none;
+	opacity: 0;
+	transition: opacity 0.3s linear;
+}
+
+.pf-bookshelf--spines .pf-book:hover .pf-book-pages::after,
+.pf-bookshelf--spines .pf-book:focus-visible .pf-book-pages::after {
+	opacity: 1;
+}
+
+/* Plats amincis pendant la bascule (cf. --pf-backcover-tip). */
+.pf-bookshelf--spines .pf-book:hover .pf-book-pages,
+.pf-bookshelf--spines .pf-book:focus-visible .pf-book-pages {
+	border-left-width: var(--pf-backcover-tip);
+	border-right-width: var(--pf-backcover-tip);
+}
+
+/* Le boîtier CD porte déjà son propre ombrage plastique, en sens inverse. */
+.pf-book--cd .pf-book-pages::after {
+	display: none;
+}
+
+/* Le plat avant disparaît dès que la saisie commence (cf. .pf-book-pages),
+   et l'ombrage du bloc de pages avec lui. */
+.pf-bookshelf--spines .pf-book.pf-book--cover-revealed .pf-book-pages {
+	border-right-color: transparent;
+	/* Épaisseur pleine rétablie : la vue redevient comprimée, le plat se
+	   reprojette sur ~1px. Étalée sur la durée du vol pour que le bloc de pages
+	   ne se resserre pas d'un coup — 1,5px de chaque côté, invisible à ce
+	   rythme, alors qu'un saut se verrait : au départ du vol la face supérieure
+	   est encore vue de face. */
+	border-left-width: var(--pf-backcover);
+	border-right-width: var(--pf-backcover);
+	transition:
+		border-right-color 0.15s linear,
+		border-left-width 0.5s cubic-bezier(0.22, 0.61, 0.36, 1),
+		border-right-width 0.5s cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.pf-bookshelf--spines .pf-book.pf-book--cover-revealed .pf-book-pages::after {
+	opacity: 0;
+}
+
+/* Étape 1 — BASCULE au survol : on tire le haut du dos vers soi.
+   Le pied ne bouge pas (transform-origin: left bottom, hérité), le haut vient
+   au lecteur, et la face supérieure — rasante au repos puisque la caméra est
+   pile à sa hauteur — entre dans le champ en s'ouvrant verticalement au-dessus
+   du dos. Aucun agrandissement : le geste seul détache le livre du rang.
+
+   Hauteur du bandeau ainsi dévoilé = profondeur du livre x sin(--pf-tip),
+   donc proportionnelle à la profondeur — un livre plus profond montre plus de
+   dessus, ce qui est juste. Elle dépasse les 40px de dégagement de
+   .pf-shelf-books dès qu'un livre est un peu profond : ASSUMÉ (décision du
+   2026-07-27), le scroller rogne et on n'en voit qu'une partie. Ne pas
+   réintroduire de recentrage vertical ici — il faudrait redescendre presque
+   tous les livres et le survol deviendrait un saut, pour un bandeau que le
+   lecteur voit de toute façon apparaître. La saisie garde le sien
+   (computeRevealShift), où l'enjeu est la couverture entière.
+
+   ⚠️ La liste de fonctions est ALIGNÉE sur celle de l'étape 2 (mêmes
+   fonctions, même ordre, valeurs neutres ici) : sans ça le navigateur
+   interpole les deux états par décomposition de matrice et le vol part en
+   trajectoire parasite. */
+.pf-bookshelf--spines .pf-book {
+	--pf-tip: 10deg;
+
+	/* Œil RAPPROCHÉ le temps de la bascule — et lui seul.
+	   Un livre qu'on incline vers soi doit s'ÉVASER : le haut se rapproche donc
+	   grossit. Avec --persp (6000px, réglé pour que le livre SAISI ait ses
+	   arêtes parallèles), l'évasement tombe à 1,18 % — 0,7 px sur un dos de 60,
+	   invisible : il ne restait que le raccourcissement de 1,5 % et le geste se
+	   lisait comme une translation. Mesuré à 10° : 6000px -> 1,18 %,
+	   2000px -> 3,85 %, 1200px -> 6,59 %.
+	   1200px est la valeur physique : incliner de 10° un livre de 21 cm vu à
+	   ~55 cm rapproche son haut de 3,6 cm, soit 6,5 % de grossissement.
+	   Les deux états ne sont PAS la même situation de vision — livre posé sur
+	   le rayon qui se penche vers vous d'un côté, livre tenu de face de l'autre
+	   — donc pas la même distance d'œil. L'atterrissage n'en souffre pas : le
+	   perspective-origin de la saisie est calculé sur --persp, et la saisie
+	   rétablit --persp (cf. plus bas). */
+	--pf-tip-persp: 500px;
+
+	/* Plats AMINCIS le temps de la bascule seulement. --pf-backcover (4px) est
+	   une exagération calibrée pour les vues COMPRIMÉES — bandeau covers, livre
+	   saisi — où elle se projette sur ~1px : au vrai ratio (0,3 mm) le carton y
+	   serait invisible. La bascule, elle, montre la face supérieure quasi de
+	   face, sans compression : la même valeur y occupe 13 % de l'épaisseur du
+	   livre et les couvertures paraissent épaisses. L'exagération doit donc
+	   suivre la compression de la vue, d'où cette valeur propre à la bascule.
+	   La position saisie n'y touche pas, elle rétablit --pf-backcover. */
+	--pf-backcover-tip: 2.5px;
+}
+
+/* (Même spécificité que la règle de saisie plus bas : c'est l'ordre du fichier
+   qui fait gagner la saisie. Ne pas intervertir.) */
+.pf-bookshelf--spines .pf-book:hover,
+.pf-bookshelf--spines .pf-book:focus-visible {
+	perspective: var(--pf-tip-persp);
+	/* Posée AVANT que le livre ne bouge : durée nulle, délai nul. Le livre est
+	   encore à plat à cet instant, la commutation ne se voit donc pas, et toute
+	   la rotation qui suit se joue déjà sous le bon œil. ⚠️ Il FAUT redéclarer
+	   la transition ici : sans ça la règle de repos s'applique, avec son délai
+	   de 0.3s destiné au retour — la perspective n'arriverait qu'une fois la
+	   bascule terminée, exactement le défaut qu'on corrige. */
+	transition:
+		perspective 0s 0s,
+		perspective-origin 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
 .pf-bookshelf--spines .pf-book:hover .pf-book-inner,
 .pf-bookshelf--spines .pf-book:focus-visible .pf-book-inner {
-	transform: translateZ(16px);
+	transform:
+		translateX(0px)
+		translateY(0px)
+		scale(1)
+		translateZ(0px)
+		rotateY(0deg)
+		rotateX(calc(-1 * var(--pf-tip)));
 }
 
 .pf-bookshelf--spines .pf-book:hover,
@@ -650,19 +882,44 @@
 			- 0.1 * var(--book-h)
 			- var(--pf-obl) * (var(--persp) + var(--spine-w))
 		);
-	transition: perspective-origin 0.5s cubic-bezier(0.22, 0.61, 0.36, 1);
+	/* L'œil repart au loin : la saisie doit retrouver --persp, celui sur lequel
+	   son perspective-origin est calculé — sans ça le livre posé atterrirait
+	   avec la perspective rapprochée de la bascule.
+
+	   ⚠️ Rendu D'UN COUP au départ du vol (`0s 0s`), jamais interpolé — même
+	   principe qu'à l'aller, troisième et dernier endroit où `perspective`
+	   commute. Interpolée, elle rend le vol NON MONOTONE : avec l'œil de la
+	   bascule (500px), la couverture qui recule jusqu'à ~280px de profondeur
+	   est projetée si violemment qu'elle s'ouvre, se referme, puis se rouvre.
+	   Mesuré sur la boîte du volume, saut maximal par image :
+	     œil de bascule tenu pendant le vol ... 26,3 px (3 retours en arrière)
+	     interpolé 500 -> 6000 .................. 26,3 px (3 retours)
+	     rendu d'un coup au départ .............. 7,1 px (0 retour)
+	     référence sans bascule rapprochée ...... 7,0 px (0 retour)
+	   La commutation elle-même ne se voit pas : elle tombe pile à l'instant où
+	   la rotation démarre, et son saut (6,4 px sur la 1re image) est du même
+	   ordre que le déplacement normal d'une image à l'autre (6,1 px). */
+	perspective: var(--persp);
+	transition:
+		perspective 0s 0s,
+		perspective-origin 0.5s cubic-bezier(0.22, 0.61, 0.36, 1);
 }
 
 /* Étape 2 — saisie : rotation rigide du volume autour de l'arête
    avant-gauche, atterrissage sur z=0. (Sélecteur .pf-book.pf-book--…
-   pour battre la spécificité du :hover d'étape 1.) */
+   pour battre la spécificité du :hover d'étape 1 : MÊME spécificité, c'est
+   l'ordre dans le fichier qui tranche — ne pas remonter cette règle.)
+   Le rotateX(0deg) final n'est pas décoratif : il aligne la liste sur celle
+   de l'étape 1 pour que la bascule se redresse en même temps que le volume
+   pivote, composante par composante (cf. l'avertissement là-haut). */
 .pf-bookshelf--spines .pf-book.pf-book--cover-revealed .pf-book-inner {
 	transform:
 		translateX(var(--reveal-dx, 0px))
 		translateY(var(--reveal-dy, 0px))
 		scale(1.1)
 		translateZ(calc(-1 * var(--spine-w)))
-		rotateY(-90deg);
+		rotateY(-90deg)
+		rotateX(0deg);
 	transition: transform 0.5s cubic-bezier(0.22, 0.61, 0.36, 1);
 }
 
@@ -691,9 +948,9 @@
    L'appareil remplace le livre : une ardoise plate aux coins arrondis,
    sans dos papier ni bandeau de pages (le PHP n'émet ni spine ni
    pages en covers). L'écran épouse le ratio de la couverture (largeur
-   calculée côté PHP : écran = hauteur − bezels, padding 7px/20px
-   ci-dessous), donc la couverture s'affiche en entier. La couverture
-   d'une liseuse ne s'ouvre pas. */
+   calculée côté PHP : écran = hauteur − bezels, mêmes fractions que le
+   padding ci-dessous), donc la couverture s'affiche en entier. La
+   couverture d'une liseuse ne s'ouvre pas. */
 
 .pf-bookshelf--covers .pf-book--ereader .pf-book-inner {
 	width: var(--cover-w);
@@ -710,7 +967,18 @@
 .pf-book--ereader .pf-book-cover {
 	background: var(--device-color);
 	border-radius: 9px;
-	padding: 7px 7px 24px;
+	/* Bezels PROPORTIONNELS à la hauteur de l'appareil, jamais figés en px :
+	   bookshelf.js redimensionne le livre (hero de la fiche livre,
+	   anti-débordement mobile) en multipliant --book-h / --cover-w. Un bezel
+	   fixe ne suit pas ce facteur → le ratio de l'écran dérive de celui de la
+	   couverture et object-fit:contain laisse des bandes blanches (haut/bas
+	   quand l'appareil grandit, côtés quand il rétrécit : 2,6px de chaque côté
+	   mesurés sur le hero, où le facteur vaut ~1,58). Fractions écrites « n sur
+	   252 » comme EREADER_BEZEL_RATIO / EREADER_CHIN_RATIO (class-bookshelf.php),
+	   qui en dérivent la largeur de l'appareil : les deux doivent rester en phase. */
+	--pf-ereader-bezel: calc(var(--book-h) * 7 / 252);
+	--pf-ereader-chin: calc(var(--book-h) * 24 / 252);
+	padding: var(--pf-ereader-bezel) var(--pf-ereader-bezel) var(--pf-ereader-chin);
 	box-sizing: border-box;
 }
 
@@ -728,11 +996,21 @@
 	object-fit: contain;
 }
 
-/* Bouton d'accueil simulé : pastille ronde blanche, logo Passiflore. */
+/* Bouton d'accueil simulé : pastille ronde blanche, logo Passiflore.
+   Taille proportionnelle à la hauteur de l'appareil, comme les bezels ci-dessus
+   et pour la même raison : figée en px, elle ne suivait pas le facteur d'échelle
+   de bookshelf.js et se retrouvait minuscule, tassée au bas d'un menton devenu
+   deux fois plus haut (hero de la fiche livre). Même fraction « n sur 252 » que
+   le padding.
+   Le retrait, lui, est DÉRIVÉ du menton et de la pastille plutôt qu'écrit en
+   fraction : c'est ce qui garantit le même jeu au-dessus et en dessous quelle
+   que soit la taille, sans troisième valeur à tenir en phase avec les deux
+   autres. --pf-ereader-chin est hérité de .pf-book-cover, dont la pastille est
+   enfant direct (et qui est aussi son bloc conteneur). */
 .pf-ereader-brand {
-	--pf-ereader-brand-size: 16px;
+	--pf-ereader-brand-size: calc(var(--book-h) * 16 / 252);
 	position: absolute;
-	bottom: 6px;
+	bottom: calc((var(--pf-ereader-chin) - var(--pf-ereader-brand-size)) / 2);
 	left: 50%;
 	transform: translateX(-50%);
 	width: var(--pf-ereader-brand-size);
@@ -1398,6 +1676,9 @@ img.pf-spine-icon--white {
 	.pf-cover-leaf,
 	.pf-book-inside,
 	.pf-book-spine::before,
+	.pf-book-spine::after,
+	.pf-book-pages::before,
+	.pf-book-pages::after,
 	.pf-chevalet {
 		transition-duration: 0.01s !important;
 		transition-delay: 0s !important;

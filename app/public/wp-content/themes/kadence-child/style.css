@@ -666,6 +666,85 @@ body .woocommerce form .form-row [placeholder]:focus::-webkit-input-placeholder 
     z-index: 20 !important;
 }
 
+/* Header collant — vrai `position: sticky`, à la place du sticky JS de Kadence
+   (débranché par inc/header-sticky.php, qui documente les deux bugs que ça corrige).
+   C'est #masthead qu'on colle, PAS `.site-header-inner-wrap` : le parent de
+   celle-ci (#main-header) est aussi haut qu'elle, un sticky y serait libéré dès le
+   premier pixel de scroll. #masthead a pour parent #wrapper, haut de toute la page
+   — et il CONTIENT les deux headers (ordinateur + mobile), donc un seul élément
+   collant couvre toutes les tailles d'écran : plus de point de bascule.
+   `top` = ce qui occupe déjà le haut du viewport :
+     --pf-adminbar  barre d'admin WP (fixed en desktop) ;
+     --pf-banner-h  bandeau bêta (sticky top:0), mesuré par son primer inline —
+                    TEMPORAIRE : le repli 0px rend cette ligne juste d'office le
+                    jour où le bandeau est retiré, sans rien à modifier ici. */
+#masthead {
+    position: sticky;
+    top: calc(var(--pf-adminbar) + var(--pf-banner-h, 0px));
+}
+
+/* Logo du header ORDINATEUR — se réduit quand la rangée manque de place.
+   La rangée est une grille `1fr auto 1fr` : [logo | menu | recherche+compte+panier].
+   Le track du logo est plafonné par sa propre largeur (200px), donc en dessous de
+   ~1060px de large c'est le MENU qui encaissait le manque : il passait à deux
+   lignes et emportait la loupe sous « Accueil / Présentation… », et « Mon compte »
+   (deux mots, donc sécable — pas « Connexion ») se coupait en deux lignes. Le logo,
+   lui, ne bougeait pas. On lui fait donc rendre les pixels manquants.
+
+   Formule : mesuré au navigateur (dichotomie sur la largeur du logo à chaque
+   viewport), la largeur maximale qui garde tout sur une ligne suit `largeur de mise
+   en page − 883` — 142px à 1025, 200px à 1085, pente 1:1. On garde 4px de marge,
+   d'où `− 887`, et on plafonne à 200px (taille nominale, réglage `logo_width` du
+   customizer) : au-delà de ~1087px rien ne change.
+
+   ⚠️ Calibré PANIER REMPLI : son compteur fait passer le bloc panier de 43 à 66px,
+   ce qui décale le seuil de 20px (une première calibration panier vide reculait le
+   problème sans le régler). La largeur du badge ne dépend PAS du nombre d'articles
+   (66px de 1 à 99, vérifié) : « panier non vide » est donc bien le pire cas.
+   La formule ne dépend que de la largeur du viewport, jamais du contenu du panier —
+   sinon le logo changerait de taille à chaque ajout au panier.
+
+   ⚠️ `100vw` INCLUT la barre de défilement, pas les media queries ni la mise en page.
+   Sans correction, un Windows à barres classiques (~15px) calculerait un logo 15px
+   trop large et le menu se replierait quand même. D'où `--scrollbar-offset`, que
+   Kadence tient à jour (script inline, `window.innerWidth − clientWidth`).
+
+   Scopé à #main-header : le header mobile a sa propre largeur de logo et sa propre
+   mise en page (logo + loupe + panier + burger), qui ne souffre pas du problème.
+
+   ⚠️ `max-width: none` est nécessaire : Kadence plafonne le logo à 200px, et tout
+   plafond exprimé en % rendrait la main à la grille — le track `1fr` du logo se
+   rabattrait sur sa part égale du reste, qui est PLUS PETITE que la formule dès
+   qu'on remonte (192px à 1100, alors que 200 y tient sans problème). La largeur
+   doit rester pilotée par le clamp seul. Aucun risque de débordement : le track se
+   dimensionne sur le contenu, donc jamais en dessous de la valeur calculée. */
+#main-header .site-branding img {
+    width: clamp(135px, calc(100vw - var(--scrollbar-offset, 0px) - 887px), 200px);
+    max-width: none;
+    height: auto;
+}
+
+/* Même chose pour le header MOBILE — [logo | loupe + panier + burger].
+   Le déclencheur ici n'est pas la largeur seule mais le PANIER REMPLI : son
+   compteur élargit le bloc, et sous ~355px le burger débordait de la rangée
+   pendant que la loupe venait toucher le logo. (La pastille « β » du bandeau,
+   elle, est hors-jeu : elle déborde de la boîte du logo sans l'élargir.)
+   Mesuré dans le pire cas (panier rempli), en exigeant 12px de respiration entre
+   logo et loupe : 128px à 320, 148px à 340, 150px dès 360 — pente 1:1 comme sur
+   ordinateur, d'où `largeur − 192`, moins 4px de marge.
+   La formule ne dépend QUE de la largeur, jamais du contenu du panier : le logo
+   ne doit pas changer de taille quand on ajoute un article. Conséquence assumée :
+   à 320px panier vide, le logo est un peu plus petit que strictement nécessaire.
+   Borné à ≤767px : au-delà le header mobile passe à 180px de logo (réglage
+   `logo_width` tablette) et la place ne manque plus. */
+@media (max-width: 767px) {
+    #mobile-header .site-branding img {
+        width: clamp(120px, calc(100vw - var(--scrollbar-offset, 0px) - 196px), 150px);
+        max-width: none;
+        height: auto;
+    }
+}
+
 /* Champ de recherche — composant réutilisable : loupe + champ + bouton effacer.
    Le bord, la transition et le focus (bord transparent + anneau) viennent de la règle
    globale input. Géométrie surchargeable via les variables locales (cf. .pf-search--sm). */
@@ -892,6 +971,81 @@ body .woocommerce form .form-row [placeholder]:focus::-webkit-input-placeholder 
    bascule vide/rempli est live, sans rechargement. */
 .header-cart-total.header-cart-is-empty-true {
     display: none;
+}
+
+/* Pulsation de l'icône du panier à l'ajout — le geste se termine en haut à
+   droite, là où le livre vient d'atterrir. Posée en JS
+   (assets/js/cart-toast.js). Sur l'icône plutôt que sur la pastille :
+   l'icône EST le panier, elle est toujours présente (la pastille n'apparaît
+   qu'à partir d'un article) et le compteur, lui, se contente de changer.
+   `--pf-cart-bump` = grossissement au sommet (micro-géométrie de composant),
+   déclaré sur l'élément animé — c'est là qu'un `var()` de `@keyframes` se
+   résout. `transform` seule → pas de reflow, rien n'est poussé dans le header.
+   L'icône grossit sous la pastille, qui la recouvre (frère suivant, donc peint
+   par-dessus) — sans conséquence, le sommet ne dure qu'un instant. */
+.header-cart-button .kadence-svg-iconset {
+    --pf-cart-bump: 1.5;
+}
+
+.header-cart-button .kadence-svg-iconset.is-bumping {
+    animation: pf-cart-bump 420ms cubic-bezier(.2, .7, .3, 1);
+}
+
+
+/* Léger creux à 55 % avant le retour : l'icône « retombe » au lieu de se
+   dégonfler linéairement. */
+@keyframes pf-cart-bump {
+    0%   { transform: scale(1); }
+    30%  { transform: scale(var(--pf-cart-bump)); }
+    55%  { transform: scale(.94); }
+    100% { transform: scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .header-cart-button .kadence-svg-iconset.is-bumping {
+        animation: none;
+    }
+}
+
+/* Livre en vol vers le panier — clone jetable du livre du hero (volume entier :
+   dos, bandeau de pages, couverture), animé en WAAPI par
+   assets/js/add-to-cart-flight.js, qui pose width/height et les transforms.
+   TROIS niveaux, un par courbe : X sur le conteneur, Y sur `__y`, échelle +
+   rotation + opacité sur `__stage`. `transform` ne sait pas donner deux courbes
+   aux deux axes d'un même nœud, et c'est justement leur décalage qui fait l'arc
+   (cf. le commentaire du JS : un seul nœud produisait un temps mort au milieu).
+   Couche : au-dessus du header sticky (le panier, sa cible, y vit — dessous, le
+   clone disparaîtrait juste avant d'atterrir) mais sous les toasts, comme
+   l'infobulle des signets. */
+/* Aucune dimension imposée : les trois niveaux s'ajustent au livre cloné, dont
+   la taille naturelle est mesurée par le JS juste après insertion. C'est ce qui
+   permet de faire voler indifféremment le livre du hero (271×391 ici) et la
+   liseuse du format numérique (162×252), sans rien coder en dur — et le centre
+   de `__stage`, origine du `scale`, est alors exactement celui du livre. */
+.pf-fly-book {
+    position: fixed;
+    left: 0;
+    top: 0;
+    z-index: calc(var(--pf-z-toast) - 1);
+    pointer-events: none;
+}
+
+.pf-fly-book__y,
+.pf-fly-book__stage {
+    display: block;
+}
+
+/* `__stage` porte aussi les classes `.pf-bookshelf --covers --hero` : tout le
+   dessin du livre y est scopé (bookshelf.css) et c'est là que sont déclarées
+   ses variables (--pf-obl, l'angle de fuite, --pf-backcover…). On ne veut en
+   revanche pas l'habillage de panneau du conteneur d'étagère (fond crème,
+   cadre, ombre portée). Spécificité (0,2,0) pour battre `.pf-bookshelf` (0,1,0)
+   sans `!important` et quel que soit l'ordre de chargement des feuilles. */
+.pf-fly-book .pf-bookshelf {
+    background: none;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
 }
 
 /* …et l'icône prend la couleur du texte du menu (= texte du bouton « Mon
@@ -1352,6 +1506,15 @@ body.admin-bar { --pf-adminbar: 32px; }
     height: 30px;
     color: var(--pf-accent);
 }
+/* Variantes de statut (opts.status) — nées du déport des notices WooCommerce
+   (assets/js/wc-notices-toast.js) : la sévérité, portée jusque-là par la couleur
+   du bandeau de notice, passe dans la couleur de l'icône. Le toast garde son fond
+   crème : un aplat rouge en bas d'écran serait plus agressif que la notice
+   d'origine, et le contraste du texte est déjà celui du composant. */
+.pf-toast--success .pf-toast__icon { color: var(--pf-success); }
+.pf-toast--error   .pf-toast__icon { color: var(--pf-danger); }
+.pf-toast--warning .pf-toast__icon { color: var(--pf-warning); }
+.pf-toast--info    .pf-toast__icon { color: var(--pf-info); }
 .pf-toast__icon svg {
     display: block;
     width: 100%;
@@ -1370,6 +1533,12 @@ body.admin-bar { --pf-adminbar: 32px; }
     font-size: var(--pf-text-sm);
     color: var(--pf-text);
     line-height: 1.4;
+}
+/* Emphase dans un message (titre d'ouvrage cité en <strong><em>, phrase d'entête
+   d'un toast de session) : semibold du système plutôt que le 700 par défaut de
+   <strong> — même voix que les titres de cartes et les libellés. */
+.pf-toast__msg strong {
+    font-weight: var(--pf-weight-semibold);
 }
 .pf-toast__actions {
     align-self: center; /* centré horizontalement par rapport au texte */
@@ -1396,6 +1565,27 @@ body.admin-bar { --pf-adminbar: 32px; }
     .pf-toast.is-leaving { transition: opacity 0.2s ease; transform: none; }
     /* Barre figée (le minuteur JS ferme quand même le toast). */
     .pf-toast__progress { animation: none; transform: scaleX(1); }
+}
+/* Notices WooCommerce déportées dans les toasts. Deux systèmes, deux contrôleurs :
+   le wrapper classique (assets/js/wc-notices-toast.js) et les conteneurs React des
+   blocs Panier/Commande (assets/js/wc-block-notices-toast.js).
+   Le voile est posé dès le premier paint par le primer inline de
+   inc/wc-notices-toast.php (classe sur <html>, posée s'il y a une notice en file
+   ou sur une page en blocs) : les contrôleurs vivant en pied de page, sans lui la
+   notice serait peinte à sa place d'origine puis retirée — flash + saut de layout.
+   Sans JavaScript la classe n'existe jamais et les notices s'affichent normalement.
+   `.wc-block-store-notices` est l'enveloppe que les blocs donnent au wrapper
+   classique (leur StoreNotices.php appelle woocommerce_output_all_notices) :
+   masquée aussi, sinon elle laisserait son interligne de bloc pour rien.
+   ⚠️ Ne concerne que des CONTENEURS de notices : les `.woocommerce-info`
+   contextuels rendus ailleurs (tunnel, bloc coupon, panier vide) et les erreurs de
+   champ du tunnel (`.wc-block-components-validation-error`, un autre système,
+   ancré sous le champ fautif) restent en place. */
+html.pf-notices-js .woocommerce-notices-wrapper,
+html.pf-notices-js .wc-block-store-notices,
+html.pf-notices-js .wc-block-components-notices,
+html.pf-notices-js .wc-block-components-notices__snackbar {
+    display: none;
 }
 
 /* =========================================================
@@ -2242,31 +2432,35 @@ body.admin-bar { --pf-adminbar: 32px; }
 
 /* =========================================================
    Éléments sticky — léger effet « aéro » (verre dépoli) au scroll.
-   Principe commun : au repos le fond reste opaque ; une fois collé et défilé
-   (l'élément chevauche le contenu qui défile), on rend son fond translucide et
-   on ajoute un flou d'arrière-plan (--pf-aero-blur). Sous @supports →
-   dégradation propre (fond opaque) si backdrop-filter est absent.
-   Ici : header Kadence + .pf-sticky-bar. Les barres propres à une page (accueil,
-   événements, fiche livre mobile) reçoivent le même traitement dans leurs CSS.
+   Principe commun : une fois collé et défilé (l'élément chevauche le contenu qui
+   défile), son fond devient translucide et un flou d'arrière-plan s'y ajoute
+   (--pf-aero-blur). Sous @supports → dégradation propre (fond opaque) si
+   backdrop-filter est absent. Ici : header Kadence + .pf-sticky-bar. Les barres
+   propres à une page (accueil, événements, fiche livre mobile) reçoivent le même
+   traitement dans leurs CSS.
    ========================================================= */
 @supports ((backdrop-filter: blur(2px)) or (-webkit-backdrop-filter: blur(2px))) {
-    /* Header : Kadence bascule en fond blanc opaque une fois fixé → translucide + flou.
-       Le fond crème opaque de la rangée interne est neutralisé, sinon il masque le flou. */
-    #masthead .site-header-inner-wrap.kadence-sticky-header.item-is-fixed:not(.item-at-start) {
-        background: rgba(245, 240, 232, 0.9) !important; /* --pf-cream-dark (palette7) translucide */
+    /* Header : verre dépoli EN PERMANENCE, sans classe d'état ni JS.
+       Contrairement aux .pf-sticky-bar (qui commencent dans le flux, sur un fond de
+       page quelconque), le header colle dès le premier pixel de scroll : ses deux
+       états n'étaient que « crème opaque » vs « la même crème à 90 % + flou ». Or
+       au repos rien ne passe derrière lui — le flou n'a rien à flouter et la
+       translucidité se composite sur le fond de page uni : rgb(246,241,234) contre
+       rgb(245,240,232) pour l'ancien aplat opaque, soit 1 à 2 valeurs sur 255.
+       Invisible. On garde donc l'effet allumé et on économise la bascule d'état
+       (l'ancienne version l'obtenait de `.item-is-fixed`, que le sticky JS de
+       Kadence posait ; avec `position: sticky` ce signal n'existe plus).
+       Le fond crème opaque de la rangée interne est neutralisé, sinon il masque le flou.
+       `body` en préfixe : le fond blanc que Kadence pose sur #masthead vient d'un
+       <style> inline (0,1,0,0 comme nous) → on l'emporte par la spécificité plutôt
+       que par l'ordre des feuilles, sans !important. */
+    body #masthead {
+        background: color-mix(in srgb, var(--pf-cream-dark) 90%, transparent);
         -webkit-backdrop-filter: blur(var(--pf-aero-blur));
         backdrop-filter: blur(var(--pf-aero-blur));
     }
-    #masthead .kadence-sticky-header.item-is-fixed:not(.item-at-start) .site-header-row-container-inner {
+    body #masthead .site-header-row-container-inner {
         background: transparent;
-    }
-    /* Bascule opaque → translucide+flou en fondu (évite le « pop » au moment où
-       le header se colle). La couche GPU ne peut pas être pré-chauffée : le header
-       contient des sous-menus + un panier en position absolue qu'un bloc conteneur
-       (will-change/transform) décalerait. D'où une simple transition de fond. */
-    #masthead .site-header-inner-wrap.kadence-sticky-header,
-    #masthead .kadence-sticky-header .site-header-row-container-inner {
-        transition: background-color 0.3s ease;
     }
     /* Barre catalogue / recherche auteurs — translucide à l'état collé. */
     .pf-sticky-bar.is-stuck {

@@ -119,5 +119,21 @@
 		function reposIfOpen() { if (!pop.hidden && pop._trigger) positionPanel(pop._trigger); }
 		window.addEventListener('resize', reposIfOpen, { passive: true });
 		window.addEventListener('scroll', reposIfOpen, { passive: true });
+
+		// ── --pf-banner-h : le header colle SOUS le bandeau (style.css, #masthead
+		// en position:sticky). La valeur est posée avant le premier paint par le
+		// primer inline de inc/beta-banner.php ; on la tient à jour ici pour les
+		// trois cas qui la font bouger : repli du bandeau (display:none → 0, le
+		// header remonte tout en haut), changement de largeur (le texte se replie),
+		// arrivée des polices web. Un ResizeObserver couvre les trois d'un coup —
+		// y compris display:none, pour lequel il notifie une taille nulle.
+		if (banner && window.ResizeObserver) {
+			new ResizeObserver(function () {
+				root.style.setProperty('--pf-banner-h', banner.getBoundingClientRect().height + 'px');
+				// La ligne de collage du header vient de bouger : --pf-sticky-offset a été
+				// calculé sur `resize`, donc AVANT cette notification. On le refait.
+				if (window.pfRefreshStickyOffset) window.pfRefreshStickyOffset();
+			}).observe(banner);
+		}
 	});
 })();

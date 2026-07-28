@@ -160,6 +160,7 @@
 	display: flex;
 	flex-direction: row;
 	gap: var(--pf-space-2);
+	flex-wrap: wrap;
 }
 
 .bs-hero__secondary-row > * {
@@ -174,14 +175,40 @@
 	cursor: progress;
 }
 
-/* Bouton WooCommerce (panier) : sélecteur composé conservé pour battre la spécificité WC ; valeurs sur tokens. */
+/* Bouton WooCommerce (panier) : sélecteur composé conservé pour battre la spécificité WC ; valeurs sur tokens.
+   inline-flex + gap pour l'icône de caddie qui suit le libellé — géométrie reprise
+   de .pf-btn--icon (style.css), que ce bouton ne peut pas porter : c'est un .button
+   WooCommerce/Kadence, pas un composant .pf-btn. text-align conservé pour le repli
+   sans flex (et sans effet ici, le libellé étant centré par justify-content). */
 .bs-hero__cart.button {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 0.5em;
 	text-align: center;
 }
 
+.bs-hero__cart-icon {
+	width: 1.4em;
+	height: 1.4em;
+	flex: none;
+}
+
+/* Coche que WooCommerce colle dans le bouton après un ajout AJAX (glyphe de sa
+   police d'icônes, ::after statique) : masquée. Kadence ne la neutralise que
+   dans les boucles produits (`ul.products li.product`), pas ici ; en flex elle
+   deviendrait un item de plus, APRÈS notre icône de caddie — et elle y resterait
+   jusqu'au rechargement. Le toast de confirmation joue ce rôle. Sélecteur
+   (0,3,1) pour battre `.woocommerce a.button.added::after` (0,2,1). */
+.bs-hero__cart.button.added::after {
+	display: none;
+}
+
 /* Lien « Voir le panier » inséré par WooCommerce après un ajout AJAX : masqué
-   (le compteur du header suffit comme retour). Sélecteur a.added_to_cart.wc-forward
-   (0,3,1) pour battre `.woocommerce a.added_to_cart{display:inline-block}` (0,2,1). */
+   (le retour est assuré par le toast de confirmation — cart-toast.js —
+   qui porte sa propre action « Voir le panier », plus le compteur du header).
+   Sélecteur a.added_to_cart.wc-forward (0,3,1) pour battre
+   `.woocommerce a.added_to_cart{display:inline-block}` (0,2,1). */
 .bs-hero__actions a.added_to_cart.wc-forward {
 	display: none;
 }
@@ -1005,6 +1032,14 @@
 	color: var(--pf-text);
 	cursor: pointer;
 }
+/* Numérique déjà au panier → l'offre n'a plus d'objet (il y est vendu à
+   l'unité). Posé en JS depuis le mini-panier, jamais au rendu : la fiche est
+   cacheable (cf. assets/js/numerique-offer.js). `display:none` et non
+   l'attribut `hidden`, que le `display:flex` ci-dessus emporterait. */
+.pf-numerique-offer.is-in-cart {
+	display: none;
+}
+
 .pf-numerique-offer__check {
 	margin-bottom: 0.08em;
 	flex-shrink: 0;

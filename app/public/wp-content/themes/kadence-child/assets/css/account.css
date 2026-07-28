@@ -8,7 +8,6 @@
 .woocommerce-account .woocommerce {
 	display: flex;
 	flex-wrap: wrap;
-	gap: clamp(1.5rem, 4vw, 3rem);
 	align-items: flex-start;
 }
 
@@ -21,6 +20,7 @@
 	flex: 1 1 320px;
 	min-width: 0;
 	color: var(--pf-text);
+	padding-right: 0 !important;
 }
 
 /* ─── Navigation latérale ────────────────────────────────────────── */

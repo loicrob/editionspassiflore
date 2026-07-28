@@ -10,6 +10,10 @@
  *   opts.html      : markup du message (de CONFIANCE — l'appelant échappe).
  *   opts.icon      : markup d'une icône de tête (SVG, de CONFIANCE) → gouttière
  *                    à gauche du message. Décorative (aria-hidden).
+ *   opts.status    : 'success' | 'error' | 'info' → classe `.pf-toast--<statut>`
+ *                    (teinte l'icône). 'error' passe aussi le toast en
+ *                    `role="alert"` : un message bloquant ne doit pas attendre
+ *                    la fin de la lecture en cours pour être annoncé.
  *   opts.duration  : ms avant fermeture auto (défaut 5000 ; 0 = illimité).
  *   opts.actions   : [ { label, onClick } | { label, href } ] → .pf-btn--primary.--sm.
  *                    `href` produit un vrai lien (clic milieu / nouvel onglet
@@ -52,8 +56,8 @@
 		var reg      = ensureRegion();
 
 		var toast = document.createElement( 'div' );
-		toast.className = 'pf-toast';
-		toast.setAttribute( 'role', 'status' );
+		toast.className = 'pf-toast' + ( opts.status ? ' pf-toast--' + opts.status : '' );
+		toast.setAttribute( 'role', 'error' === opts.status ? 'alert' : 'status' );
 		toast.tabIndex = -1;
 
 		// Colonne texte + actions (les boutons se placent sous le texte).

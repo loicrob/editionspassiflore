@@ -225,6 +225,81 @@ function pf_numerique_offer_sentence( array $offer ): string {
 }
 
 /**
+ * Terme générique de l'offre pour un format source, INDÉPENDAMMENT de tout
+ * produit : « gratuitement », « à -50 % » ou « à 4,90 € ». Null si ce format
+ * source est désactivé.
+ *
+ * Distinct de pf_numerique_offer_sentence(), qui décrit l'offre pour un livre
+ * précis (et a donc besoin du prix régulier de SON numérique compagnon) : ici
+ * on ne lit que le réglage, ce qui permet d'en parler là où aucun produit n'est
+ * en contexte — l'accroche de l'accueil.
+ * ⚠️ En mode `fixed`, la valeur réglée EST le prix ; en mode `percent`, c'est
+ * une remise. D'où deux formulations différentes.
+ */
+function pf_numerique_offer_term( string $source ): ?string {
+	$cfg = pf_numerique_get_settings()[ $source ] ?? null;
+	if ( ! $cfg || 'disabled' === $cfg['mode'] ) {
+		return null;
+	}
+	if ( 'free' === $cfg['mode'] ) {
+		return 'gratuitement';
+	}
+	if ( 'percent' === $cfg['mode'] ) {
+		$pct = min( 100.0, max( 0.0, pf_numerique_to_float( $cfg['value'] ) ) );
+		// -100 % = gratuit. On le dit comme tel, comme le fait déjà
+		// pf_numerique_offer_sentence() sur la fiche livre (son test price <= 0).
+		if ( $pct >= 100.0 ) {
+			return 'gratuitement';
+		}
+		return 'à -' . rtrim( rtrim( number_format( $pct, 2, ',', ' ' ), '0' ), ',' ) . ' %';
+	}
+	$prix = wc_price( max( 0.0, pf_numerique_to_float( $cfg['value'] ) ) );
+	return 'à ' . html_entity_decode( wp_strip_all_tags( $prix ), ENT_QUOTES, 'UTF-8' );
+}
+
+/**
+ * Phrase d'accroche de l'offre numérique pour l'accueil, ou '' si aucune offre
+ * n'est active (l'offre est dormante par défaut → l'accroche disparaît d'elle-même).
+ *
+ * Les deux formats source se règlent séparément : on ne parle de « livre
+ * physique » que s'ils sont tous deux actifs AU MÊME tarif, sinon on nomme le
+ * ou les formats concernés — annoncer une remise sur « un livre physique »
+ * quand seule l'édition classique en bénéficie serait une promesse fausse.
+ */
+function pf_numerique_offer_teaser(): string {
+	$labels = [ 'classique' => 'classique', 'grands-caracteres' => 'grands caractères' ];
+	$terms  = [];
+
+	foreach ( $labels as $src => $label ) {
+		$term = pf_numerique_offer_term( $src );
+		if ( null !== $term ) {
+			$terms[ $src ] = $term;
+		}
+	}
+
+	if ( ! $terms ) {
+		return '';
+	}
+
+	if ( count( $terms ) === count( $labels ) && 1 === count( array_unique( $terms ) ) ) {
+		return sprintf(
+			'En ce moment, pour l’achat d’un livre physique, sa version numérique est proposée %s.',
+			reset( $terms )
+		);
+	}
+
+	$parts = [];
+	foreach ( $terms as $src => $term ) {
+		$parts[] = sprintf(
+			'pour l’achat d’un format %s, sa version numérique est proposée %s',
+			$labels[ $src ],
+			$term
+		);
+	}
+	return 'En ce moment, ' . implode( ' ; ', $parts ) . '.';
+}
+
+/**
  * Rend la case « ajouter aussi la version numérique » pour un produit papier,
  * ou une chaîne vide si aucune offre ne s'applique. Appelée depuis
  * woocommerce/content-single-product.php, juste après le prix.
@@ -241,12 +316,24 @@ function pf_numerique_render_offer_checkbox( int $physical_id ): string {
 
 	ob_start();
 	?>
-	<label class="pf-numerique-offer">
+	<label class="pf-numerique-offer" data-pf-numerique-id="<?php echo esc_attr( (int) $offer['numerique_id'] ); ?>">
 		<input type="checkbox" class="pf-numerique-offer__check">
 		<span class="pf-numerique-offer__text">Inclure le format numérique <?php if ( $is_free ) : ?>— <?php echo $price_html; // phpcs:ignore WordPress.Security.EscapeOutput ?><?php else : ?>pour <?php echo $price_html; // phpcs:ignore WordPress.Security.EscapeOutput ?><?php endif; ?><span class="pf-numerique-tip"><span class="pf-numerique-tip__trigger" tabindex="0" role="button" aria-label="Détails de l'offre numérique" aria-describedby="pf-numerique-tip-bubble"><svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor" aria-hidden="true"><path d="M11 7h2v2h-2V7zm0 4h2v6h-2v-6zm1-9C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/></svg></span><span class="pf-numerique-tip__bubble" id="pf-numerique-tip-bubble" role="tooltip"><?php echo esc_html( $tip_text ); ?></span></span></span>
 	</label>
 	<?php
-	return trim( (string) ob_get_clean() );
+	$html = trim( (string) ob_get_clean() );
+
+	// Markup de la liseuse, pour son vol vers le panier quand la case est cochée
+	// (assets/js/add-to-cart-flight.js, qui n'y prend que le `.pf-book` et le pose
+	// dans sa propre scène). Dans un <template> : contenu INERTE — rien n'est
+	// rendu, le script inline du shortcode ne s'exécute pas, les images ne sont
+	// pas téléchargées (le JS les réchauffe à la coche) et `relayoutAll()` du
+	// contrôleur d'étagère ne le voit pas. Coût page : le seul markup.
+	$html .= '<template class="pf-numerique-offer__book">'
+		. do_shortcode( '[passiflore_etagere ids="' . (int) $offer['numerique_id'] . '" hero="true" nb_books_first_displayed="1"]' )
+		. '</template>';
+
+	return $html;
 }
 
 /**
@@ -458,6 +545,11 @@ function pf_numerique_ajax_cart_offers() {
 			$offers[] = [
 				'physical_id' => $pid,
 				'title'       => get_the_title( $pid ),
+				// Titre du produit ajouté (« … (numérique) »), pour le toast de
+				// confirmation : l'encart, lui, affiche « Version numérique de <titre
+				// du papier> », tournure qui ne se recolle pas au gabarit de phrase
+				// des toasts panier (accord au masculin, comme un titre de livre).
+				'added_title' => get_the_title( $offer['numerique_id'] ),
 				'price_html'  => pf_numerique_price_html( $offer ),
 				'tip'         => pf_numerique_offer_sentence( $offer ),
 			];
@@ -515,6 +607,12 @@ function pf_numerique_ajax_add_companion() {
 	);
 
 	if ( $key ) {
+		// Pas de `wc_add_to_cart_message()` ici : `WC()->cart->add_to_cart()` n'émet
+		// aucune notice, mais celle de WooCommerce porterait sa formulation et son
+		// icône de notice, là où l'ajout doit ressembler à tous les autres ajouts au
+		// panier. La confirmation est donc rendue par le contrôleur des toasts
+		// panier, à qui l'encart passe le relais par sessionStorage avant de
+		// recharger (cf. assets/js/numerique-cart-nudge.js et cart-toast.js).
 		wp_send_json_success( [ 'added' => true ] );
 	}
 	wp_send_json_error( [ 'message' => 'add_failed' ] );

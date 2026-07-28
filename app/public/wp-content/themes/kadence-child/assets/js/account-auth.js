@@ -20,6 +20,21 @@
 	}
 
 	/*
+	 * Page restaurée depuis le back/forward cache (bouton Précédent) : le
+	 * navigateur ré-affiche le HTML mémorisé SANS consulter le serveur. Elle
+	 * montre donc l'état d'authentification d'avant — formulaire de connexion et
+	 * bouton « Connexion » alors que la session a pu s'ouvrir entre-temps. Aucun
+	 * garde-fou PHP ne peut corriger ça, puisqu'aucune requête n'a lieu : le seul
+	 * moyen de resynchroniser est de forcer un rechargement, qui repassera par
+	 * pf_auth_guards() et enverra un visiteur connecté sur la page compte.
+	 */
+	window.addEventListener( 'pageshow', function ( event ) {
+		if ( event.persisted ) {
+			window.location.reload();
+		}
+	} );
+
+	/*
 	 * Hauteur « plein écran » de la zone (cf. account.css) : on mesure la
 	 * distance réelle entre le haut du viewport et le début de la zone, que le
 	 * CSS ne sait pas exprimer — --pf-sticky-offset ne compte que les barres

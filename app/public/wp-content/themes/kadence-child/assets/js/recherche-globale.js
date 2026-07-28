@@ -17,12 +17,13 @@
 	// figée pendant le défilement. Seul écart connu et ASSUMÉ : la barre d'admin WP en
 	// mobile (position:absolute, défile) → offset figé ~46px trop haut pour un admin
 	// connecté prévisualisant sur téléphone ; sans effet pour un vrai visiteur.
-	const HEADER_SELECTORS = [
-		'.site-header-inner-wrap.kadence-sticky-header',
-		'.site-header-wrap.kadence-sticky-header',
-		'.kadence-sticky-header',
-		'#masthead',
-	];
+	// #masthead est le header collant lui-même (position:sticky, cf. style.css) :
+	// son bord bas vaut la même chose à l'arrêt et défilé, donc une seule mesure
+	// suffit et elle est juste à tout moment. C'est ce qui a permis de retirer le
+	// rattrapage « en-tête défilé au-dessus du viewport » que réclamait le sticky JS
+	// de Kadence : après un rechargement avec scroll restauré, il n'avait pas encore
+	// re-fixé le header, la mesure tombait à 0 et les barres sticky se collaient
+	// derrière lui. Avec un vrai sticky, ce cas n'existe plus.
 	function updateStickyOffset() {
 		const ab = document.getElementById('wpadminbar');
 		let abBottom = 0;
@@ -31,25 +32,21 @@
 			if (abRect.bottom > 0) abBottom = abRect.bottom;
 		}
 		let best = abBottom;
-		for (const sel of HEADER_SELECTORS) {
-			document.querySelectorAll(sel).forEach(function (el) {
-				if (el.offsetHeight === 0) return;
-				let b = el.getBoundingClientRect().bottom;
-				// En-tête sticky défilé au-dessus du viewport (b <= 0) : typiquement juste
-				// après un rechargement avec scroll restauré, avant que le sticky JS de
-				// Kadence ne l'ait re-fixé. Il SERA fixé en haut → on prend sa hauteur sous
-				// la barre d'admin. Sans ça l'offset retombe à 0 et les barres sticky se
-				// collent à top:0, derrière le header → invisibles jusqu'au moindre scroll.
-				if (b <= 0 && el.classList.contains('kadence-sticky-header')) {
-					b = abBottom + el.offsetHeight;
-				}
-				if (b > best) best = b;
-			});
+		const header = document.getElementById('masthead');
+		if (header && header.offsetHeight) {
+			best = Math.max(best, header.getBoundingClientRect().bottom);
 		}
 		document.documentElement.style.setProperty('--pf-sticky-offset', Math.max(0, best) + 'px');
 	}
 	window.addEventListener('resize', updateStickyOffset, { passive: true });
 	window.addEventListener('orientationchange', updateStickyOffset);
+	// Exposée pour qui déplace la ligne de collage du header APRÈS le resize.
+	// Cas actuel unique : le bandeau bêta, dont la hauteur (donc --pf-banner-h, donc
+	// le `top` du header) est mesurée par un ResizeObserver — or ceux-ci sont livrés
+	// après l'événement `resize`. Sans ce rappel, une rotation de téléphone laissait
+	// l'offset une mesure en retard (17px d'écart entre 390 et 500px de large), et
+	// les barres collantes calées dessus autant à côté. TEMPORAIRE avec le bandeau.
+	window.pfRefreshStickyOffset = updateStickyOffset;
 	// Filet : header définitif une fois tout chargé (utile après un reload avec scroll
 	// restauré, où le sticky JS de Kadence n'a pas encore re-fixé le header au DOMContentLoaded).
 	window.addEventListener('load', updateStickyOffset);

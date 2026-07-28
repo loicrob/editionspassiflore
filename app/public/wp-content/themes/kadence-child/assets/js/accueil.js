@@ -4,7 +4,6 @@ document.addEventListener( 'DOMContentLoaded', function () {
     initRelocateActualites( carousel );
     initActualiteFit( carousel );
     initScrollCarets();
-    initStickyHeaderShadow();
     initBookshelfIntro();
     initWordmarkFit();
 
@@ -391,33 +390,6 @@ function initActualiteFit( splide ) {
     } );
 }
 
-// ── Sticky header shadow ──────────────────────────────────────────────────────
-
-function initStickyHeaderShadow() {
-    var headers = [
-        '.pf-en-ce-moment-section > .pf-section-header',
-        '.pf-au-catalogue-section > .pf-section-header',
-    ].map( function ( sel ) {
-        return document.querySelector( sel );
-    } ).filter( Boolean );
-
-    if ( ! headers.length ) return;
-
-    function update() {
-        var stickyOffset = parseFloat(
-            getComputedStyle( document.documentElement ).getPropertyValue( '--pf-sticky-offset' )
-        ) || 0;
-        headers.forEach( function ( header ) {
-            var stuck = header.getBoundingClientRect().top <= stickyOffset + 1;
-            header.classList.toggle( 'pf-header-stuck', stuck );
-        } );
-    }
-
-    window.addEventListener( 'scroll', update, { passive: true } );
-    window.addEventListener( 'resize', update, { passive: true } );
-    update();
-}
-
 // ── Animation d'entrée des étagères ────────────────────────────────────────────
 
 function initBookshelfIntro() {
@@ -428,17 +400,31 @@ function initBookshelfIntro() {
 
     var STEP_COVERS = 0.2; // s entre deux livres — mode covers
     var STEP_SPINES = 0.04; // s entre deux livres — mode spines
+    // Un livre en covers reste invisible tant que son tour n'est pas venu : sur un
+    // rayon long (le rayon « numérique » en compte 64), 0,2 s/livre laisserait le
+    // dernier apparaître 13 s après le déclenchement. Le pas est donc resserré pour
+    // que la cascade tienne dans ce budget (2,4 s = 12 livres au pas nominal, soit
+    // le nb_books_first_displayed par défaut). Spines non concerné : ses dos sont
+    // visibles dès le départ, seule leur inclinaison se redresse.
+    var CASCADE_MAX_COVERS = 2.4; // s — durée totale max de la cascade, mode covers
 
-    // Pose de départ (couverture ouverte+agrandie / dos penché) posée dès le chargement,
-    // visible avant le scroll de déclenchement.
+    // Pose de départ posée dès le chargement, avant le scroll de déclenchement :
+    // covers = livre absent (visibility) en couverture ouverte + agrandi, spines =
+    // dos penché (visible, lui).
     shelves.forEach( function ( shelf ) { shelf.classList.add( 'pf-bookshelf-armed' ); } );
 
     var observer = new IntersectionObserver( function ( entries, obs ) {
         entries.forEach( function ( entry ) {
             if ( ! entry.isIntersecting ) return;
             var shelf = entry.target;
-            var step = shelf.classList.contains( 'pf-bookshelf--spines' ) ? STEP_SPINES : STEP_COVERS;
-            shelf.querySelectorAll( '.pf-book' ).forEach( function ( book, i ) {
+            var books = shelf.querySelectorAll( '.pf-book' );
+            var step;
+            if ( shelf.classList.contains( 'pf-bookshelf--spines' ) ) {
+                step = STEP_SPINES;
+            } else {
+                step = Math.min( STEP_COVERS, CASCADE_MAX_COVERS / Math.max( 1, books.length - 1 ) );
+            }
+            books.forEach( function ( book, i ) {
                 book.style.setProperty( '--pf-intro-delay', ( i * step ).toFixed( 2 ) + 's' );
             } );
             // L'anim prend le relais de la pose de départ au même instant → pas d'à-coup.
