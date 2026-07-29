@@ -1950,22 +1950,6 @@ img.pf-spine-icon--white {
 		   arrière du bois. Avec 22px et une planche de 44, l'assise retombe à
 		   33% de la profondeur — exactement le rapport de l'ordinateur. */
 		--pf-chevalet-reserve: 22px;
-
-		/* Vol allongé sur téléphone. Le coût de démarrage du vol est FIXE
-		   (~55 ms : première rastérisation de la couverture, cf.
-		   .pf-book--arming) et n'est jamais rattrapé, la transition étant
-		   pilotée par l'horloge. Il ne se supprime donc pas en allongeant
-		   l'animation — il se DILUE : la même perte fait démarrer le livre à
-		   ~30 % d'ouverture sur 0,5s, ~20 % sur 0,8s. Le préchauffage attaque
-		   la cause, ceci en réduit ce qu'il en reste ; les deux se cumulent.
-		   ⚠️ Les deux sens ensemble : le retour emprunte volontairement la
-		   durée et la courbe de l'aller (cf. .pf-book--releasing) et les
-		   désaccorder ferait claquer le repli — c'est le défaut corrigé le
-		   2026-07-28. Le minuteur JS suit tout seul, il lit la variable.
-		   1s serait plus efficace encore, mais une saisie doit rester une
-		   réponse au geste, pas une séquence à regarder. */
-		--pf-reveal-dur: 0.8s;
-		--pf-release-dur: 0.8s;
 	}
 
 	.pf-bookshelf--show-price.pf-bookshelf--covers {
