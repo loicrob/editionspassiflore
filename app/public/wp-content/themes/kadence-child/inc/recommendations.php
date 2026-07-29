@@ -363,7 +363,7 @@ function pf_shelf_display_switch( string $shelf, string $active = 'covers' ): st
 			. esc_html( $label ) . '</button>';
 	};
 	return '<div class="pf-switch pf-shelf-switch" role="group" aria-label="Affichage de l\'étagère" data-pf-shelf="' . esc_attr( $shelf ) . '">'
-		. $btn( 'covers', 'Couvertures' ) . $btn( 'spines', 'Dos' )
+		. $btn( 'covers', 'Vue couvertures' ) . $btn( 'spines', 'Vue dos' )
 		. '</div>';
 }
 

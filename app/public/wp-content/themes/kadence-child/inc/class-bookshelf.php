@@ -270,7 +270,7 @@ class Passiflore_Bookshelf {
 		$products = $this->query_products( $atts );
 		if ( empty( $products ) ) {
 			self::$last_total = 0;
-			return '<p class="pf-bookshelf-empty">' . esc_html__( 'Aucun livre ne correspond à votre recherche.', 'kadence-child' ) . '</p>';
+			return '<p class="pf-empty">' . esc_html__( 'Aucun livre ne correspond à votre recherche.', 'kadence-child' ) . '</p>';
 		}
 
 		$show_formats = filter_var( $atts['display_formats'], FILTER_VALIDATE_BOOLEAN );
@@ -330,19 +330,13 @@ class Passiflore_Bookshelf {
 			unset( $b );
 		}
 
-		$max_h = 0;
-		foreach ( $books as $b ) {
-			if ( $b['height_px'] > $max_h ) $max_h = $b['height_px'];
-		}
-		$shelf_inner = $max_h + 20;
-
 		$cat_theme = $this->resolve_category_theme( $atts );
 
 		if ( $mode === 'scroll' ) {
-			return $this->render_scroll( $books, $display, $show_price, $shelf_inner, $nb_first, $is_hero, $cat_theme, $show_formats, $libraires_url, $show_bookmarks );
+			return $this->render_scroll( $books, $display, $show_price, $nb_first, $is_hero, $cat_theme, $show_formats, $libraires_url, $show_bookmarks );
 		}
 
-		return $this->render_shelves( $books, $display, $show_price, $shelf_inner, $per_shelf, $nb_first, $is_hero, $cat_theme, $show_formats, $libraires_url, $show_bookmarks );
+		return $this->render_shelves( $books, $display, $show_price, $per_shelf, $nb_first, $is_hero, $cat_theme, $show_formats, $libraires_url, $show_bookmarks );
 	}
 
 	private function default_atts() {
@@ -1596,18 +1590,16 @@ class Passiflore_Bookshelf {
 
 	/* ─── Render Modes ───────────────────────────────────────────── */
 
-	private function render_scroll( $books, $display, $show_price, $shelf_inner, $nb_first = 12, $is_hero = false, $cat_theme = '', $show_formats = false, $libraires_url = '', $show_bookmarks = false ) {
+	private function render_scroll( $books, $display, $show_price, $nb_first = 12, $is_hero = false, $cat_theme = '', $show_formats = false, $libraires_url = '', $show_bookmarks = false ) {
 		// En spines le chevalet n'apparaît qu'au survol (superposé) :
 		// seule la grille covers réserve de la hauteur pour lui.
 		$has_chevalet = $display === 'covers' && $show_price;
-		$chevalet_h  = $has_chevalet ? 32 : 0;
-		$shelf_h     = $shelf_inner + $chevalet_h;
 		$hero_class  = $is_hero ? ' pf-bookshelf--hero' : '';
 		$cat_class   = $cat_theme ? ' pf-bookshelf--cat-' . esc_attr( $cat_theme ) : '';
 		$price_class = $has_chevalet ? ' pf-bookshelf--show-price' : '';
 
 		$html  = '<div class="pf-bookshelf pf-bookshelf--scroll' . $hero_class . $cat_class . $price_class . ' pf-bookshelf--' . esc_attr( $display ) . '">';
-		$html .= '<div class="pf-shelf" style="--shelf-inner:' . $shelf_h . 'px;">';
+		$html .= '<div class="pf-shelf">';
 		$html .= '<div class="pf-shelf-inner"><div class="pf-shelf-books">';
 
 		$index = 0;
@@ -1629,9 +1621,8 @@ class Passiflore_Bookshelf {
 		return '<a class="bs-hero__libraires" href="' . esc_url( $libraires_url ) . '" target="_blank" rel="noopener noreferrer">Voir sur Place des libraires' . pf_new_window_note() . '</a>';
 	}
 
-	private function render_shelves( $books, $display, $show_price, $shelf_inner, $per_shelf, $nb_first = 12, $is_hero = false, $cat_theme = '', $show_formats = false, $libraires_url = '', $show_bookmarks = false ) {
+	private function render_shelves( $books, $display, $show_price, $per_shelf, $nb_first = 12, $is_hero = false, $cat_theme = '', $show_formats = false, $libraires_url = '', $show_bookmarks = false ) {
 		$has_chevalet = $display === 'covers' && $show_price;
-		$chevalet_h  = $has_chevalet ? 32 : 0;
 		$hero_class  = $is_hero ? ' pf-bookshelf--hero' : '';
 		$cat_class   = $cat_theme ? ' pf-bookshelf--cat-' . esc_attr( $cat_theme ) : '';
 		$price_class = $has_chevalet ? ' pf-bookshelf--show-price' : '';
@@ -1694,13 +1685,7 @@ class Passiflore_Bookshelf {
 
 		$index = 0;
 		foreach ( $shelves as $shelf_books ) {
-			$max_h = 0;
-			foreach ( $shelf_books as $b ) {
-				if ( $b['height_px'] > $max_h ) $max_h = $b['height_px'];
-			}
-			$this_shelf_h = $max_h + 20 + $chevalet_h;
-
-			$html .= '<div class="pf-shelf" style="--shelf-inner:' . $this_shelf_h . 'px;">';
+			$html .= '<div class="pf-shelf">';
 			$html .= '<div class="pf-shelf-books">';
 			foreach ( $shelf_books as $b ) {
 				$html .= $this->render_book( $b, $display, $show_price, $index, $nb_first, $is_hero, $show_formats, $show_bookmarks );
@@ -2015,9 +2000,13 @@ class Passiflore_Bookshelf {
 		$layout = $this->spine_layout( $b );
 		$fs_a   = round( $layout['size'] * self::SPINE_AUTHOR_RATIO * 2 ) / 2;
 
-		return '<span class="pf-spine-authors" style="font-size:' . $fs_a . 'px;">'
+		// Corps émis en VARIABLES et non en `font-size` direct : le CSS les
+		// multiplie par --pf-spines-scale, qui rétrécit le dos entier (corps,
+		// marges, logo) sur mobile. Une font-size en dur ne suivrait pas et le
+		// titre déborderait d'un dos réduit.
+		return '<span class="pf-spine-authors" style="--pf-spine-fs:' . $fs_a . 'px;">'
 			. esc_html( $layout['authors'] ) . '</span>'
-			. '<span class="pf-spine-title" style="font-size:' . $layout['size'] . 'px;">'
+			. '<span class="pf-spine-title" style="--pf-spine-fs:' . $layout['size'] . 'px;">'
 			. esc_html( $layout['title'] ) . '</span>';
 	}
 

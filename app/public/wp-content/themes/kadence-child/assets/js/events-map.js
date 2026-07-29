@@ -386,6 +386,12 @@
 			bar.classList.toggle( 'is-searching', hasText || focused );
 		}
 
+		// Attente d'une réponse : filet accent au bas du sous-header (composant
+		// partagé avec la recherche globale et la recherche liste, cf. style.css).
+		function setLoading( on ) {
+			if ( bar ) { bar.classList.toggle( 'is-loading', on ); }
+		}
+
 		function applyIds( ids ) {
 			var idSet = {};
 			( ids || [] ).forEach( function ( id ) { idSet[ id ] = true; } );
@@ -403,6 +409,7 @@
 
 		function run( q ) {
 			var mine = ++seq;
+			setLoading( true );
 			fetch( cfg.ajaxUrl, {
 				method:      'POST',
 				headers:     { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -413,9 +420,12 @@
 				return r.json();
 			} ).then( function ( res ) {
 				if ( mine !== seq ) { return; } // une frappe plus récente est partie
+				setLoading( false );
 				applyIds( res && res.success && res.data ? res.data.ids : [] );
 			} ).catch( function () {
-				if ( mine === seq ) { renderMarkers( allMarkers ); }
+				if ( mine !== seq ) { return; }
+				setLoading( false );
+				renderMarkers( allMarkers );
 			} );
 		}
 
@@ -427,6 +437,7 @@
 			clearTimeout( timer );
 			if ( q.length < 2 ) {
 				seq++; // invalide toute requête en vol
+				setLoading( false );
 				renderMarkers( allMarkers );
 				return;
 			}
@@ -440,6 +451,7 @@
 				input.focus();
 				clearTimeout( timer );
 				seq++;
+				setLoading( false );
 				renderMarkers( allMarkers );
 			} );
 		}

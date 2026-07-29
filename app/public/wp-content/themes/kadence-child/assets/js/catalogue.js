@@ -35,6 +35,15 @@
 		const bar             = root.querySelector('.pf-catalogue-bar:not(.pf-catalogue-bar-top)');
 		const dropdowns       = root.querySelectorAll('.pf-cat-dropdown');
 
+		// Attente d'une réponse : filet accent au bas de la barre sticky
+		// (composant partagé avec la recherche globale, /auteurs et /evenements,
+		// cf. style.css) — la grille se contente de s'estomper, ce qui dit « ces
+		// résultats sont périmés » mais pas « quelque chose arrive ».
+		function setLoading(on) {
+			if (grid) grid.classList.toggle('is-loading', on);
+			if (bar)  bar.classList.toggle('is-loading', on);
+		}
+
 		// Gate progressif : la bascule vers le panneau de filtres mobile n'est
 		// active que si le JS tourne (sans JS, repli sur la barre empilée). La
 		// classe est normalement déjà posée AVANT le 1er paint par un script
@@ -387,17 +396,23 @@
 		if (searchInput) {
 			searchInput.addEventListener('focus', refreshSearchState);
 			searchInput.addEventListener('blur',  refreshSearchState);
+			// `is-searching` replie le tri et laisse la recherche s'étendre : la
+			// largeur des rangées scrollables change, donc leurs fondus de bord
+			// sont à recalculer. Sur TOUTES les rangées (`forEach`) — ici on ne
+			// réagit pas au défilement d'une rangée précise, mais à un changement
+			// de mise en page de la barre. `updateFades` exige un élément : sans
+			// argument elle lève un TypeError et ne recalcule rien.
 			searchInput.addEventListener('input', () => {
 				refreshSearchState();
 				clearTimeout(searchTimer);
-				searchTimer = setTimeout(() => { setFilter('search', searchInput.value); updateFades(); }, 300);
+				searchTimer = setTimeout(() => { setFilter('search', searchInput.value); scrollRows.forEach(updateFades); }, 300);
 			});
 			searchClear.addEventListener('click', () => {
 				searchInput.value = '';
 				refreshSearchState();
 				setFilter('search', '');
 				searchInput.focus();
-				updateFades();
+				scrollRows.forEach(updateFades);
 			});
 		}
 
@@ -599,7 +614,7 @@
 		function goTo(overrides) {
 			closeAllDropdowns();
 			closePanel();
-			if (grid) grid.classList.add('is-loading');
+			setLoading(true); // rechargement complet : le retour reste à l'écran jusqu'au nouveau rendu
 			window.location.replace(buildUrl(overrides));
 		}
 
@@ -669,7 +684,7 @@
 		function fetchAndUpdate() {
 			if (abortCtrl) abortCtrl.abort();
 			abortCtrl = new AbortController();
-			grid.classList.add('is-loading');
+			setLoading(true);
 
 			const fd = new FormData();
 			fd.append('action', 'pf_catalogue_filter');
@@ -678,7 +693,7 @@
 			fetch(config.ajax_url, { method: 'POST', body: fd, signal: abortCtrl.signal })
 				.then(r => r.json())
 				.then(payload => {
-					grid.classList.remove('is-loading');
+					setLoading(false);
 					if (!payload || !payload.success) return;
 					grid.innerHTML = payload.data.html;
 					updateCounts(payload.data.counts || {});
@@ -691,7 +706,9 @@
 						window.PassifloreBookshelf.init();
 					}
 				})
-				.catch(err => { if (err.name !== 'AbortError') { console.error(err); grid.classList.remove('is-loading'); } });
+				// Pas d'extinction sur AbortError : la requête a été annulée par une
+				// plus récente, qui vient d'allumer le retour pour elle-même.
+				.catch(err => { if (err.name !== 'AbortError') { console.error(err); setLoading(false); } });
 		}
 
 		function updateCounts(counts) {

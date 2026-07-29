@@ -15,13 +15,73 @@
 	var EDGE_MARGIN_PX  = 14;
 	// Doit refléter le scale(1.1) des règles CSS hover/reveal.
 	var HOVER_SCALE     = 1.1;
+	// Percentile des empreintes de livres sur lequel se cale le facteur de
+	// réduction COMMUN à toute l'étagère (cf. fitBookshelf). Plage utile
+	// [0.95, 1.00] : à 1.00 le facteur est calé sur le plus grand livre (aucun
+	// écrêtage, mais un seul très grand format impose sa réduction à tous) ;
+	// en descendant, les livres restent plus grands et quelques-uns sont
+	// écrêtés. Sous 0.95 le facteur sature à 1 et seul le nombre d'écrêtés
+	// augmente — autrement dit on ne fait plus que réintroduire le défaut
+	// qu'on corrige. Mesuré sur le catalogue à 390px : 1.00 → livre médian
+	// 138px, 1.45 livre/rangée ; 0.95 → 172px, 1.04 livre/rangée, 7 écrêtés.
+	var FIT_PERCENTILE  = 0.95;
 
 	// Tactile : un seul livre ouvert à la fois (1er tap = saisie,
 	// 2e tap = navigation). Référence du livre actuellement ouvert.
 	var touchOpenBook = null;
 
+	// Le retour au repos depuis la SAISIE doit emprunter la durée et la courbe
+	// de l'aller (cf. .pf-book--releasing dans bookshelf.css) : le livre saisi
+	// pouvant être bien plus petit que sur le rayon (--pf-reveal-scale), sa
+	// course de retour est longue et les 0,3s du repos la font claquer. Le CSS
+	// ne sachant pas distinguer ce cas de la simple fin de bascule — qui, elle,
+	// doit rester à 0,3s — on le marque ici, le temps de la transition.
+	// Appelé AVANT le retrait de la classe de saisie : il teste cet état.
+	//
+	// ⚠️ Ce minuteur NE RÈGLE PAS la durée de l'animation — celle-ci vit dans
+	// --pf-release-dur (bookshelf.css), lue ci-dessous. Il ne fait que tenir la
+	// classe le temps que la transition se joue. La ralentir se règle donc dans
+	// le CSS ; changer ce nombre seul ne ferait qu'allonger la classe.
+	//
+	// Pourquoi une marge : la classe ne porte pas que la courbe, c'est aussi le
+	// seul état qui tient le z-index du livre pendant le retour (cf.
+	// bookshelf.css). La lâcher avant la fin de la transition ferait passer la
+	// couverture encore ouverte derrière ses voisins. Elle doit donc vivre un
+	// peu PLUS longtemps que la transition, jamais moins — et la transition ne
+	// démarre pas à l'instant où le minuteur est armé, mais au recalcul de
+	// style suivant. La marge reste petite : tant que la classe est là, le
+	// livre est au-dessus de ses voisins alors qu'il est déjà au repos.
+	var RELEASE_MARGIN_MS = 100;
+
+	function cssDurationMs(el, name) {
+		var v = getComputedStyle(el).getPropertyValue(name).trim();
+		var n = parseFloat(v);
+		if (!v || isNaN(n)) return 0;
+		return /ms$/.test(v) ? n : n * 1000; // « 0.5s » ou « 500ms »
+	}
+
+	function markReleasing(book) {
+		if (!book.classList.contains('pf-book--cover-revealed')) return;
+		book.classList.add('pf-book--releasing');
+		var hold = (cssDurationMs(book, '--pf-release-dur') || 500) + RELEASE_MARGIN_MS;
+		clearTimeout(book._pfReleaseTimer);
+		book._pfReleaseTimer = setTimeout(function () {
+			book._pfReleaseTimer = null;
+			book.classList.remove('pf-book--releasing');
+		}, hold);
+	}
+
+	function cancelReleasing(book) {
+		clearTimeout(book._pfReleaseTimer);
+		book._pfReleaseTimer = null;
+		book.classList.remove('pf-book--releasing');
+	}
+
 	function closeTouchBook() {
 		if (!touchOpenBook) return;
+		// Chemin TACTILE (tap à côté) : c'est par là que le livre se referme
+		// sur téléphone, pas par onLeave.
+		markReleasing(touchOpenBook);
 		touchOpenBook.classList.remove('pf-book--cover-revealed');
 		touchOpenBook = null;
 	}
@@ -97,15 +157,15 @@
 		});
 		if (same) return;
 
-		// ⚠️ Trois phases strictement séparées — écritures, puis lectures, puis
-		// écritures. Lire une géométrie (offsetHeight) juste après avoir touché
-		// au DOM force le navigateur à recalculer le layout séance tenante ;
-		// intercalées dans la boucle de déplacement, ces lectures coûtaient un
-		// layout PAR LIVRE. Mesuré sur le catalogue (146 livres, 78 rangées) :
-		// ~950 ms de reconstruction, contre ~75 ms une fois les passes séparées.
+		// ⚠️ Lectures et écritures strictement séparées (cf. la passe `widths`
+		// plus haut, faite AVANT la moindre écriture). Lire une géométrie juste
+		// après avoir touché au DOM force le navigateur à recalculer le layout
+		// séance tenante ; intercalées dans la boucle de déplacement, ces
+		// lectures coûtaient un layout PAR LIVRE. Mesuré sur le catalogue
+		// (146 livres, 78 rangées) : ~950 ms de reconstruction, contre ~75 ms
+		// une fois les passes séparées. Ne pas ré-intercaler de mesure ici.
 
-		// 1) Écritures seules : créer les rayons manquants, déplacer les livres.
-		var used = [];
+		// Écritures seules : créer les rayons manquants, déplacer les livres.
 		rows.forEach(function (r, i) {
 			var shelf = shelves[i];
 			if (!shelf) {
@@ -123,26 +183,11 @@
 			r.forEach(function (b) {
 				target.appendChild(b); // appendChild déplace le nœud (handlers conservés)
 			});
-			used.push(shelf);
 		});
 
 		for (var i = rows.length; i < shelves.length; i++) {
 			shelves[i].remove();
 		}
-
-		// 2) Lectures seules : hauteur du plus grand livre de chaque rangée.
-		var heights = rows.map(function (r) {
-			var maxH = 0;
-			r.forEach(function (b) {
-				if (b.offsetHeight > maxH) maxH = b.offsetHeight;
-			});
-			return maxH;
-		});
-
-		// 3) Écritures seules : hauteur intérieure de chaque rayon.
-		used.forEach(function (shelf, i) {
-			shelf.style.setProperty('--shelf-inner', (heights[i] + 20) + 'px');
-		});
 	}
 
 	/* ─── Ajustement à la largeur visible (anti-débordement mobile) ───
@@ -254,12 +299,28 @@
 			return Math.min(fitH, fitW);
 		}
 
-		// Empilé : largeur de référence = conteneur hero (jamais l'étagère).
+		// Empilé : largeur de référence = conteneur hero (jamais l'étagère,
+		// fit-content donc circulaire). Le livre ÉPOUSE cette largeur, dans les
+		// deux sens — comme la branche deux colonnes épouse la hauteur dispo.
+		// Il ne faisait auparavant que rétrécir : sur téléphone il restait donc
+		// à sa taille naturelle (172px de large pour 302 disponibles) et
+		// réduire le padding ne faisait que resserrer le cadre autour de lui,
+		// sans jamais l'agrandir.
 		var booksRow = bookshelf.querySelector('.pf-shelf-books');
 		var cs     = getComputedStyle(booksRow);
 		var pad    = (parseFloat(cs.paddingLeft) || 0) + (parseFloat(cs.paddingRight) || 0);
-		var availW = hero.clientWidth - pad;
-		return (availW > 0 && footprint > availW) ? availW / footprint : 1;
+		// Le cadre de l'étagère a sa propre bordure : sans la déduire, le livre
+		// remplit la largeur du hero et l'étagère la dépasse de 2px.
+		var border = bookshelf.offsetWidth - bookshelf.clientWidth;
+		var availW = hero.clientWidth - pad - border;
+		if (availW <= 0 || footprint <= 0) return 1;
+
+		// Garde-fou : un livre très élancé rempli en largeur occuperait tout
+		// l'écran en hauteur. Le catalogue plafonne vers 2:1, mais rien ne
+		// l'impose.
+		var fitW = availW / footprint;
+		var maxH = 0.7 * window.innerHeight;
+		return raw.bh > 0 ? Math.min(fitW, maxH / raw.bh) : fitW;
 	}
 
 	function fitBookshelf(bookshelf) {
@@ -271,46 +332,78 @@
 		var pad = (parseFloat(cs.paddingLeft) || 0) + (parseFloat(cs.paddingRight) || 0);
 		var avail = availableWidth(bookshelf) - pad;
 
-		bookshelf.querySelectorAll('.pf-book').forEach(function (book) {
-			var raw = bookRawDims(book);
-			if (!raw.cw && !raw.sw) return;
+		var books = Array.prototype.slice.call(bookshelf.querySelectorAll('.pf-book'));
 
-			// Empreinte au repos (bord droit du livre) selon le mode : en
-			// spines seul le dos est visible ; la liseuse n'a pas de
-			// dos papier ; sinon couverture + dos.
-			var footprint = isSpines
+		// Correctif d'échelle du mode dos (cf. --pf-spines-scale) : le PHP y
+		// dessine tout 1,5x plus grand, ramené à 1,2x sur mobile. Le seuil de
+		// largeur reste en CSS — on ne fait que lire la valeur, pour ne pas
+		// dupliquer le point de rupture ici.
+		var modeScale = isSpines
+			? (cssVarPx(bookshelf, '--pf-spines-scale') || 1)
+			: 1;
+
+		// Empreinte au repos (bord droit du livre) selon le mode : en spines
+		// seul le dos est visible ; la liseuse n'a pas de dos papier ; sinon
+		// couverture + dos. Valeurs NATIVES (avant correctif d'échelle).
+		var footprints = books.map(function (book) {
+			var raw = bookRawDims(book);
+			if (!raw.cw && !raw.sw) return 0;
+			return isSpines
 				? raw.sw
 				: (book.classList.contains('pf-book--ereader') ? raw.cw : raw.cw + raw.sw);
+		});
+
+		// UN SEUL facteur pour toute l'étagère : réduit livre par livre, chaque
+		// livre trop large sortait exactement à la largeur disponible, donc un
+		// album de 360mm et un roman de 220mm rendus IDENTIQUES (36 livres sur
+		// 146 à 390px), à côté de leurs voisins restés à taille vraie. Les
+		// tailles relatives — tout l'intérêt d'une étagère — disparaissaient.
+		//
+		// Le facteur se cale sur le p95 des empreintes et non sur la plus
+		// grande : un unique très grand format imposerait sa réduction à tout
+		// le catalogue. Les ~5% au-dessus restent écrêtés individuellement
+		// (sans quoi ils déborderaient, #wrapper étant en overflow:clip) : ils
+		// perdent leur taille relative, mais ils sont 10 au lieu de 36
+		// (mesuré à 390px : les 7 au-dessus du p95, plus les 3 pile dessus).
+		//
+		// Rien de tout ceci ne s'applique au-dessus de 768px, où tous les
+		// livres tiennent déjà : le facteur y vaut 1 et le code est inerte.
+		var fit = 1;
+		if (!isHero && avail > 0) {
+			// Percentile sur les empreintes RÉELLEMENT occupées, correctif
+			// d'échelle compris.
+			var sorted = footprints.filter(Boolean)
+				.map(function (f) { return f * modeScale; })
+				.sort(function (a, b) { return a - b; });
+			if (sorted.length) {
+				var ref = sorted[Math.min(
+					sorted.length - 1,
+					Math.max(0, Math.ceil(FIT_PERCENTILE * sorted.length) - 1)
+				)];
+				if (ref > avail) fit = avail / ref;
+			}
+		}
+
+		books.forEach(function (book, i) {
+			var raw = bookRawDims(book);
+			if (!raw.cw && !raw.sw) return;
 
 			// Hero : pilotage par la hauteur du texte (mesures stables, pas de
 			// dépendance à `avail` qui serait circulaire avec une étagère
 			// fit-content). Les autres étagères gardent le shrink-to-width.
-			var fit;
+			// Facteur TOTAL appliqué aux dimensions natives : correctif
+			// d'échelle du mode dos x réduction d'encombrement.
+			var f;
 			if (isHero) {
-				fit = heroFit(bookshelf, book, raw, footprint);
+				f = heroFit(bookshelf, book, raw, footprints[i]);
 			} else {
 				if (avail <= 0) return;
-				fit = footprint > avail ? avail / footprint : 1;
+				f = footprints[i] * modeScale * fit > avail
+					? avail / footprints[i]          // écrêtage : facteur total direct
+					: modeScale * fit;
 			}
 
-			setBookScale(book, raw, fit);
-		});
-
-		// Recaler la hauteur de chaque rayon sur le plus grand livre (après
-		// réduction éventuelle), même méthode que repackShelves : sans ça un
-		// livre réduit laisserait un vide au-dessus de lui (livre calé en bas).
-		// Lectures et écritures séparées, même raison que dans repackShelves :
-		// écrire --shelf-inner entre deux mesures relance un layout par rayon.
-		var shelfEls = Array.prototype.slice.call(bookshelf.querySelectorAll('.pf-shelf'));
-		var shelfHeights = shelfEls.map(function (shelf) {
-			var maxH = 0;
-			shelf.querySelectorAll('.pf-book').forEach(function (b) {
-				if (b.offsetHeight > maxH) maxH = b.offsetHeight;
-			});
-			return maxH;
-		});
-		shelfEls.forEach(function (shelf, i) {
-			if (shelfHeights[i]) shelf.style.setProperty('--shelf-inner', (shelfHeights[i] + 20) + 'px');
+			setBookScale(book, raw, f);
 		});
 
 		// Révèle le(s) livre(s) hero une fois la bonne taille appliquée (voir
@@ -346,9 +439,9 @@
 	   sa cible et oscillerait) : seuls l'inner et la déco reçoivent les
 	   décalages calculés ici. */
 
-	// Spines : position du livre saisi. Couverture centrée sur le dos
+	// Spines : taille et position du livre saisi. Couverture centrée sur le dos
 	// par défaut, recalée pour que l'empreinte totale (dos fantôme à
-	// gauche incluse, scale 1.1 d'origine left bottom) reste dans le
+	// gauche incluse, scale d'origine left bottom) reste dans le
 	// container (.pf-shelf = viewport du scroll en mode scroll).
 	function computeRevealShift(book) {
 		var shelf = book.closest('.pf-shelf');
@@ -356,10 +449,32 @@
 		var coverW = cssVarPx(book, '--cover-w-base');
 		var spineW = cssVarPx(book, '--spine-w-base');
 		if (!coverW) return;
-		var c     = coverW * HOVER_SCALE; // empreinte couverture [0, c] (origine x=0)
-		var s     = spineW * HOVER_SCALE; // dos fantôme [-s, 0]
 		var rect  = book.getBoundingClientRect();
 		var box   = shelf.getBoundingClientRect();
+
+		// Le mode dos dessine tout 1,5x plus grand (mode_scale, pour que les
+		// titres verticaux des dos restent lisibles). Une fois le livre
+		// retourné, cette taille vaut pour sa COUVERTURE : sur un écran étroit
+		// elle atteignait 693px pour 308px disponibles (mesuré sur le plus
+		// grand format du catalogue, /catalogue en vue dos à 390px) et
+		// débordait du rayon — rogné en mode scroll, déversé sur les rangées
+		// voisines en mode shelves. On plafonne donc l'agrandissement de la
+		// SAISIE à ce qui tient dans le rayon. Le dos au repos n'est pas
+		// touché : c'est sa lisibilité qui justifie le 1,5x.
+		// ⚠️ Ce facteur est aussi lu par le CSS (--pf-reveal-scale) pour la
+		// transform ET pour le perspective-origin, dont le terme
+		// (scale - 1) x --book-h repère le haut du volume agrandi. Les trois
+		// doivent rester d'accord, sinon l'atterrissage ne retombe plus sur la
+		// cavalière du mode couvertures.
+		var room  = box.width - 2 * EDGE_MARGIN_PX;
+		var scale = HOVER_SCALE;
+		if (room > 0 && coverW + spineW > 0) {
+			scale = Math.min(HOVER_SCALE, room / (coverW + spineW));
+		}
+		book.style.setProperty('--pf-reveal-scale', scale);
+
+		var c     = coverW * scale; // empreinte couverture [0, c] (origine x=0)
+		var s     = spineW * scale; // dos fantôme [-s, 0]
 		var dx    = (rect.width - c) / 2;
 		var minDx = (box.left + EDGE_MARGIN_PX) - rect.left + s;
 		var maxDx = (box.right - EDGE_MARGIN_PX) - rect.left - c;
@@ -375,15 +490,15 @@
 
 		// Vertical : uniquement en mode scroll, où le scroller rogne au
 		// padding-box (en shelves le livre déborde librement sur la rangée
-		// du dessus). Le scale 1.1 (origine bas) pousse le haut du livre de
-		// 10 % + le bandeau de pages au-dessus : on descend le livre juste
+		// du dessus). Le scale (origine bas) pousse le haut du livre d'autant
+		// + le bandeau de pages au-dessus : on descend le livre juste
 		// assez, sans pousser son pied au-delà du bas du container.
 		var dy = 0;
 		if (book.closest('.pf-bookshelf--scroll')) {
 			var bookH    = cssVarPx(book, '--book-h');
 			var topAfter = rect.top
-				- (HOVER_SCALE - 1) * bookH
-				- spineW * oblique(book) * HOVER_SCALE;
+				- (scale - 1) * bookH
+				- spineW * oblique(book) * scale;
 			var overshoot = (box.top + EDGE_MARGIN_PX) - topAfter;
 			if (overshoot > 0) {
 				dy = Math.min(overshoot, Math.max(0, box.bottom - 2 - rect.bottom));
@@ -532,6 +647,9 @@
 		function onEnter() {
 			hoverActive = true;
 			hoverStart  = Date.now();
+			// On revient sur le livre pendant son retour : la course reprend
+			// depuis là, plus rien à ralentir.
+			cancelReleasing(book);
 			computeRevealShift(book);
 			scheduleCoverLoad();
 			attemptReveal();
@@ -547,7 +665,9 @@
 			clearLoad();
 			clearReveal();
 			// Drop the class so the book closes back, and so the next
-			// hover gets a fresh REVEAL_DELAY_MS countdown.
+			// hover gets a fresh REVEAL_DELAY_MS countdown. Le marquage doit
+			// précéder le retrait : il teste l'état saisi.
+			markReleasing(book);
 			book.classList.remove('pf-book--cover-revealed');
 			if (touchOpenBook === book) touchOpenBook = null;
 		}

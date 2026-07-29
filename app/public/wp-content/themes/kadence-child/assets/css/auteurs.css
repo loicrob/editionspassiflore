@@ -56,16 +56,22 @@
 
 /* La barre porte la classe commune .pf-sub-header (padding) — cf. style.css. */
 
-/* Grille de résultats — états */
+/* Filet d'attente de la recherche (composant partagé, style.css) — posé par
+   recherche-auteurs.js le temps de la requête. Ancré au BAS de la barre, sur
+   toute la largeur de l'écran : le pseudo-élément est absolu et le premier
+   ancêtre positionné n'est pas .pf-sub-header (jamais `position`, cf. style.css)
+   mais .pf-rech-sticky (.pf-sticky-bar, position:sticky) — il se cale donc sur
+   SA boîte de padding, qui est full-bleed, et non sur le contenu centré. */
+.pf-rech-sticky .pf-sub-header.is-loading::after {
+    bottom: 0;
+}
+
+/* Grille de résultats — états. L'estompage dit « ces résultats sont périmés » ;
+   c'est le filet ci-dessus qui dit « quelque chose arrive ». */
 .pf-rech-grid.is-loading {
     opacity: 0.5;
     transition: opacity 0.15s ease;
     pointer-events: none;
 }
 
-.pf-rech-vide {
-    text-align: center;
-    color: var(--pf-muted);
-    padding: var(--pf-space-8) 0;
-    font-style: italic;
-}
+/* Message « aucun auteur » : composant global .pf-empty (style.css). */

@@ -18,12 +18,12 @@ $is_multi_day    = $start_day_str !== $end_day_str;
 $show_time       = empty( $event->all_day );
 
 $event_week_day  = $display_date->format_i18n( 'l' );
-$event_day_num   = pf_date_i18n_ordinal( 'j', $display_date->getTimestamp() ); // déjà échappé (avec <sup> brut pour "1er")
+$event_day_num   = pf_date_i18n_ordinal( 'j', pf_date_i18n_ts( $display_date ) ); // déjà échappé (avec <sup> brut pour "1er")
 $event_date_attr = $display_date->format( Dates::DBDATEFORMAT );
 $start_time      = $show_time ? pf_event_format_hm( (int) $display_date->format( 'G' ), (int) $display_date->format( 'i' ) ) : '';
 
 $end_week_day    = $end_date->format_i18n( 'l' );
-$end_day_num     = pf_date_i18n_ordinal( 'j', $end_date->getTimestamp() ); // déjà échappé (avec <sup> brut pour "1er")
+$end_day_num     = pf_date_i18n_ordinal( 'j', pf_date_i18n_ts( $end_date ) ); // déjà échappé (avec <sup> brut pour "1er")
 $end_date_attr   = $end_date->format( Dates::DBDATEFORMAT );
 $end_time        = $show_time ? pf_event_format_hm( (int) $end_date->format( 'G' ), (int) $end_date->format( 'i' ) ) : '';
 

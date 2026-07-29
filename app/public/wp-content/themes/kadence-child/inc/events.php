@@ -83,6 +83,8 @@ function pf_date_icon_svg() {
  * 1er du mois tombe sur $timestamp. $format doit contenir un jeton "j" isolé (jour sans
  * zéro) ; les autres jetons sont traités normalement par date_i18n(). Retourne du HTML
  * (échappé en interne) — l'appelant ne doit pas ré-échapper la valeur retournée.
+ *
+ * ⚠️ $timestamp est un timestamp DÉCALÉ, pas un instant UTC réel — cf. pf_date_i18n_ts().
  */
 function pf_date_i18n_ordinal( string $format, int $timestamp ): string {
     if ( (int) date( 'j', $timestamp ) !== 1 || strpos( $format, 'j' ) === false ) {
@@ -91,6 +93,26 @@ function pf_date_i18n_ordinal( string $format, int $timestamp ): string {
     $placeholder = "\x1F";
     $formatted   = date_i18n( str_replace( 'j', $placeholder, $format ), $timestamp );
     return str_replace( $placeholder, '1<sup>er</sup>', esc_html( $formatted ) );
+}
+
+/**
+ * Timestamp « décalé » attendu par date_i18n() — et donc par pf_date_i18n_ordinal() — à partir
+ * d'un objet date porteur d'un VRAI fuseau, typiquement les Date_I18n de TEC
+ * ($event->dates->start_display), dont getTimestamp() renvoie l'instant UTC réel.
+ *
+ * ⚠️ date_i18n() n'attend pas un instant : son paramètre est documenté « a sum of Unix timestamp
+ * and timezone offset in seconds ». Il fait gmdate() dessus puis RÉINTERPRÈTE le résultat dans le
+ * fuseau du site. Lui passer un vrai timestamp recule donc l'affichage du décalage : un événement
+ * à 00h00 heure de Paris (= 22h00 UTC la veille) s'affichait LA VEILLE, tandis que le jour de
+ * semaine — rendu par format_i18n() de TEC, correct — restait juste : « mardi 21 » pour un mardi 22.
+ *
+ * On repasse donc par l'heure murale, comme le font déjà tous les autres appelants de
+ * pf_date_i18n_ordinal() (DateTime::createFromFormat() sur _EventStartDate, ou strtotime() sur un
+ * Ymd — le fuseau PHP par défaut valant UTC sous WordPress, ils produisent d'office ce décalage).
+ * Le suffixe « UTC » est explicite pour ne pas dépendre de ce réglage par défaut.
+ */
+function pf_date_i18n_ts( DateTimeInterface $date ): int {
+    return (int) strtotime( $date->format( 'Y-m-d H:i:s' ) . ' UTC' );
 }
 
 /**
@@ -390,7 +412,7 @@ add_filter( 'tribe_events_event_schedule_details', function ( $schedule, $event_
 	// une heure de fin reelle (non sentinelle) est renseignee.
 	if ( ! $multi_jour ) {
 		if ( $allday ) {
-			$str .= ' · journée entière';
+			$str .= ' · Journée entière';
 		} elseif ( function_exists( 'pf_event_format_hm' ) ) {
 			$heure = pf_event_format_hm( (int) date( 'G', $start_ts ), (int) date( 'i', $start_ts ) );
 
@@ -704,7 +726,7 @@ class Passiflore_Event_Tiles {
         if ( $heure !== '' ) {
             $heure_line = $heure;
         } elseif ( ! $multi_jour && ! empty( $event['is_all_day'] ) ) {
-            $heure_line = 'journée entière';
+            $heure_line = 'Journée entière';
         }
 
         $date_row = $ts ? pf_render_meta_row( pf_date_icon_svg(), $date_txt, $heure_line, '', true ) : '';

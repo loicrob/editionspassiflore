@@ -12,8 +12,8 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 
 /**
  * Compose les sections de la fiche événement en DEUX zones (layout desktop) :
- *  - **top** (à gauche de l'image collée) : Horaires, Lieu, Organisateur ;
- *  - **bot** (pleine largeur, sous le hero — l'image a repris son scroll) : Présence,
+ *  - **top** (à gauche de l'image collée) : Horaires, Lieu, Organisateur, Participants ;
+ *  - **bot** (pleine largeur, sous le hero — l'image a repris son scroll) :
  *    Livres associés ;
  *  - **nav** : barre listant TOUTES les sections (≥3), affichée dans la zone haute.
  * Le template (tribe-events/single-event.php) place `nav` + `top` dans la grille du
@@ -41,7 +41,7 @@ function passiflore_get_event_sections_parts( $event_id ) {
 
 	if ( function_exists( 'passiflore_render_event_participants_tiles' ) ) {
 		$html = passiflore_render_event_participants_tiles( $event_id );
-		if ( $html ) $bot[] = [ 'label' => 'Participants', 'html' => $html ];
+		if ( $html ) $top[] = [ 'label' => 'Participants', 'html' => $html ];
 	}
 
 	if ( function_exists( 'passiflore_render_event_books' ) ) {

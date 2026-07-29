@@ -109,6 +109,42 @@
 			if (overlay) { overlay.remove(); overlay = null; }
 		}
 
+		// L'overlay accompagne le MODE recherche, pas les résultats : il est posé
+		// dès le clic sur la loupe (open()) et ne tombe qu'à la fermeture du
+		// panneau. Vider le champ ne doit donc pas le retirer… sauf sur tablette
+		// (769–1024px), où la barre est permanente, sans bouton toggle : là
+		// body.pf-search-open n'est jamais posée et c'est le FOCUS de la barre
+		// qui délimite le mode recherche (voir les écouteurs focusin/focusout).
+		function removeOverlayIfClosed() {
+			if (document.body.classList.contains('pf-search-open')) return;
+			if (holdsFocus(document.activeElement)) return; // barre encore active (tablette)
+			removeOverlay();
+		}
+
+		// Le focus est-il encore DANS la recherche ? Le menu de type et le panneau
+		// de résultats sont déplacés dans <body> (contexte d'empilement racine) :
+		// ils sortent du root sans sortir de la recherche, un simple
+		// root.contains() les lirait à tort comme une sortie.
+		function holdsFocus(el) {
+			return !!el && (root.contains(el) || (typeMenu && typeMenu.contains(el)) || results.contains(el));
+		}
+
+		// ── Tablette : le focus de la barre tient lieu d'ouverture/fermeture ──
+		// Entrer dans le champ = entrer en mode recherche, donc voile ; en sortir
+		// le retire. Sur les deux autres largeurs le panneau ouvert prime et ces
+		// écouteurs ne changent rien (le voile y est déjà posé par open() et ne
+		// tombe qu'à la fermeture, cf. le premier test de removeOverlayIfClosed).
+		root.addEventListener('focusin', addOverlay);
+		root.addEventListener('focusout', function (e) {
+			if (holdsFocus(e.relatedTarget)) return;
+			if (document.body.classList.contains('pf-search-open')) return;
+			// Résultats affichés = mode toujours actif : le panneau ne doit pas
+			// se retrouver posé sur une page non assombrie. C'est aussi ce qui
+			// protège le clic SUR un résultat, qui blure le champ avant de naviguer.
+			if (results.innerHTML) return;
+			removeOverlay();
+		});
+
 		// ── Ouvrir ────────────────────────────────────────────────────────
 		function open() {
 			if (document.body.classList.contains('pf-search-open')) return;
@@ -118,6 +154,7 @@
 				document.documentElement.style.setProperty('--pf-gsearch-nav-w', menu.offsetWidth + 'px');
 			}
 			document.body.classList.add('pf-search-open');
+			addOverlay();
 			btn.setAttribute('aria-expanded', 'true');
 			input.focus();
 		}
@@ -137,6 +174,12 @@
 			if (abortCtrl) { abortCtrl.abort(); abortCtrl = null; }
 			closeTypeMenu();
 			btn.blur(); // sinon la loupe garde l'état focus/actif après fermeture (le clic sur la croix laisse le focus sur le bouton)
+			// Le champ aussi : replié, il resterait focusé derrière un panneau de
+			// largeur nulle (desktop/mobile) ; et sur tablette, où le voile suit le
+			// focus de la barre, un champ resté focusé après un clic sur l'overlay
+			// laisserait le mode recherche « actif » sans voile — plus aucun
+			// focusin pour le reposer, puisque le focus n'a jamais bougé.
+			input.blur();
 
 			var done = false;
 			function finish() {
@@ -167,7 +210,7 @@
 		if (clearBtn) clearBtn.addEventListener('click', function () {
 			input.value = '';
 			results.innerHTML = '';
-			removeOverlay();
+			removeOverlayIfClosed();
 			input.focus();
 		});
 
@@ -204,6 +247,12 @@
 				if (typeLabel) typeLabel.textContent = opt.textContent;
 				applyPlaceholder();
 				closeTypeMenu();
+				// Retour au champ : on vient de choisir un filtre, on repart taper.
+				// Nécessaire aussi pour le voile de tablette, qui suit le focus —
+				// le menu étant déplacé dans <body>, l'option cliquée porte le
+				// focus HORS de la barre, et sa fermeture (display:none) le
+				// renverrait sur <body>, donc hors recherche.
+				input.focus();
 				clearTimeout(timer);
 				runSearch();
 			});
@@ -233,7 +282,7 @@
 
 			if (q.length < 2) {
 				results.innerHTML = '';
-				removeOverlay();
+				removeOverlayIfClosed();
 				return;
 			}
 

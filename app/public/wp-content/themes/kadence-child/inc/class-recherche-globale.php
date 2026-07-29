@@ -190,7 +190,7 @@ class Passiflore_Recherche_Globale {
 				'auteurs'    => 'Aucun auteur trouvé avec votre recherche.',
 				'evenements' => 'Aucun événement à venir trouvé avec votre recherche.',
 			];
-			$html = '<p class="pf-gsearch-empty">' . esc_html( $messages[ $type ] ?? $messages['all'] ) . '</p>';
+			$html = '<p class="pf-empty">' . esc_html( $messages[ $type ] ?? $messages['all'] ) . '</p>';
 		}
 
 		wp_send_json_success( [ 'html' => $html ] );

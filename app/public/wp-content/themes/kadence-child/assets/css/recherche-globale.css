@@ -191,6 +191,18 @@ body.pf-search-closing .pf-gsearch-panel {
 	top: var(--pf-sticky-offset, 0px);
 	background: rgba(26, 22, 21, 0.35);
 	z-index: 9997;
+	/* Le voile est posé dès le clic sur la loupe (cf. recherche-globale.js) : il
+	   arrive donc EN MÊME TEMPS que le dépliage du panneau, d'où un fondu calé
+	   exactement sur sa transition (même durée, même easing) plutôt qu'un
+	   assombrissement brutal de toute la page sous une barre encore en train de
+	   s'ouvrir. Sans `forwards` : l'état final de l'animation est déjà l'état
+	   de repos de l'élément. */
+	animation: pf-gsearch-overlay-in 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes pf-gsearch-overlay-in {
+	from { opacity: 0; }
+	to   { opacity: 1; }
 }
 
 /* ── Résultats (position fixed sous le header) ────────────────────────────── */
@@ -213,25 +225,14 @@ body.pf-search-closing .pf-gsearch-panel {
 }
 
 .pf-gsearch-results.is-loading {
-	min-height: 48px;
+	min-height: 3px;
 }
 
+/* Filet d'attente : peint par le composant partagé de style.css, ancré ici en
+   haut du panneau de résultats (le panneau est en position:fixed, donc bloc
+   conteneur du pseudo-élément ; son overflow-y:auto en assure le clip). */
 .pf-gsearch-results.is-loading::before {
-	content: '';
-	position: absolute;
 	top: 0;
-	left: 0;
-	right: 0;
-	height: 2px;
-	background: linear-gradient(90deg, transparent, var(--pf-accent), transparent);
-	transform: translateX(-100%);
-	animation: pf-gsearch-loading 1.1s ease-in-out infinite;
-	will-change: transform;
-}
-
-@keyframes pf-gsearch-loading {
-	from { transform: translateX(-100%); }
-	to   { transform: translateX(100%); }
 }
 
 /* ── Groupes ──────────────────────────────────────────────────────────────── */
@@ -340,13 +341,8 @@ body.pf-search-closing .pf-gsearch-panel {
 	-webkit-box-orient: vertical;
 }
 
-/* ── Message vide ─────────────────────────────────────────────────────────── */
-
-.pf-gsearch-empty {
-	padding: 20px;
-	text-align: center;
-	margin: 0;
-}
+/* ── Message vide ───────────────────────────────────────────────────────────
+   Composant global .pf-empty (style.css). */
 
 /* ── Header mobile Kadence (tablette + mobile, ≤1024px) ─────────────────────── */
 /* Toutes les règles sont scopées #mobile-header : la spécificité id (1,1,1) bat

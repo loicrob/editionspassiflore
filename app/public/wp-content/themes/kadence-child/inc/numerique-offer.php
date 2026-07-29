@@ -253,7 +253,9 @@ function pf_numerique_offer_term( string $source ): ?string {
 		}
 		return 'à -' . rtrim( rtrim( number_format( $pct, 2, ',', ' ' ), '0' ), ',' ) . ' %';
 	}
+	add_filter( 'woocommerce_price_trim_zeros', '__return_true' );
 	$prix = wc_price( max( 0.0, pf_numerique_to_float( $cfg['value'] ) ) );
+	remove_filter( 'woocommerce_price_trim_zeros', '__return_true' );
 	return 'à ' . html_entity_decode( wp_strip_all_tags( $prix ), ENT_QUOTES, 'UTF-8' );
 }
 

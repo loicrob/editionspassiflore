@@ -34,8 +34,8 @@ $event_id = Tribe__Events__Main::postIdHelper( get_the_ID() );
 			<!-- Layout événement, grille `.pf-event-hero` [nav | contenu | image]. La NAV (points)
 			     est une colonne de gauche qui longe TOUTE la page (topsec + botsec) → reste sticky
 			     partout. L'IMAGE (colonne droite, collée pleine hauteur) ne couvre que la ZONE HAUTE
-			     (head + body + topsec = Horaires/Lieu/Organisateur) → elle reprend son scroll dès la
-			     ZONE BASSE (botsec = Présence + Livres associés), qui s'étend alors sur contenu+image
+			     (head + body + topsec = Horaires/Lieu/Organisateur/Participants) → elle reprend son
+			     scroll dès la ZONE BASSE (botsec = Livres associés), qui s'étend alors sur contenu+image
 			     (pleine largeur à droite de la nav). Mobile+tablette : tout empilé. Placement via
 			     grid-template-areas (event-single.css). -->
 			<div class="pf-event-hero">

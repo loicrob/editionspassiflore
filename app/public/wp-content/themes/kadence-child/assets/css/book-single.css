@@ -892,6 +892,18 @@
 	.bs-hero__heading { order: 1; }
 	.bs-hero__visual  { order: 2; align-self: center; }
 	.bs-hero__info    { order: 3; align-self: center; align-items: center; }
+
+	/* Le padding ample du hero (64px de chaque côté) mangeait un tiers d'un
+	   écran de 390px : l'étagère étant fit-content, il ne se rabote que si la
+	   colonne est plus étroite que le livre + le padding, ce qui n'arrive pas
+	   ici — le livre restait donc petit pour rien. Aligné sur le mobilier
+	   mobile de bookshelf.css (invariant padding >= 2 x --pf-plank-inset,
+	   qui vaut 16px sous 767px). */
+	.pf-bookshelf--hero .pf-shelf-books {
+		padding-left: 20px;
+		padding-right: 20px;
+		padding-top: 20px;
+	}
 }
 
 /* Mobile uniquement : espacements réduits */
@@ -993,14 +1005,9 @@
 	padding: var(--pf-space-3) 0.85rem var(--pf-space-4);
 }
 
-/* Dégradés scroll (override couleur — .pf-scroll-fade est global, style.css) */
-.bs-tab-auteurs .pf-scroll-fade::before {
-	background: linear-gradient(to right, var(--pf-surface-alt), transparent);
-}
-
-.bs-tab-auteurs .pf-scroll-fade::after {
-	background: linear-gradient(to left, var(--pf-surface-alt), transparent);
-}
+/* Fondu de bord : composant global .pf-scroll-fade (style.css). Rien à régler ici
+   depuis qu'il masque au lieu de peindre — la surcharge de couleur qui vivait à cet
+   endroit (vers --pf-surface-alt, le fond de la section) n'a plus d'objet. */
 
 /* Scroll horizontal — overflow + scrollbar fournis par .pf-hscroll (style.css). */
 .bs-tab-auteurs .pf-event-auteurs-scroll {

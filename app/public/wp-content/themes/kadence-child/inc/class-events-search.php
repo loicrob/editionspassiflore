@@ -110,7 +110,10 @@ class Passiflore_Events_Search {
 
 		if ( empty( $all_ids ) ) {
 			wp_send_json_success( [
-				'html'     => '<li class="pf-ev-search-empty"><p class="pf-ev-msg is-visible">Aucun événement ne correspond à votre recherche.</p></li>',
+				// .pf-empty (style.css), pas .pf-ev-msg : celui-ci reste réservé aux
+				// repères de défilement de la liste (« Début des archives. »), plus
+				// discrets. Une absence de résultat parle la même voix partout.
+				'html'     => '<li class="pf-ev-search-empty"><p class="pf-empty">Aucun événement ne correspond à votre recherche.</p></li>',
 				'has_more' => false,
 				'count'    => 0,
 			] );
@@ -255,12 +258,12 @@ class Passiflore_Events_Search {
 		$show_time     = empty( $event->all_day );
 
 		$event_week_day  = $display_date->format_i18n( 'l' );
-		$event_day_num   = pf_date_i18n_ordinal( 'j', $display_date->getTimestamp() ); // déjà échappé (avec <sup> brut pour "1er")
+		$event_day_num   = pf_date_i18n_ordinal( 'j', pf_date_i18n_ts( $display_date ) ); // déjà échappé (avec <sup> brut pour "1er")
 		$event_date_attr = $display_date->format( Dates::DBDATEFORMAT );
 		$start_time      = $show_time ? pf_event_format_hm( (int) $display_date->format( 'G' ), (int) $display_date->format( 'i' ) ) : '';
 
 		$end_week_day  = $end_date->format_i18n( 'l' );
-		$end_day_num   = pf_date_i18n_ordinal( 'j', $end_date->getTimestamp() ); // déjà échappé (avec <sup> brut pour "1er")
+		$end_day_num   = pf_date_i18n_ordinal( 'j', pf_date_i18n_ts( $end_date ) ); // déjà échappé (avec <sup> brut pour "1er")
 		$end_date_attr = $end_date->format( Dates::DBDATEFORMAT );
 		$end_time      = $show_time ? pf_event_format_hm( (int) $end_date->format( 'G' ), (int) $end_date->format( 'i' ) ) : '';
 

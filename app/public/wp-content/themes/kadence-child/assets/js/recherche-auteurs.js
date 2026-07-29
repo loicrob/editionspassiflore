@@ -10,10 +10,20 @@
 		catch (e) { console.error('pf-recherche-auteurs: bad config', e); return; }
 
 		const sticky = root.querySelector('.pf-rech-sticky');
+		const bar    = root.querySelector('.pf-sub-header');
 		const grid   = root.querySelector('.pf-rech-grid');
 		const input  = root.querySelector('.pf-search-input');
 		const clear  = root.querySelector('.pf-search-clear');
 		if (!sticky || !grid || !input) return;
+
+		// Attente d'une réponse : filet accent au bas de la barre (composant
+		// partagé avec la recherche globale et /evenements, cf. style.css) — la
+		// grille se contente de s'estomper, ce qui dit « ces résultats sont
+		// périmés » mais pas « quelque chose arrive ».
+		function setLoading(on) {
+			grid.classList.toggle('is-loading', on);
+			if (bar) bar.classList.toggle('is-loading', on);
+		}
 
 		// ── Smart-hide : masque au scroll vers le bas, réaffiche vers le haut.
 		let lastY = window.scrollY;
@@ -41,7 +51,7 @@
 		function runSearch() {
 			if (abortCtrl) abortCtrl.abort();
 			abortCtrl = new AbortController();
-			grid.classList.add('is-loading');
+			setLoading(true);
 
 			const fd = new FormData();
 			fd.append('action', 'pf_recherche_auteurs');
@@ -50,12 +60,14 @@
 			fetch(config.ajax_url, { method: 'POST', body: fd, signal: abortCtrl.signal })
 				.then(r => r.json())
 				.then(payload => {
-					grid.classList.remove('is-loading');
+					setLoading(false);
 					if (!payload || !payload.success) return;
 					grid.innerHTML = payload.data.html;
 				})
+				// Pas d'extinction sur AbortError : la requête a été annulée par une
+				// frappe plus récente, qui vient d'allumer le retour pour elle-même.
 				.catch(err => {
-					if (err.name !== 'AbortError') { console.error(err); grid.classList.remove('is-loading'); }
+					if (err.name !== 'AbortError') { console.error(err); setLoading(false); }
 				});
 
 			syncUrl();

@@ -1616,6 +1616,21 @@ html.pf-notices-js .wc-block-components-notices__snackbar {
 .pf-notice--success { background: var(--pf-success-bg); color: var(--pf-success); }
 
 /* =========================================================
+   Message « aucun résultat » — voix commune à TOUTES les recherches du site
+   (auteurs, catalogue, recherche globale, événements). Italique + gris
+   secondaire : c'est un état, pas un contenu — il ne doit pas se lire aussi
+   noir que les résultats qu'il remplace. Réservé à l'absence de résultat ;
+   les repères de défilement (« Début des archives. ») gardent leur style
+   propre, plus discret. ========================================================= */
+.pf-empty {
+    margin: 0;
+    padding: var(--pf-space-8) var(--pf-space-4);
+    text-align: center;
+    color: var(--pf-muted);
+    font-style: italic;
+}
+
+/* =========================================================
    Bouton rond à icône — rouge plein, icône crème (chargement des événements
    passés, fermeture de la recherche globale…). !important nécessaires : bat le style
    générique des boutons de contenu (.entry-content button) où qu'il soit rendu.
@@ -1689,6 +1704,43 @@ html.pf-notices-js .wc-block-components-notices__snackbar {
 }
 
 /* =========================================================
+   Filet d'attente des recherches AJAX — un trait de 2px parcouru d'un bord à
+   l'autre par une lueur accent. Indéterminé par nature (ni la durée de la
+   requête ni le nombre de résultats ne sont connus), donc pas de barre de
+   progression : c'est le retour d'attente commun à toutes les recherches du
+   site, à la place d'un spinner qui ferait un point de fixation isolé loin du
+   champ de saisie.
+   Deux hôtes aujourd'hui, qui ne posent QUE le bord auquel le filet se colle :
+     - recherche globale du header  → bord HAUT du panneau de résultats ;
+     - sous-header de /evenements   → bord BAS de la barre (liste + carte).
+   Le pseudo-élément se cale sur la boîte de padding de l'ancêtre positionné le
+   plus proche : c'est ce qui le rend pleine largeur d'écran sur /evenements
+   (cf. events.css) — ne pas poser `position` sur .pf-sub-header.
+   La lueur sort de sa boîte de ±100 % : le clip est assuré par l'hôte ou par
+   #wrapper (overflow: clip), jamais par une barre de défilement horizontale. ========================================================= */
+.pf-gsearch-results.is-loading::before,
+.pf-sub-header.is-loading::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--pf-accent), transparent);
+    transform: translateX(-100%);
+    animation: pf-loading-sweep 1.1s ease-in-out infinite;
+    will-change: transform;
+    pointer-events: none;
+}
+@keyframes pf-loading-sweep {
+    from { transform: translateX(-100%); }
+    to   { transform: translateX(100%); }
+}
+@media (prefers-reduced-motion: reduce) {
+    .pf-gsearch-results.is-loading::before,
+    .pf-sub-header.is-loading::after { animation-duration: 3s; }
+}
+
+/* =========================================================
    Bloc « réponse de l'éditeur » sous un avis (compte client + fiche livre).
    Base visuelle : .pf-quote (ci-dessus) avec filet accent. ========================================================= */
 .pf-avis-reponse {
@@ -1721,45 +1773,60 @@ html.pf-notices-js .wc-block-components-notices__snackbar {
 .pf-hscroll::-webkit-scrollbar-thumb { background: var(--pf-border); border-radius: 3px; }
 
 /* =========================================================
-   Ombres de bord (« scroll shadows ») — signalent qu'un scroll horizontal
-   masque du contenu de part et d'autre du conteneur. Partagé par les tuiles
-   d'événements/auteurs (accueil, fiche auteur, fiche livre) et la nav de
-   section mobile (fiche livre). JS (assets/js/scroll-fade.js) bascule
-   .is-scroll-left/.is-scroll-right sur .pf-scroll-fade selon scrollLeft/
-   scrollWidth de son enfant .pf-hscroll (ou de lui-même s'il n'y a pas
-   d'enfant .pf-hscroll — cas d'un conteneur qui scrolle lui-même).
-   Couleur du dégradé via --pf-scroll-fade-color (défaut : --pf-cream) ;
-   surcharger avec une seule déclaration selon le fond réel du contexte. ====== */
-.pf-scroll-fade {
+   Fondu de bord d'un scroll horizontal — signale que du contenu sort du champ
+   d'un côté ou de l'autre. Partagé par les tuiles d'événements/auteurs (accueil,
+   fiche auteur, fiche livre), les navs de section (fiche livre, fiche événement,
+   compte client), l'infobulle de la vue carte, et la rangée de filtres du
+   catalogue (cf. son exception plus bas).
+
+   MASQUE, et non dégradé peint par-dessus (bascule du 2026-07-29) : on retire
+   l'opacité du contenu lui-même au lieu de peindre la couleur du fond dessus.
+     - Un dégradé doit CONNAÎTRE le fond, donc être redéclaré contexte par contexte
+       (l'ancienne `--pf-scroll-fade-color`, supprimée) — et il devient faux dès que
+       ce fond n'est pas un aplat. La nav de section est une barre en verre (fond
+       translucide + backdrop-filter) : le dégradé y posait une bavure crème opaque
+       sur le flou. Elle avait donc DÉJÀ son masque local ; c'est celui-ci, le plus
+       complet des trois qui coexistaient, qui est remonté ici.
+     - Un masque n'a rien à savoir du fond : une seule écriture pour tous les hôtes.
+   Sur fond opaque de la couleur attendue, les deux rendus sont indiscernables —
+   c'est pourquoi la divergence a pu passer inaperçue si longtemps.
+
+   Ce qui NE change pas : `scroll-fade.js` reste la source d'état (il pose
+   .is-scroll-left / .is-scroll-right sur le wrapper), et le fondu s'anime toujours
+   en 0,25 s. Ce sont désormais les LONGUEURS du masque qui s'interpolent, d'où les
+   @property ci-dessous : sans typage, une custom property ne s'interpole pas et les
+   arrêts du dégradé de masque basculeraient d'un bloc. Navigateur sans @property :
+   masque fonctionnel, seule la transition saute.
+
+   Le masque porte sur le WRAPPER, jamais sur l'élément qui scrolle — c'est déjà
+   l'invariant de `scroll-fade.js` (« .pf-scroll-fade ne doit JAMAIS scroller
+   lui-même », le scroller est son unique enfant direct). Seule chose à surcharger
+   par contexte : --pf-fade-size, la longueur de la rampe. ==================== */
+@property --pf-fade-l { syntax: '<length>'; inherits: false; initial-value: 0px; }
+@property --pf-fade-r { syntax: '<length>'; inherits: false; initial-value: 0px; }
+
+/* .pf-cat-row-scroll (rangée de filtres du catalogue) est le seul hôte qui scrolle
+   LUI-MÊME et dont l'état vient de son propre contrôleur (catalogue.js, classes
+   .has-fade-*) plutôt que de scroll-fade.js. Sans wrapper à masquer, il porte donc
+   le masque directement — sans conséquence, un masque se cale sur la boîte de
+   bordure et non sur le contenu défilé. Il rejoint le composant ici plutôt que de
+   garder sa propre copie du masque dans catalogue.css. */
+.pf-scroll-fade,
+.pf-cat-row-scroll {
     position: relative;
-    --pf-scroll-fade-color: var(--pf-cream);
+    --pf-fade-size: 60px;
+    --pf-fade-l: 0px;
+    --pf-fade-r: 0px;
+    -webkit-mask-image: linear-gradient(to right, transparent 0, #000 var(--pf-fade-l), #000 calc(100% - var(--pf-fade-r)), transparent 100%);
+            mask-image: linear-gradient(to right, transparent 0, #000 var(--pf-fade-l), #000 calc(100% - var(--pf-fade-r)), transparent 100%);
+    transition: --pf-fade-l 0.25s ease, --pf-fade-r 0.25s ease;
 }
 
-.pf-scroll-fade::before,
-.pf-scroll-fade::after {
-    content: '';
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    width: 60px;
-    pointer-events: none;
-    z-index: 1;
-    opacity: 0;
-    transition: opacity 0.25s ease;
-}
+.pf-scroll-fade.is-scroll-left,
+.pf-cat-row-scroll.has-fade-left   { --pf-fade-l: var(--pf-fade-size); }
 
-.pf-scroll-fade::before {
-    left: 0;
-    background: linear-gradient(to right, var(--pf-scroll-fade-color), transparent, transparent);
-}
-
-.pf-scroll-fade::after {
-    right: 0;
-    background: linear-gradient(to left, var(--pf-scroll-fade-color), transparent, transparent);
-}
-
-.pf-scroll-fade.is-scroll-left::before  { opacity: 1; }
-.pf-scroll-fade.is-scroll-right::after  { opacity: 1; }
+.pf-scroll-fade.is-scroll-right,
+.pf-cat-row-scroll.has-fade-right  { --pf-fade-r: var(--pf-fade-size); }
 
 /* =========================================================
    Popup d'événement flottant (.pf-map-pop) — COMPOSANT PARTAGÉ.
@@ -1861,16 +1928,14 @@ html.pf-notices-js .wc-block-components-notices__snackbar {
     padding-top: var(--pf-space-4);
 }
 
-/* Enveloppe scroll-fade de la rangée : porte les ombres de bord gauche/droite.
+/* Enveloppe scroll-fade de la rangée : porte le fondu de bord gauche/droite.
    C'est l'enfant direct du conteneur flex column → flex-shrink:0 pour ne pas la
-   comprimer. Couleur du fondu = fond du popup (surchargée par le contexte si besoin). */
+   comprimer. Le fondu étant un masque, il n'y a plus de couleur de fond à lui
+   déclarer (l'ancienne --pf-scroll-fade-color pointait ici sur --pf-surface-alt,
+   le fond du popup) : seule sa longueur reste propre au contexte. */
 .pf-map-pop__fade {
     flex-shrink: 0;
-    --pf-scroll-fade-color: var(--pf-surface-alt);
-}
-.pf-map-pop__fade::before,
-.pf-map-pop__fade::after {
-    width: 36px;
+    --pf-fade-size: 36px;
 }
 
 /* Rangée horizontale des cartes d'événement (composant global .pf-event-tile,
@@ -1930,15 +1995,6 @@ html.pf-notices-js .wc-block-components-notices__snackbar {
    sans lien avec la mise en page (position:relative n'a pas d'effet visuel ici). */
 .pf-sectionnav__track {
 	position: relative;
-}
-
-/* Ombre de bord (.pf-scroll-fade) : wrap statique distinct de l'élément qui scrolle
-   (.pf-sectionnav__track, son enfant) — jamais le même élément, sinon le dégradé
-   (position:absolute relatif à sa propre boîte) ferait partie de la zone de scroll
-   et se déplacerait avec le contenu au lieu de rester épinglé au bord. Couleur
-   alignée sur le fond de la nav (--pf-cream-dark). */
-.pf-sectionnav .pf-scroll-fade {
-	--pf-scroll-fade-color: var(--pf-cream-dark);
 }
 
 .pf-sectionnav::before {
@@ -2018,12 +2074,16 @@ html.pf-notices-js .wc-block-components-notices__snackbar {
 		box-shadow: var(--pf-shadow-stuck);
 		z-index: 100;
 		/* Full-bleed : le fond couvre la largeur du viewport (même technique que
-		   .pf-sticky-bar), le 1er lien reste aligné sur le contenu. */
+		   .pf-sticky-bar). Le rentrant qui aligne le 1er lien sur le contenu est
+		   porté par .pf-sectionnav__track (voir plus bas), PAS ici : porté par la
+		   nav, il rentrait aussi la zone de défilement et le wrap .pf-scroll-fade,
+		   dont les dégradés s'arrêtaient alors 24px en deçà du bord de l'écran —
+		   couture verticale franche, puis une lisière de barre intacte. */
 		width: calc(100vw - var(--scrollbar-offset, 0px));
 		margin-left:  calc(50% - 50vw + var(--scrollbar-offset, 0px) / 2);
 		margin-right: calc(50% - 50vw + var(--scrollbar-offset, 0px) / 2);
-		padding-left:  calc(50vw - 50% - var(--scrollbar-offset, 0px) / 2);
-		padding-right: calc(50vw - 50% - var(--scrollbar-offset, 0px) / 2);
+		padding-left: 0;
+		padding-right: 0;
 		box-sizing: border-box;
 		/* Masquée tant que le haut de la 1ère section n'a pas atteint le haut de
 		   l'écran (JS : section-nav.js, classe .is-visible) — évite qu'elle
@@ -2049,19 +2109,43 @@ html.pf-notices-js .wc-block-components-notices__snackbar {
 		}
 	}
 
-	/* Le défilement horizontal vit sur .pf-sectionnav__track (pas sur .pf-sectionnav
-	   lui-même) : ce dernier est full-bleed (100vw), donc si LUI portait l'overflow,
-	   le clip du scroll se ferait à la largeur de l'écran plutôt qu'à celle du
-	   conteneur visuel — les liens voisins dépasseraient dans la zone de bleed. */
-	.pf-sectionnav__track {
+	/* Le défilement horizontal vit sur .pf-sectionnav__track, jamais sur son parent
+	   .pf-scroll-fade (scroll-fade.js exige un wrap statique distinct de l'élément
+	   qui scrolle). Le track couvre toute la largeur de l'écran et porte lui-même le
+	   rentrant du conteneur : les liens sortent du champ par le BORD DE L'ÉCRAN, où
+	   le fondu peut donc se poser. Ce rentrant est déjà soustrait par section-nav.js
+	   (padLeft) pour caler le lien actif au ras du contenu.
+
+	   Sélecteur redondant (0,2,0) : le track de la variante --static est un <ul>,
+	   et sur les pages compte il tombe sous `.single-content ul` de Kadence
+	   (content.min.css, 0,1,1 → padding-left: 2em = 34px), qui battrait une classe
+	   seule. Le reset `padding: 0` de --static masquait ce conflit tant qu'il
+	   s'appliquait aussi en barre horizontale. */
+	.pf-sectionnav .pf-sectionnav__track {
 		display: flex;
 		flex-direction: row;
 		overflow-x: auto;
 		white-space: nowrap;
 		scrollbar-width: none;
+		/* Rentrant = padding latéral du conteneur Kadence, exprimé par le token et
+		   NON par `calc(50vw - 50%)` : un pourcentage se résout contre le bloc
+		   conteneur de l'élément qui l'utilise — ici .pf-scroll-fade, désormais large
+		   de 100vw → l'expression tomberait à 0. Constant à 24px sur tout l'intervalle
+		   ≤1023px (la largeur max de contenu, 1290px, n'y est jamais atteinte). */
+		padding-left:  var(--global-content-edge-padding, 1.5rem);
+		padding-right: var(--global-content-edge-padding, 1.5rem);
 	}
 
 	.pf-sectionnav__track::-webkit-scrollbar { display: none; }
+
+	/* Le fondu de bord est celui du composant global (masque — c'est d'ici qu'il
+	   vient) ; il ne reste à régler que sa longueur.
+	   3.5rem (56px) et non 2.5 : le fondu part du BORD DE L'ÉCRAN, alors que le
+	   dégradé peint qu'il a remplacé commençait 24px plus loin (le padding latéral
+	   du site, porté par le track). Sa portée utile valait donc 24px de barre nue
+	   + ~30px de rampe = 54px depuis le bord ; 56px la rétablit. Plus long (5rem
+	   testé) et le fondu mord sur le libellé actif au lieu du seul voisin. */
+	.pf-sectionnav .pf-scroll-fade { --pf-fade-size: 3.5rem; }
 
 	.pf-sectionnav::before { display: none; }
 
@@ -2156,8 +2240,11 @@ html.pf-notices-js .wc-block-components-notices__snackbar {
    ligne »). Markup en <ul>/<li> (menu sémantique) au lieu des <a> à plat du
    composant de base. ========================================================= */
 
-/* Reset liste — le composant de base a des <a> enfants directs du track. */
-.pf-sectionnav--static .pf-sectionnav__track { margin: 0; padding: 0; list-style: none; }
+/* Reset liste — le composant de base a des <a> enfants directs du track. Le
+   `padding: 0` du <ul> est réservé au desktop (bloc ≥1024px plus bas) : en barre
+   horizontale (≤1023px) le track porte le rentrant full-bleed, et cette règle-ci
+   — plus spécifique (0,2,0) ET plus bas dans le fichier — l'écraserait. */
+.pf-sectionnav--static .pf-sectionnav__track { margin: 0; list-style: none; }
 .pf-sectionnav--static .pf-sectionnav__track li { margin: 0; }
 
 /* Pas de ligne verticale reliant les pastilles. */
@@ -2168,6 +2255,10 @@ html.pf-notices-js .wc-block-components-notices__snackbar {
 .pf-sectionnav--static .woocommerce-MyAccount-navigation-link--customer-logout a::before { display: none; }
 
 @media (min-width: 1024px) {
+	/* Reset du padding-inline-start natif du <ul> (rail vertical : pas de rentrant
+	   full-bleed à porter ici, contrairement à la barre horizontale ≤1023px). */
+	.pf-sectionnav--static .pf-sectionnav__track { padding: 0; }
+
 	/* Chaque <a> est l'unique enfant de son <li> → le `a:first-child` du composant
 	   de base ciblerait TOUS les liens (aplatissement + pastille décalée vers le
 	   haut). On rétablit la géométrie normale (padding + pastille centrée) partout. */

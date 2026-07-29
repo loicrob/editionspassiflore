@@ -111,7 +111,7 @@ class Passiflore_Recherche_Auteurs {
 			$message = trim( (string) $search ) === ''
 				? __( 'Aucun auteur pour le moment.', 'kadence-child' )
 				: __( 'Aucun auteur ne correspond à votre recherche.', 'kadence-child' );
-			return '<p class="pf-rech-vide">' . esc_html( $message ) . '</p>';
+			return '<p class="pf-empty">' . esc_html( $message ) . '</p>';
 		}
 
 		$html = '<div class="pf-auteurs-grille">';

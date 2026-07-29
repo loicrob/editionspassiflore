@@ -296,21 +296,14 @@
 	color: var(--pf-accent);
 }
 
-/* ─── Suggestions de livres ──────────────────────────────────────── */
-/* L'étagère apporte son propre bookshelf.css ; ici, juste le chrome de section. */
-
-.pf-account-reco,
-.pf-reco {
-	margin-top: 2.5rem;
-}
-
 .pf-account-reco > h2,
 .pf-reco > h2 {
 	margin: 0 0 1rem;
 }
 
 /* En-tête d'étagère : titre à gauche, switch d'affichage « Couvertures | Dos »
-   à droite, sur la même ligne (Suggestions, Ma liste de lecture, Catalogue). */
+   à droite, sur la même ligne (Suggestions, Ma liste de lecture, Catalogue).
+   Sur mobile le switch passe sous le titre, pleine largeur — cf. Responsive. */
 .pf-shelf-head {
 	display: flex;
 	align-items: center;
@@ -331,6 +324,19 @@
 	transition: opacity 0.15s ease;
 }
 
+/* Page /liste-de-lecture : sépare les deux étagères (« Ma liste de lecture » et
+   « Catalogue »), collées l'une à l'autre — les deux <section> n'ont aucune
+   marge propre. Le conteneur est un simple <div> en flux, où un `gap` serait
+   inerte : d'où la colonne flex. Colonne et non grille : sur l'axe transversal
+   d'un flex, `min-width:auto` se résout à 0, donc une rangée d'étagère encore
+   trop large avant le re-packing de bookshelf.js déborde visuellement comme en
+   flux — là où une piste de grille, elle, s'élargirait à son contenu. */
+.pf-liste-lecture {
+	display: flex;
+	flex-direction: column;
+	gap: var(--pf-space-6);
+}
+
 /* État vide de « Ma liste de lecture » (page /liste-de-lecture) : message à la
    place de l'étagère, invitant à ajouter des signets depuis le Catalogue. */
 .pf-liste-lecture-empty {
@@ -346,6 +352,66 @@
 /* Titres de section greffés (adresses dans le compte, téléchargements dans les commandes). */
 .pf-account-section-title {
 	margin-top: 2.5rem;
+}
+
+/* ─── Page « Adresses » ──────────────────────────────────────────── */
+/* Carte d'adresse centrée de bout en bout : titre, adresse, bouton d'action
+   (cf. woocommerce/myaccount/my-address.php). La carte est une colonne flex :
+   l'espacement vertical vient du `gap` seul, pas de marges d'éléments — donc
+   une seule valeur à régler, et les mêmes écarts quel que soit l'état de la
+   carte. Les marges des trois blocs sont mises à zéro pour ça (celles du <h2>
+   et de l'<address> s'AJOUTERAIENT au gap : entre items flex, les marges ne
+   fusionnent pas). */
+.woocommerce-account .woocommerce-Address {
+	display: flex;
+	flex-direction: column;
+	gap: var(--pf-space-5);
+}
+
+.woocommerce-account .woocommerce-Address-title,
+.woocommerce-account .woocommerce-Address-title h2 {
+	margin: 0;
+	text-align: center;
+}
+
+/* `font-style: normal` : l'italique vient de la feuille de style par défaut du
+   navigateur (`address { font-style: italic }`), pas d'un choix de design — une
+   adresse postale n'est pas une citation. */
+.woocommerce-account .woocommerce-Address address {
+	margin: 0;
+	text-align: center;
+	font-style: normal;
+}
+
+/* ⚠️ L'<address> est rendu MÊME sans adresse enregistrée : il porte le hook
+   `woocommerce_my_account_after_my_address`, qu'un greffon peut alimenter dans
+   les deux cas. Item flex de hauteur nulle, il ferait donc compter DEUX gaps
+   entre le titre et le bouton (soit le double de l'écart de la carte
+   renseignée). On le sort de la colonne tant qu'il ne rend rien — et il y
+   revient de lui-même si un greffon écrit dedans.
+   `:empty` exige zéro nœud enfant, espaces blancs COMPRIS : c'est pour ça que
+   le gabarit ne met aucun espace entre `<address>` et son PHP. */
+.woocommerce-account .woocommerce-Address address:empty {
+	display: none;
+}
+
+/* Bouton d'action de la carte, sous l'adresse. Couleurs fournies par
+   .pf-btn--primary et par la règle .button du compte (plus haut) ; ici, le
+   seul calage — `align-self` centre ET ramène l'item à la largeur de son
+   contenu, là où un item flex s'étirerait sur toute la colonne.
+
+   Le lien porte AUSSI `.button` : la règle globale des liens de contenu
+   (`.entry-content a:not(.button)…`, style.css) impose sinon `color` et
+   `text-decoration: underline` en !important — soit du rouge sur rouge et un
+   soulignement. `.button` est la classe par laquelle cette règle exclut les
+   liens-boutons (même double-classage que le bouton « Google Maps » de la
+   fiche événement).
+
+   Plus de shim anti-Kadence à prévoir ici : le `float: right; padding: .3em 0`
+   de `woocommerce-account.min.css` est scopé à `.title .edit`, or le lien vit
+   désormais hors du `<header>`. */
+.woocommerce-account .woocommerce-Address .pf-address-btn {
+	align-self: center;
 }
 
 /* ─── Zone de suppression du compte ──────────────────────────────── */
@@ -395,5 +461,43 @@
 @media (max-width: 1023px) {
 	.woocommerce-account .woocommerce-MyAccount-navigation.pf-sectionnav {
 		width: calc(100vw - var(--scrollbar-offset, 0px));
+	}
+
+	/* Espacement barre ↔ contenu — idiome des pages à barre sticky (/catalogue,
+	   /auteurs) : `.content-area { margin-top: 0 }` pour que la barre se cale au
+	   RAS du header, et c'est la barre qui porte la respiration en dessous d'elle
+	   (`.pf-sticky-bar { margin-bottom: var(--pf-space-6) }`, style.css).
+	   Ici la barre est le premier enfant de la zone de contenu : les 32px de
+	   `#primary` (--global-md-spacing) tombaient donc AU-DESSUS d'elle, et le
+	   contenu venait coller sous son bord — l'espace était du mauvais côté.
+	   `:has()` : la page de connexion partage `.woocommerce-account` sans avoir
+	   de nav (même motif que `#primary:has(.pf-auth)` plus haut, qui neutralise
+	   la marge basse). Desktop non concerné : le rail y est vertical, à côté du
+	   contenu, et la marge haute de #primary y est le rythme normal de la page. */
+	.woocommerce-account #primary:has(.pf-sectionnav--static) {
+		margin-top: 0;
+	}
+
+	.woocommerce-account .woocommerce-MyAccount-navigation.pf-sectionnav--static {
+		margin-bottom: var(--global-md-spacing);
+	}
+}
+
+/* Mobile : les 3 switchs d'affichage (Suggestions sur l'accueil du compte, Ma
+   liste de lecture + Catalogue sur /liste-de-lecture) passent SOUS leur titre,
+   pleine largeur. Le `flex-wrap` de .pf-shelf-head les renvoyait déjà à la
+   ligne, mais ils y restaient à leur largeur de contenu (223px sur 342), calés
+   à gauche sous un titre qui, lui, occupe la ligne entière.
+   `align-items: stretch` suffit à les étirer : un item flex est blockifié, donc
+   l'`inline-flex` du composant .pf-switch calcule `flex` ici. `flex: 1` sur les
+   segments partage ensuite la largeur en deux parts égales. */
+@media (max-width: 767px) {
+	.pf-shelf-head {
+		flex-direction: column;
+		align-items: stretch;
+	}
+
+	.pf-shelf-head .pf-switch__btn {
+		flex: 1;
 	}
 }

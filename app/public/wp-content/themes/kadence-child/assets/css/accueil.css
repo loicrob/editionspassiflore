@@ -712,7 +712,6 @@ Workaround: stack two pseudo-elements. ::before is the base gradient (always vis
 .pf-etagere-accroche {
     grid-area: 2 / 1 / 3 / -1;
     margin: 0;
-    max-width: 70ch;
     font-size: var(--pf-text-sm);
     line-height: var(--pf-leading-snug);
     color: var(--pf-muted);

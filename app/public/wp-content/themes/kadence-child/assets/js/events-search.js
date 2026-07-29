@@ -4,10 +4,15 @@
  * Résultats paginés par lots de PAGE_SIZE (même mécanisme que la liste
  * normale : sentinelle + IntersectionObserver en bas de la liste de
  * résultats, réutilisant les classes pf-ev-bottom/pf-ev-sentinel — donc le
- * même spinner logo, sans CSS supplémentaire). L'offset est un simple compteur
- * côté client (nombre de résultats déjà chargés pour la requête courante) ;
- * chaque nouvelle frappe (recherche différente) réinitialise l'offset à 0 et
- * remplace les résultats, un scroll vers le bas des résultats charge la suite.
+ * même logo tournant et les mêmes styles, sans CSS supplémentaire). L'offset
+ * est un simple compteur côté client (nombre de résultats déjà chargés pour la
+ * requête courante) ; chaque nouvelle frappe (recherche différente) réinitialise
+ * l'offset à 0 et remplace les résultats, un scroll vers le bas charge la suite.
+ *
+ * Attente d'une réponse : le retour se pose là où le résultat va apparaître —
+ * filet accent au bas du sous-header pour une NOUVELLE recherche (composant
+ * partagé avec la recherche globale du header, style.css), logo tournant au bas
+ * des résultats pour le LOT SUIVANT. Cf. setLoading().
  *
  * Au lancement d'une recherche (1ers résultats affichés), la page remonte en
  * haut (window.scrollTo(0,0)) pour que la barre et les résultats soient
@@ -65,12 +70,13 @@
 		var active    = false; // recherche actuellement affichée (liste masquée) ?
 		var savedScrollY = 0;
 		var resultsList  = null;
-		var resultsBottomWrap = null; // pf-ev-bottom : sentinelle + spinner du lot suivant
+		var resultsBottomWrap = null; // pf-ev-bottom : sentinelle + logo du lot suivant
 		var resultsIO    = null;
 		var query    = '';
 		var offset   = 0;
 		var hasMore  = false;
 		var pageBusy = false;
+		var seq      = 0; // dernière requête gagne (cf. fetchPage)
 
 		// Sélecteurs ':not' : excluent nos propres liste/échafaudage de résultats,
 		// qui partagent leurs classes (tribe-events-calendar-list, pf-ev-bottom)
@@ -101,7 +107,7 @@
 
 		// Échafaudage des résultats : liste + son propre déclencheur de lot suivant.
 		// Mêmes classes pf-ev-bottom/pf-ev-sentinel que la liste normale → même
-		// spinner logo et mêmes styles, aucun CSS propre à la recherche nécessaire.
+		// logo tournant et mêmes styles, aucun CSS propre à la recherche.
 		// Créé une seule fois par session de recherche active (persiste d'une
 		// requête à l'autre, comme resultsList lui-même).
 		function ensureResultsScaffold() {
@@ -144,9 +150,33 @@
 			else resultsList.insertAdjacentHTML('beforeend', html);
 		}
 
+		// Attente d'une réponse — DEUX retours, chacun là où le résultat va
+		// apparaître, jamais les deux à la fois :
+		//  - nouvelle recherche → filet accent au bas du sous-header (composant
+		//    partagé avec la recherche globale, cf. style.css). Le bas des
+		//    résultats ne conviendrait pas : à la 1re frappe l'échafaudage
+		//    n'existe pas encore, ensuite il est repoussé sous les résultats
+		//    précédents — donc hors écran, l'attente ne se voyait pas.
+		//  - lot suivant → logo tournant au bas des résultats (.pf-ev-bottom,
+		//    events-infinite.css), comme le scroll infini de la liste normale.
+		//    Le filet du sous-header y serait invisible : ce lot est déclenché
+		//    par un scroll DESCENDANT, qui rétracte justement la barre
+		//    (.pf-sticky-bar.is-hidden, opacity 0 — mesuré).
+		function setLoading(bottom) {
+			var target = bottom ? resultsBottomWrap : bar;
+			if (target) target.classList.add('is-loading');
+		}
+		// Éteint les deux sans avoir à se souvenir duquel a été allumé.
+		function clearLoading() {
+			if (bar) bar.classList.remove('is-loading');
+			if (resultsBottomWrap) resultsBottomWrap.classList.remove('is-loading');
+		}
+
 		function restoreList() {
 			if (!active) return;
 			active = false;
+			seq++; // invalide la requête en vol : sa réponse ne rallumera rien
+			clearLoading();
 			if (abortCtrl) abortCtrl.abort();
 			if (resultsIO) { resultsIO.disconnect(); resultsIO = null; }
 			removeNode(resultsList); resultsList = null;
@@ -156,11 +186,16 @@
 			query = ''; offset = 0; hasMore = false; pageBusy = false;
 		}
 
+		// Garde de séquence (`mine`/`seq`) : abort() rejette la requête précédente
+		// de façon ASYNCHRONE, donc son .catch() s'exécute APRÈS le setLoading()
+		// de la nouvelle — sans garde, il éteindrait le retour d'une requête
+		// encore en vol. Même motif que la recherche carte (events-map.js).
 		function fetchPage(isNewSearch) {
 			if (abortCtrl) abortCtrl.abort();
 			abortCtrl = new AbortController();
+			var mine = ++seq;
 			pageBusy = true;
-			if (resultsBottomWrap) resultsBottomWrap.classList.add('is-loading');
+			setLoading(! isNewSearch);
 
 			var fd = new FormData();
 			fd.append('action', 'pf_events_search');
@@ -170,8 +205,9 @@
 			fetch(cfg.ajax_url, { method: 'POST', body: fd, credentials: 'same-origin', signal: abortCtrl.signal })
 				.then(function (r) { return r.json(); })
 				.then(function (payload) {
+					if (mine !== seq) return; // une requête plus récente est partie
 					pageBusy = false;
-					if (resultsBottomWrap) resultsBottomWrap.classList.remove('is-loading');
+					clearLoading();
 					if (!payload || !payload.success) return;
 					var data = payload.data || {};
 					if (isNewSearch) { offset = 0; showResults(data.html || '', true); }
@@ -180,8 +216,9 @@
 					hasMore = !!data.has_more;
 				})
 				.catch(function (err) {
+					if (mine !== seq) return;
 					pageBusy = false;
-					if (resultsBottomWrap) resultsBottomWrap.classList.remove('is-loading');
+					clearLoading();
 					if (err.name !== 'AbortError') console.error('pf-events-search:', err);
 				});
 		}
@@ -249,6 +286,7 @@
 
 		function teardown() {
 			clearTimeout(timer);
+			seq++;
 			if (abortCtrl) abortCtrl.abort();
 			if (phMq) phMq.removeEventListener('change', applyPlaceholder);
 			if (resultsIO) resultsIO.disconnect();

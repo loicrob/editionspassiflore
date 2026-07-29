@@ -33,8 +33,77 @@
 	   trait d'épaisseur constante quel que soit le livre — exactement ce
 	   qu'on veut, un carton ne s'épaississant pas avec le nombre de pages. */
 	--pf-backcover: 4px;
+
+	/* Retrait latéral de la planche par rapport au bord de l'étagère — et,
+	   volontairement, la MÊME valeur pour le retrait ARRIÈRE de son dessus
+	   (clip-path). L'arête arrière du bois tombe donc à 2x cette valeur du
+	   bord, c'est-à-dire exactement là où commence le premier livre : d'où le
+	   padding latéral de la rangée en calc(... * 2).
+
+	   Ces trois nombres ne sont pas indépendants — les désaccorder décolle le
+	   pied du livre de l'arête de sa planche. Un seul token pour les tenir
+	   ensemble. Le hero (book-single.css) impose un padding plus GÉNÉREUX :
+	   l'invariant est un minimum (padding >= 2x retrait), pas une égalité. */
+	--pf-plank-inset: 20px;
 	--plank-h: 44px;
 	--plank-front: 8px;
+
+	/* Place réservée DEVANT le pied du livre pour le chevalet de prix (mode
+	   couvertures). C'est une profondeur de planche : elle se retranche de
+	   l'assise du livre dans le bois, `--plank-h` restant fixe. Le livre est
+	   donc assis d'autant plus en arrière — d'où le besoin de la faire varier
+	   AVEC la planche : à 390px, une réserve de 30px sur une planche de 40px
+	   ne laissait que 3px d'assise (8% de la profondeur du bois, contre 33%
+	   sur ordinateur) et le pied du livre affleurait l'arête arrière.
+	   Le chevalet mesure 21px à 390px et 24px à 1400px : la réserve doit
+	   rester au-dessus. L'étiquette « À paraître » s'en déduit (+4px). */
+	--pf-chevalet-reserve: 30px;
+
+	/* Agrandissement du livre SAISI en mode dos. Le dos est dessiné 1,5x plus
+	   grand que la même couverture en mode couvertures (mode_scale, pour que
+	   les titres verticaux restent lisibles) : une fois retourné, sa couverture
+	   atteignait 693px pour 308px disponibles à 390px (mesuré sur le plus grand
+	   format du catalogue) et débordait de l'étagère. bookshelf.js abaisse donc
+	   cette valeur par livre, juste assez pour que l'empreinte saisie tienne
+	   dans le rayon ; le dos AU REPOS garde sa taille, c'est sa lisibilité qui
+	   justifie le 1,5x. Valeur ici = repli sans JS et cas où tout tient.
+	   ⚠️ Elle apparaît AUSSI dans le perspective-origin de la saisie (terme
+	   `(scale - 1) x --book-h`, qui repère le haut du volume agrandi) et dans
+	   computeRevealShift() : les trois doivent rester d'accord, sinon
+	   l'atterrissage ne retombe plus sur la cavalière du mode couvertures. */
+	--pf-reveal-scale: 1.1;
+
+	/* Durée du DÉVOILEMENT (saisie : le livre pivote et vient se présenter de
+	   face) — source unique, jumelle de --pf-release-dur. Elle couvre tout ce
+	   qui accompagne le vol : rotation du volume, course de la caméra, voile de
+	   profondeur du dos, ombrage du bloc de pages, épaississement des plats.
+	   Ne PAS y inclure le délai d'avant-vol (700 ms, REVEAL_DELAY_MS dans
+	   bookshelf.js) : c'est le temps de survol exigé avant que le livre bouge,
+	   pas une durée d'animation.
+	   Pour observer le dévoilement au ralenti : mettre 15s. */
+	--pf-reveal-dur: 0.5s;
+
+	/* Durée du RETOUR AU REPOS depuis la saisie (mode dos) — source unique.
+	   Consommée par les trois règles de `.pf-book--releasing` (transform,
+	   perspective-origin, délai de commutation de perspective), par le délai
+	   de `visibility` de la couverture, ET par bookshelf.js, qui en déduit
+	   combien de temps garder la classe (elle porte aussi le z-index du
+	   livre pendant le retour : la lâcher trop tôt ferait passer la
+	   couverture encore ouverte derrière ses voisins).
+	   La changer ici change tout l'ensemble — c'est le seul endroit.
+	   Pour observer l'animation au ralenti : mettre 15s. */
+	--pf-release-dur: 0.5s;
+
+	/* Correctif d'échelle du mode DOS. Le PHP y dessine tout 1,5x plus grand
+	   (mode_scale, pour que les titres verticaux restent lisibles) ; sur un
+	   écran de téléphone les dos en deviennent trop hauts. Ce facteur ramène
+	   le rendu à 1,2x (0,8 x 1,5) et s'applique À TOUT l'intérieur du dos —
+	   dimensions (bookshelf.js), corps du texte, marges, logo — pour que la
+	   mise en page calculée par spine_layout() reste juste par similitude.
+	   ⚠️ Scopé au mode dos : les dos générés existent AUSSI en mode
+	   couvertures (livres sans photo de tranche), où ils ne doivent pas
+	   rétrécir. */
+	--pf-spines-scale: 1;
 	--plank-color-top: #d4c4a8;
 	--plank-color-front: #c0ad8e;
 	--plank-color-dark: #a89474;
@@ -85,8 +154,7 @@
 	display: flex;
 	align-items: flex-end;
 	gap: 18px;
-	padding: 40px 40px 3px 40px;
-	min-height: var(--shelf-inner);
+	padding: 40px calc(var(--pf-plank-inset) * 2) 3px;
 	position: relative;
 	z-index: 2;
 }
@@ -159,7 +227,7 @@
 /* Spines mode: books touch like on a real bookshelf */
 .pf-bookshelf--spines .pf-shelf-books {
 	gap: 2px;
-	padding: 40px 40px 0 40px;
+	padding: 40px calc(var(--pf-plank-inset) * 2) 0;
 }
 
 /* Planche plus haute quand les chevalets de prix sont affichés :
@@ -176,8 +244,8 @@
 	top: calc(-0.9 * var(--plank-h));
 	z-index: 1;
 	height: calc(var(--plank-h) + var(--plank-front));
-	margin-left: 20px;
-	margin-right: 20px;
+	margin-left: var(--pf-plank-inset);
+	margin-right: var(--pf-plank-inset);
 }
 
 .pf-shelf-plank::before {
@@ -188,7 +256,12 @@
 		linear-gradient(to bottom, rgba(255,255,255,0.2) 0%, transparent 40%, rgba(0,0,0,0.03) 100%),
 		linear-gradient(to right, var(--plank-color-top) 0%, #ddd0b8 20%, var(--plank-color-top) 50%, #d8c8a4 80%, var(--plank-color-top) 100%);
 	border-top: 1px solid rgba(255, 255, 255, 0.35);
-	clip-path: polygon(20px 0%, calc(100% - 20px) 0%, 100% 100%, 0% 100%);
+	clip-path: polygon(
+		var(--pf-plank-inset) 0%,
+		calc(100% - var(--pf-plank-inset)) 0%,
+		100% 100%,
+		0% 100%
+	);
 }
 
 .pf-shelf-plank::after {
@@ -246,7 +319,7 @@
 /* En covers, le livre est assis au fond de la planche pour laisser la
    place du chevalet devant lui. */
 .pf-bookshelf--covers .pf-book--has-price {
-	padding-bottom: 30px;
+	padding-bottom: var(--pf-chevalet-reserve);
 }
 
 .pf-book-inner {
@@ -537,7 +610,7 @@
 
 .pf-bookshelf--spines .pf-book.pf-book--cover-revealed .pf-book-spine::before {
 	opacity: 1;
-	transition: opacity 0.5s linear;
+	transition: opacity var(--pf-reveal-dur) linear;
 }
 
 /* Ombre de bascule — renforce le sentiment que le HAUT se rapproche.
@@ -592,9 +665,13 @@
 	visibility: hidden;
 	pointer-events: none;
 	z-index: 2;
+	/* Le délai de `visibility` doit couvrir TOUTE la durée du retour au repos,
+	   sinon la couverture s'éteint avant d'être refermée — d'où la variable
+	   partagée plutôt qu'un nombre recopié (il valait 0,45s, dimensionné pour
+	   le retour de 0,3s d'avant). */
 	transition:
 		transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94),
-		visibility 0s 0.45s;
+		visibility 0s var(--pf-release-dur);
 }
 
 /* ─── Couverture qui s'ouvre au curseur (spines) ─────────────────
@@ -723,11 +800,18 @@
 	background: linear-gradient(to left, rgba(0, 0, 0, 0), rgba(0, 0, 0, 0.18));
 	pointer-events: none;
 	opacity: 0;
-	transition: opacity 0.5s cubic-bezier(0.22, 0.61, 0.36, 1);
+	/* ⚠️ Seule transition du cycle déclarée UNE FOIS pour les deux sens : cet
+	   ombrage ne change qu'entre repos et saisie, et le style d'ARRIVÉE fournit
+	   la durée. Ici l'arrivée est le repos, donc le RETOUR ; l'aller est
+	   déclaré sur la règle de saisie juste en dessous. Sans ce dédoublement,
+	   un seul nombre gouvernerait les deux sens et l'ombrage se désolidariserait
+	   du vol dès que les deux durées diffèrent. */
+	transition: opacity var(--pf-release-dur) cubic-bezier(0.22, 0.61, 0.36, 1);
 }
 
 .pf-bookshelf--spines .pf-book.pf-book--cover-revealed .pf-book-pages::before {
 	opacity: 1;
+	transition: opacity var(--pf-reveal-dur) cubic-bezier(0.22, 0.61, 0.36, 1);
 }
 
 .pf-bookshelf--spines .pf-book-pages::after {
@@ -770,8 +854,8 @@
 	border-right-width: var(--pf-backcover);
 	transition:
 		border-right-color 0.15s linear,
-		border-left-width 0.5s cubic-bezier(0.22, 0.61, 0.36, 1),
-		border-right-width 0.5s cubic-bezier(0.22, 0.61, 0.36, 1);
+		border-left-width var(--pf-reveal-dur) cubic-bezier(0.22, 0.61, 0.36, 1),
+		border-right-width var(--pf-reveal-dur) cubic-bezier(0.22, 0.61, 0.36, 1);
 }
 
 .pf-bookshelf--spines .pf-book.pf-book--cover-revealed .pf-book-pages::after {
@@ -855,9 +939,21 @@
 		rotateX(calc(-1 * var(--pf-tip)));
 }
 
+/* ⚠️ .pf-book--releasing DOIT figurer ici — c'est le seul état qui couvre le
+   RETOUR au repos. Sans lui le livre retombe à z-index 2 dès le premier pixel
+   du retour (ni :hover ni la classe de saisie ne matchent plus, elles
+   disparaissent ensemble), alors que sa couverture fait encore ~300px de large
+   et pivote encore : elle est aussitôt peinte DERRIÈRE tous les frères qui la
+   suivent dans le DOM. Seule la part qui recouvre les frères PRÉCÉDENTS reste
+   visible — d'où une couverture qui semble écrasée/étirée vers la gauche,
+   coincée entre les dos voisins. Mesuré à 390px (sondes elementFromPoint sur
+   la largeur de la couverture, retour gelé image par image) : livre en tête de
+   rayon 5 sondes masquées sur 5 pendant TOUT le retour ; livre au milieu, 3
+   sur 5. Défaut ancien mais indolore tant que le retour durait 0,3s. */
 .pf-bookshelf--spines .pf-book:hover,
 .pf-bookshelf--spines .pf-book:focus-visible,
-.pf-bookshelf--spines .pf-book.pf-book--cover-revealed {
+.pf-bookshelf--spines .pf-book.pf-book--cover-revealed,
+.pf-bookshelf--spines .pf-book--releasing {
 	z-index: 10;
 }
 
@@ -871,15 +967,17 @@
    en y avec le facteur --pf-obl pour l'épaisseur du bandeau de pages.
 
    x0 / y0 = le coin haut-gauche du volume une fois posé, d'où la reprise de
-   --reveal-dx / --reveal-dy (recentrage JS) et du -0.1 x --book-h (le
-   scale(1.1), d'origine left bottom, remonte le haut du livre). Sans ces
-   termes le bandeau perdrait ~10 % de son épaisseur. */
+   --reveal-dx / --reveal-dy (recentrage JS) et du (scale - 1) x --book-h (le
+   scale de saisie, d'origine left bottom, remonte le haut du livre). Sans ces
+   termes le bandeau perdrait ~10 % de son épaisseur. Le facteur n'est plus
+   constant : bookshelf.js l'abaisse quand la couverture ne tiendrait pas dans
+   le rayon (cf. --pf-reveal-scale), et ce terme doit le suivre. */
 .pf-bookshelf--spines .pf-book.pf-book--cover-revealed {
 	perspective-origin:
 		calc(var(--reveal-dx, 0px) - (var(--persp) + var(--spine-w)))
 		calc(
 			var(--reveal-dy, 0px)
-			- 0.1 * var(--book-h)
+			- (var(--pf-reveal-scale) - 1) * var(--book-h)
 			- var(--pf-obl) * (var(--persp) + var(--spine-w))
 		);
 	/* L'œil repart au loin : la saisie doit retrouver --persp, celui sur lequel
@@ -902,7 +1000,7 @@
 	perspective: var(--persp);
 	transition:
 		perspective 0s 0s,
-		perspective-origin 0.5s cubic-bezier(0.22, 0.61, 0.36, 1);
+		perspective-origin var(--pf-reveal-dur) cubic-bezier(0.22, 0.61, 0.36, 1);
 }
 
 /* Étape 2 — saisie : rotation rigide du volume autour de l'arête
@@ -916,11 +1014,90 @@
 	transform:
 		translateX(var(--reveal-dx, 0px))
 		translateY(var(--reveal-dy, 0px))
-		scale(1.1)
+		scale(var(--pf-reveal-scale))
 		translateZ(calc(-1 * var(--spine-w)))
 		rotateY(-90deg)
 		rotateX(0deg);
-	transition: transform 0.5s cubic-bezier(0.22, 0.61, 0.36, 1);
+	transition: transform var(--pf-reveal-dur) cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+/* ─── Relâchement : le retour emprunte la durée ET la courbe de l'aller ──
+   Le repos transitionne en 0,3s avec une autre courbe que la saisie (0,5s) :
+   tant que le livre saisi n'était que 1,1x plus grand, l'asymétrie ne se
+   voyait pas. Depuis que --pf-reveal-scale peut le réduire à ~0,6 pour le
+   faire tenir dans un rayon étroit, le retour cumule un changement d'échelle
+   de 1,7x et une longue course horizontale : joué en 0,3s avec une courbe
+   différente, il se lit comme un claquement.
+
+   Classe TRANSITOIRE posée par bookshelf.js, car le CSS ne sait pas
+   distinguer « je quitte la SAISIE » de « je quitte la BASCULE » — cette
+   dernière, un simple redressement de 10°, doit rester à 0,3s. */
+.pf-bookshelf--spines .pf-book--releasing .pf-book-inner {
+	transition: transform var(--pf-release-dur) cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+/* ⚠️ `perspective` REPOSÉE ICI, explicitement, et commutée SANS DÉLAI.
+   La formule de caméra (perspective-origin de la saisie) est exacte *à
+   condition* que la perspective en vigueur soit bien --persp : le décalage de
+   l'œil y vaut -(--persp + --spine-w). Si la perspective en vigueur est
+   l'autre — celle de la bascule, --pf-tip-persp — le cisaillement est
+   |œil| x z / (P + z) au lieu de z, soit un dos fantôme démesuré qui traîne le
+   livre vers la gauche. Reproduit à l'identique en forçant P=1200px avec la
+   caméra calculée sur 6000 : dos fantôme 108px au lieu de 24, couverture
+   intacte à 205,7px — exactement l'image signalée le 2026-07-29.
+
+   Deux protections, parce que la valeur peut diverger de deux façons :
+   1. La DÉCLARATION (et non l'héritage de la règle de base) : le sélecteur est
+      en (0,3,0), à égalité avec `:hover`, et placé APRÈS lui dans le fichier —
+      il gagne donc même si l'état de survol met une image de plus à tomber que
+      le retrait de la classe de saisie par le JS. C'est cette fenêtre d'une
+      image qui rend le défaut dépendant du navigateur et de la machine.
+   2. Le DÉLAI NUL : le délai valait la durée du retour, donc une perspective
+      erronée au départ le restait du début à la fin. Rien à perdre à
+      commuter tout de suite — dans le cas nominal la valeur ne change pas,
+      donc il n'y a aucune transition à jouer. (Le délai de 0,3s de la règle
+      de base, lui, garde tout son sens : il sert au retour de la BASCULE,
+      où la perspective doit bien rester rapprochée jusqu'au redressement.) */
+.pf-bookshelf--spines .pf-book.pf-book--releasing {
+	perspective: var(--persp);
+	transition:
+		perspective 0s 0s,
+		perspective-origin var(--pf-release-dur) cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+/* ─── Le repli est ininterruptible ──────────────────────────────
+   Ramener le curseur sur le livre pendant son retour déclenchait onEnter,
+   donc cancelReleasing() : la classe tombait en plein vol, le livre basculait
+   en 0,3s avec une autre courbe et repartait pour un compte à rebours de
+   700 ms. Le retour cassait au milieu.
+
+   `pointer-events: none` est le SEUL levier qui neutralise vraiment le survol
+   — `:hover` suit le test de collision. Il coupe d'un coup la bascule CSS ET
+   le `mouseenter`, donc `onEnter` ne peut plus s'exécuter : aucun garde-fou à
+   ajouter côté JS, et donc aucun risque de désaccord entre l'état du
+   contrôleur et l'état de survol du moteur (la famille de bug qui a produit
+   les deux précédents).
+
+   Ce que ça n'expose PAS, contrairement à ce qu'on pouvait craindre : le
+   livre ne fait ici que la largeur de son dos au repos — il ne recouvre aucun
+   voisin. La couverture, elle, est déjà repassée en `pointer-events: none`
+   (règle de base) au retrait de la classe de saisie, donc les voisins ne
+   gagnent aucune sensibilité au survol qu'ils n'avaient pas déjà.
+
+   ⚠️ Scopé aux pointeurs qui survolent. Sur tactile il n'y a pas de survol à
+   neutraliser : rendre le livre inerte n'y coûterait qu'un tap avalé pendant
+   le repli. Le clavier n'est pas concerné non plus (`:focus-visible` ne passe
+   pas par les événements pointeur), la bascule au focus reste donc entière.
+
+   Le seul état à restaurer est celui du curseur revenu sur le livre à
+   l'atterrissage : le navigateur ré-évalue le survol au retrait de la classe
+   et redéclenche les événements de frontière, donc la bascule et le compte à
+   rebours repartent normalement — et si un moteur ne le faisait pas, `:hover`
+   matche quand même en CSS et le moindre mouvement de souris resynchronise. */
+@media (hover: hover) {
+	.pf-bookshelf--spines .pf-book--releasing {
+		pointer-events: none;
+	}
 }
 
 /* Une fois saisi, la face du volume ne bouge plus : l'ouverture au curseur
@@ -1117,8 +1294,13 @@
 	align-items: center;
 	/* ⚠️ Le total vertical (14 + 12) DOIT rester synchronisé avec
 	   Passiflore_Bookshelf::SPINE_PAD_Y : c'est ce que le PHP déduit du
-	   budget de texte pour calculer le corps du titre. */
-	padding: 14px 2px 12px;
+	   budget de texte pour calculer le corps du titre. Le facteur d'échelle
+	   s'applique aux DEUX (marges et corps), donc le budget du PHP reste juste
+	   par similitude — ne pas l'appliquer ici casserait la mise en page. */
+	padding:
+		calc(14px * var(--pf-spines-scale, 1))
+		calc(2px * var(--pf-spines-scale, 1))
+		calc(12px * var(--pf-spines-scale, 1));
 	box-sizing: border-box;
 	color: #fff;
 	overflow: hidden;
@@ -1163,10 +1345,16 @@
 	flex: 0 1 auto;
 }
 
+/* --pf-spine-fs est posé par le PHP (spine_texts_html) d'après la place
+   disponible ; --pf-spines-scale rétrécit le dos entier sur mobile. Le corps
+   doit suivre ce facteur, sinon le titre déborderait d'un dos réduit — la
+   mise en page du PHP reste juste PAR SIMILITUDE, tout l'intérieur du dos
+   (corps, marges, logo) étant multiplié par le même nombre. La valeur en dur
+   n'est plus qu'un repli. */
 .pf-spine-title {
 	font-family: Inter, system-ui, sans-serif;
 	font-weight: 700;
-	font-size: 11px;
+	font-size: calc(var(--pf-spine-fs, 11px) * var(--pf-spines-scale, 1));
 }
 
 /* Littérature : titre en Newsreader (serif). Culture Sud-Ouest : Inter, donc
@@ -1181,12 +1369,12 @@
 .pf-spine-authors {
 	font-family: Inter, system-ui, sans-serif;
 	font-weight: 400;
-	font-size: 9px;
+	font-size: calc(var(--pf-spine-fs, 9px) * var(--pf-spines-scale, 1));
 }
 
 .pf-spine-icon {
 	width: 70%;
-	max-width: 24px;
+	max-width: calc(24px * var(--pf-spines-scale, 1));
 	height: auto;
 	color: rgba(255, 255, 255, 0.85);
 	opacity: 0.9;
@@ -1229,11 +1417,24 @@ img.pf-spine-icon--white {
    ::before est le dos du pliage qui dépasse du haut. Frère de
    .pf-book-inner : il reste immobile quand le livre est saisi — et comme
    le livre agrandi ne le recouvre qu'à moitié, il s'efface au hover. */
+/* Centré dans la bande qui va du PIED DU LIVRE au DEVANT DE PLANCHE, et non
+   collé au bas du wrapper : posé sur `bottom: 0` il ne restait qu'un cheveu
+   entre le livre et le prix (1px à 390px, 6px sur ordinateur) alors que le
+   bois continuait dessous. La bande = la réserve du chevalet + le padding-bas
+   de la rangée (3px) + la part de planche qui dépasse sous ce bord
+   (`0.1 x --plank-h`, cf. le `top: -0.9 x --plank-h` de .pf-shelf-plank) ; on
+   vise son milieu, d'où le translate(-50%) vertical.
+   ⚠️ `bottom: auto` explicite : sans lui, `top` ET `bottom` seraient posés et
+   la boîte serait étirée entre les deux au lieu d'être centrée. */
 .pf-chevalet {
 	position: absolute;
-	bottom: 0;
+	top: calc(
+		var(--book-h)
+		+ (var(--pf-chevalet-reserve) + 3px + 0.1 * var(--plank-h)) / 2
+	);
+	bottom: auto;
 	left: 50%;
-	transform: translateX(-50%) rotateX(20deg);
+	transform: translate(-50%, -50%) rotateX(20deg);
 	z-index: 5;
 	pointer-events: none;
 	transition: opacity 0.25s ease;
@@ -1333,11 +1534,13 @@ img.pf-spine-icon--white {
 	pointer-events: none;
 }
 
-/* Avec chevalet de prix, le wrapper porte un padding-bas (30px) qui remonte
-   le livre au-dessus du chant : on décale l'étiquette d'autant pour la
-   garder sur le devant de planche, et non au niveau du chevalet. */
+/* Avec chevalet de prix, le wrapper porte un padding-bas qui remonte le livre
+   au-dessus du chant : on décale l'étiquette d'autant pour la garder sur le
+   devant de planche, et non au niveau du chevalet. Dérivée de la réserve pour
+   qu'elle suive automatiquement (30 + 4 = 34px sur ordinateur, valeur
+   d'origine). */
 .pf-book--has-price .pf-book-shelf-label {
-	top: calc(var(--book-h) + 34px);
+	top: calc(var(--book-h) + var(--pf-chevalet-reserve) + 4px);
 }
 
 /* Étiquette de format (Classique, Grands caractères…) : fond neutre, texte gris chaud. */
@@ -1541,14 +1744,8 @@ img.pf-spine-icon--white {
 	pointer-events: none;
 }
 
-/* ─── Empty State ────────────────────────────────────────────── */
-
-.pf-bookshelf-empty {
-	text-align: center;
-	padding: 40px 20px;
-	color: var(--pf-muted);
-	font-style: italic;
-}
+/* ─── Empty State ──────────────────────────────────────────────
+   Étagère vide : composant global .pf-empty (style.css). */
 
 /* ─── Mode HERO (fiche livre) ────────────────────────────────────
    En mode hero (page produit unique), la rotation de couverture est
@@ -1643,13 +1840,69 @@ img.pf-spine-icon--white {
 
 /* ─── Responsive ─────────────────────────────────────────────── */
 
-@media (max-width: 768px) {
+/* 767 et non 768 : point de rupture du design system (max-width:767px <->
+   min-width:768px). À 768px pile, l'ancien `max-width: 768px` appliquait encore
+   l'angle de fuite mobile alors que tout le reste du site y est déjà en
+   « tablette » — c'est le seul écart de rendu attendu de cette correction. */
+@media (max-width: 767px) {
 	/* Angle de fuite radouci (13° au lieu de 18°). Une seule valeur : le
 	   bandeau covers, la caméra du mode spines, l'écart des stries de la
 	   face supérieure et la projection du plat arrière suivent tous
 	   --pf-obl. */
 	.pf-bookshelf {
 		--pf-obl: 0.2309;
+
+		/* Mobilier resserré. Il est ABSOLU (aucune media query ne le touchait
+		   jusqu'ici) : les mêmes 40px de padding et la même planche de 44/58px
+		   qu'à 1400px mangeaient 33% d'un écran de 390px avant le premier
+		   pixel de livre, et laissaient 92px entre une planche et le livre du
+		   dessous — 34% de la hauteur d'une rangée, contre 29% sur ordinateur.
+		   L'écart ne bougeait pas, les livres rapetissaient. */
+		--pf-plank-inset: 8px;   /* -> padding latéral 16px au lieu de 40 */
+		--plank-h: 32px;         /* -> zone morte 28.8px au lieu de 39.6 */
+		--plank-front: 6px;
+
+		/* Resserrée en proportion de la planche (le chevalet n'y fait que 21px)
+		   pour rendre au livre son assise : sans ça il affleurait l'arête
+		   arrière du bois. Avec 22px et une planche de 44, l'assise retombe à
+		   33% de la profondeur — exactement le rapport de l'ordinateur. */
+		--pf-chevalet-reserve: 22px;
+	}
+
+	.pf-bookshelf--show-price.pf-bookshelf--covers {
+		/* 44 et non 40 : c'est la moitié « planche » du même correctif
+		   d'assise (l'autre étant --pf-chevalet-reserve). Ne coûte que 3,6px
+		   sur l'écart entre deux rangées. */
+		--plank-h: 44px;
+	}
+
+	/* Dos rendus à 1,2x au lieu de 1,5x : à cette largeur ils étaient trop
+	   hauts au repos. Uniquement en mode dos (cf. --pf-spines-scale). */
+	.pf-bookshelf--spines {
+		--pf-spines-scale: 0.8;
+	}
+
+	.pf-shelf-books {
+		gap: 12px;   /* le mode dos garde ses 2px : sa règle est plus spécifique */
+	}
+
+	/* Le padding HAUT ne se réduit qu'en shelves + COUVERTURES. Trois exclusions,
+	   chacune mesurée :
+	   • mode scroll — le rayon rogne au padding-box et computeRevealShift ne
+	     peut redescendre le livre que de la valeur du padding-bas (3px) : ce
+	     dégagement haut est le seul qui empêche de couper le livre dévoilé ;
+	   • mode DOS — la bascule au survol fait monter l'encre de 55px pour les
+	     livres les plus profonds (mesuré à 390px sur le plus profond du
+	     catalogue) ; avec 18px il ne resterait que 47px de dégagement et le
+	     bandeau de pages mordrait sur la planche du dessus. Le gain y serait
+	     de toute façon marginal (4% de la hauteur de page, les rangées étant
+	     dominées par la hauteur des dos) ;
+	   • hero (32px, book-single.css) et étagère de recommandations (64px pour
+	     son badge flottant) — exclus explicitement plutôt qu'en pariant sur
+	     l'ordre de chargement, leurs règles ayant une spécificité comparable.
+	   En couvertures la montée n'est que de 17px pour 48px de dégagement. */
+	.pf-bookshelf--shelves.pf-bookshelf--covers:not(.pf-bookshelf--hero):not(:has(.pf-book-reco)) .pf-shelf-books {
+		padding-top: 18px;
 	}
 
 	.pf-bookshelf--covers .pf-book-spine {

@@ -41,9 +41,6 @@ function pf_beta_a_verifier() {
 function pf_beta_bugs_connus() {
 	return [
 		'Sur mobile, pour les étagères en général, pas assez d’espaces autour des livres au sein des étagères',
-		'Événements : bordure rouge quand on clique sur un événement',
-		'"Mon compte" : design pas top des adresses',
-		'Sur mobile, design pas top des "petits" sous-menus dans la page d’un livre, d’un événement et de "Mon compte"',
 		'Design pas top pages de connexion, de panier, commande et commande passée',
 	];
 }

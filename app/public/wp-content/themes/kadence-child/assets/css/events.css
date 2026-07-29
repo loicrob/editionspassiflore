@@ -338,6 +338,20 @@
     width: 100%;
 }
 
+/* Filet d'attente des recherches (composant partagé, style.css) — posé par
+   events-search.js (vue liste) et events-map.js (vue carte) le temps de la
+   requête, à la place d'un spinner. Ancré au BAS du header, sur toute la
+   largeur de l'écran : le pseudo-élément est absolu et le premier ancêtre
+   positionné n'est pas .pf-sub-header (jamais `position`, cf. style.css) mais
+   le <header> lui-même (position:sticky) — il se cale donc sur SA boîte de
+   padding, qui est full-bleed, et non sur le contenu centré du sous-header.
+   Le trait remplace visuellement la bordure basse de la barre le temps de la
+   requête ; hors chargement la barre n'en a pas (elle se détache par son ombre
+   `.is-stuck`), rien à neutraliser. */
+.pf-events-header-bar .pf-sub-header.is-loading::after {
+    bottom: 0;
+}
+
 .pf-events-header-bar__left,
 .pf-events-header-bar__right {
     display: flex;
@@ -702,6 +716,14 @@
     font-size: var(--search-font);
 }
 
+/* Shim (0,2,0) : même gotcha pour le message « aucun résultat ». Le reset
+   `.tribe-common a, …, p, …` de common-skeleton.css pose `padding: 0` en (0,1,1)
+   et bat le composant global `.pf-empty` (0,1,0) — le message se retrouvait
+   collé à la liste, sans respiration. Classe répétée, mêmes tokens. */
+.pf-empty.pf-empty {
+    padding: var(--pf-space-8) var(--pf-space-4);
+}
+
 /* ============================================================
    Participants d'événement — vue liste & single event
    ============================================================ */
@@ -869,6 +891,10 @@
 .tribe-events-calendar-list__event-wrapper.pf-card {
     padding: var(--pf-space-5);
     margin-right: var(--global-content-edge-padding);
+}
+
+.tribe-events-calendar-list__event-wrapper.pf-card .pf-card-link:focus {
+    outline: none;
 }
 
 /* Titre = look « titre de carte » (pf-card-title). Spécificité supérieure à la règle
@@ -1115,11 +1141,6 @@ h3:has(> .tribe-events-calendar-list__month-separator-text) {
 }
 
 /* ─── Section "Présence de" — single event page ────────────── */
-
-.pf-event-presence-tiles {
-    margin-top: var(--tec-spacer-3);
-    padding-top: var(--tec-spacer-3);
-}
 
 .pf-event-presence-tiles .pf-event-section-titre {
     margin-bottom: 0.75rem;

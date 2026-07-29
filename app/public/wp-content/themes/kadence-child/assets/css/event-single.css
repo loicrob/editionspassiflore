@@ -24,9 +24,9 @@
 /* ── Layout événement — DEUX zones (desktop ≥1024px) ──────────
    ZONE HAUTE = grille `.pf-event-hero` à 3 colonnes [nav | contenu | image] :
      • head (titre+planning) et body (description+actions) en pleine largeur nav+contenu ;
-     • nav (points) à gauche + topsec (Horaires/Lieu/Organisateur) dans la colonne contenu ;
+     • nav (points) à gauche + topsec (Horaires/Lieu/Organisateur/Participants) dans la colonne contenu ;
      • image (media) COLLÉE pleine hauteur à droite, span head → topsec UNIQUEMENT.
-   ZONE BASSE = `.pf-event-botsec` PLEINE LARGEUR juste après (Présence + Livres associés) :
+   ZONE BASSE = `.pf-event-botsec` PLEINE LARGEUR juste après (Livres associés) :
      image et nav ont leur containing block sticky dans `.pf-event-hero` → elles reprennent
      leur scroll dès que la zone basse commence.
    Colonne image = --pf-event-media-col (JS = largeur réelle plafonnée à 40% ; event-single-media.js).
@@ -61,7 +61,7 @@
    (align-self:stretch) pour servir de containing block au sticky de __media-inner :
    un sticky en grille colle sinon dans TOUT le conteneur → l'image ne sortirait
    jamais. Ainsi bornée, l'image reste collée dans la zone haute puis reprend son
-   scroll dès la zone basse (botsec = Présence/Livres). */
+   scroll dès la zone basse (botsec = Livres associés). */
 .pf-event-hero__media {
 	grid-area: media;
 	align-self: stretch;
@@ -81,7 +81,7 @@
 .pf-event-hero__media-inner {
 	position: sticky;
 	top: calc(var(--pf-sticky-offset, 0px) + var(--global-md-spacing));
-	height: calc(100vh - var(--pf-sticky-offset, 0px) - (var(--global-md-spacing) * 2));
+	height: calc(100vh - var(--pf-sticky-offset, 0px) - (var(--global-md-spacing) * 4));
 	display: flex;
 	align-items: center;
 	justify-content: center;
@@ -232,11 +232,11 @@
 	color: var(--pf-heading);
 }
 
-/* Zone basse : filet de séparation PLEINE LARGEUR au-dessus de Présence. Le border-top
-   de .pf-section est retiré sur :first-child (style.css) → on le restaure pour la 1re
-   section de la zone basse (délimite le passage zone haute → pleine largeur). Padding-top
+/* Zone basse : filet de séparation PLEINE LARGEUR au-dessus de la 1re section de la zone
+   (Livres associés). Le border-top de .pf-section est retiré sur :first-child (style.css)
+   → on le restaure ici (délimite le passage zone haute → pleine largeur). Padding-top
    restauré en desktop : la règle d'alignement :first-child padding-top:0 ne vaut que pour
-   la 1re section de la PAGE (Horaires), pas pour Présence. */
+   la 1re section de la PAGE (Horaires), pas pour celle de la zone basse. */
 .pf-event-hero__botsec .pf-section:first-child {
 	border-top: 1px solid var(--pf-border);
 }

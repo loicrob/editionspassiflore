@@ -88,13 +88,13 @@ body.tax-product_cat .entry-hero.product-hero-section {
 
 .pf-cat-row-scroll > * { flex-shrink: 0; }
 
-/* Dynamic left/right fade indicators on each scrollable container. */
-.pf-cat-row-scroll.has-fade-right:not(.has-fade-left)
-	{ mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 32px), transparent 100%); }
-.pf-cat-row-scroll.has-fade-left:not(.has-fade-right)
-	{ mask-image: linear-gradient(to right, transparent 0, #000 32px, #000 100%); }
-.pf-cat-row-scroll.has-fade-left.has-fade-right
-	{ mask-image: linear-gradient(to right, transparent 0, #000 32px, #000 calc(100% - 32px), transparent 100%); }
+/* Fondu de bord gauche/droite : masque du composant global .pf-scroll-fade
+   (style.css), qui liste .pf-cat-row-scroll parmi ses hôtes — cette rangée est le
+   seul cas qui scrolle lui-même et dont l'état vient d'ici (catalogue.js, classes
+   .has-fade-*) et non de scroll-fade.js. Ne reste que la longueur de la rampe ;
+   32px et non 60 : la rangée est courte et les puces de filtre sont étroites, un
+   fondu long en effacerait une entière. La transition de 0,25s vient avec. */
+.pf-cat-row-scroll { --pf-fade-size: 32px; }
 
 
 /* ─── Mobile / tablet (< 1024px) ─────────────────────────────────── */
@@ -433,7 +433,6 @@ body.tax-product_cat .entry-hero.product-hero-section {
 	align-items: center;
 	gap: 4px;
 	padding: 4px 6px 4px 10px;
-	margin-bottom: 10px;
 	border: 1px solid var(--pf-accent);
 	border-radius: 999px;
 	background: var(--pf-red-soft);
@@ -741,6 +740,20 @@ body.tax-product_cat .entry-hero.product-hero-section {
 
 /* ─── Grid AJAX loading state ───────────────────────────────────── */
 
+/* Filet d'attente (composant partagé, style.css) — posé par catalogue.js le
+   temps de la requête. Ancré au BAS du conteneur sticky, sur toute la largeur
+   de l'écran : le pseudo-élément est absolu et le premier ancêtre positionné
+   n'est pas .pf-sub-header (jamais `position`, cf. style.css) mais
+   .pf-catalogue-sticky (.pf-sticky-bar, position:sticky) — il se cale donc sur
+   SA boîte de padding, full-bleed, et non sur le contenu centré. La barre
+   principale n'étant pas le dernier enfant du sticky (top bar, barre, chips),
+   le filet passe donc bien SOUS les chips : c'est le bas de la barre entière. */
+.pf-catalogue-sticky .pf-sub-header.is-loading::after {
+	bottom: 0;
+}
+
+/* L'estompage dit « ces résultats sont périmés » ; le filet ci-dessus dit
+   « quelque chose arrive ». */
 .pf-catalogue-grid.is-loading { opacity: 0.5; transition: opacity 0.15s ease; pointer-events: none; }
 
 /* ─── Panneau de filtres mobile/tablette (bottom-sheet) ─────────── */
