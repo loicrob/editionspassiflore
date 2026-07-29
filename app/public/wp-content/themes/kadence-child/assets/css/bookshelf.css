@@ -2100,3 +2100,39 @@ img.pf-spine-icon--white {
 	border-radius: var(--pf-radius);
 	box-shadow: var(--pf-focus-ring-accent);
 }
+
+/* ══════════════════════════════════════════════════════════════════════
+   ⚠️ TEMPORAIRE — TEST DU TREMBLEMENT. BLOC À SUPPRIMER EN ENTIER.
+   Rien d'autre à défaire : il ne fait que réécrire deux transitions
+   existantes, en s'appuyant sur l'ordre du fichier (mêmes sélecteurs,
+   même spécificité, placés plus bas donc gagnants).
+
+   Ce qu'on retire : l'ANIMATION de la caméra (`perspective-origin`), la
+   seule propriété du vol que le compositeur ne sait PAS jouer — elle
+   n'avance qu'aux recalculs de style du fil principal, pendant que la
+   `transform`, elle, est interpolée par le compositeur. Chaque image
+   affichée combine donc une rotation issue d'une horloge et une caméra
+   issue d'une autre : si les deux ne sont pas en phase, la géométrie
+   avance de façon inégale d'une image à l'autre. C'est exactement le
+   motif mesuré sur les vidéos (un pas fort, un pas faible, en alternance).
+
+   La caméra n'est plus interpolée mais COMMUTÉE, à un instant où elle ne
+   se voit pas — même principe que `perspective`, déjà traitée ainsi :
+   - saisie : tout de suite (le livre est encore à plat, tout est à z = 0,
+     la position de l'œil n'a alors aucun effet) ;
+   - repli : à la toute fin (délai = durée), une fois le livre reposé.
+   Entre les deux, la caméra reste à sa position cavalière : l'atterrissage
+   est donc inchangé, seul le milieu du vol est un peu plus cisaillé.
+   ══════════════════════════════════════════════════════════════════════ */
+.pf-bookshelf--spines .pf-book.pf-book--cover-revealed {
+	transition:
+		perspective 0s 0s,
+		perspective-origin 0s 0s;
+}
+
+.pf-bookshelf--spines .pf-book.pf-book--releasing {
+	transition:
+		perspective 0s 0s,
+		perspective-origin 0s var(--pf-release-dur);
+}
+/* ════════════ fin du bloc temporaire ════════════ */
