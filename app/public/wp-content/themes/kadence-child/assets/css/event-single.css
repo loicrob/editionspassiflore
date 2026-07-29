@@ -81,7 +81,7 @@
 .pf-event-hero__media-inner {
 	position: sticky;
 	top: calc(var(--pf-sticky-offset, 0px) + var(--global-md-spacing));
-	height: calc(100vh - var(--pf-sticky-offset, 0px) - (var(--global-md-spacing) * 4));
+	height: calc(100vh - var(--pf-sticky-offset, 0px) - (var(--global-md-spacing) * 2));
 	display: flex;
 	align-items: center;
 	justify-content: center;

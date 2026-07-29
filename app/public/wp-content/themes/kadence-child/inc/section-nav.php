@@ -40,7 +40,9 @@ function pf_sectionnav_bar( array $sections ) {
 		// .menu-item-link : exclut ces liens de la règle globale `.entry-content a:not(.menu-item-link)…`
 		// (style.css) — nécessaire quand la nav est rendue à l'intérieur de `.entry-content`
 		// (fiche événement) pour ne pas hériter du style « lien de contenu ». Inerte ailleurs.
-		echo '<a class="menu-item-link" href="#' . esc_attr( $slug ) . '">' . esc_html( $s['label'] ) . '</a>';
+		// data-label : libellé recopié pour le double invisible en gras (`a::after` dans
+		// style.css) qui réserve la largeur de l'état actif — cf. le commentaire là-bas.
+		echo '<a class="menu-item-link" data-label="' . esc_attr( $s['label'] ) . '" href="#' . esc_attr( $slug ) . '">' . esc_html( $s['label'] ) . '</a>';
 	}
 	echo '</div>';
 	echo '</div>';

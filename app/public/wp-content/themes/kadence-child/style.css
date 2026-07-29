@@ -2039,7 +2039,29 @@ html.pf-notices-js .wc-block-components-notices__snackbar {
 
 .pf-sectionnav a.is-active {
 	color: var(--pf-accent);
-	font-weight: 600;
+	font-weight: var(--pf-weight-semibold);
+}
+
+/* Largeur du GRAS réservée dès le repos — sinon la mise en page dépend de l'item actif.
+   Le libellé actif passe en semibold (règle ci-dessus), donc s'élargit ; là où la piste
+   de la colonne nav est dimensionnée sur son CONTENU (fiche événement : `[nav] auto`
+   dans .pf-event-hero), c'est le PLUS LONG des libellés qui fixe la piste — devenu actif,
+   il l'élargissait et poussait tout le contenu vers la droite (mesuré : 121,69 → 125,59px,
+   soit 3,9px de décalage sur « Livres associés »).
+   Un double invisible du libellé, TOUJOURS en semibold, fige la largeur du lien : elle ne
+   dépend plus de l'état. `height:0` + `overflow:hidden` → n'occupe aucune hauteur (seule
+   sa contribution en largeur compte) ; `visibility:hidden` → hors de l'arbre
+   d'accessibilité, sinon le contenu généré est exposé et le libellé annoncé deux fois.
+   ⚠ Le poids doit rester CELUI de .is-active (même token) : c'est ce qu'on réserve.
+   Sans effet là où la piste est fixe (fiche livre 160px, compte 200px). */
+.pf-sectionnav a::after {
+	content: attr(data-label);
+	display: block;
+	height: 0;
+	overflow: hidden;
+	visibility: hidden;
+	font-weight: var(--pf-weight-semibold);
+	pointer-events: none;
 }
 
 .pf-sectionnav a.is-active::before {
@@ -2058,6 +2080,25 @@ html.pf-notices-js .wc-block-components-notices__snackbar {
 	.pf-sectionnav a:hover::before {
 		border-color: var(--pf-accent);
 		background: var(--pf-accent);
+	}
+}
+
+/* Desktop (≥1024px) : PAS de masque sur le wrap de fondu.
+   Un masque ROGNE son élément et toute sa descendance à sa boîte de bordure — y
+   compris ce qui en déborde. Or les pastilles (.pf-sectionnav a::before, à
+   left: -1.0625rem) et le rail vivent À GAUCHE du track, donc HORS du wrap : sous
+   masque elles étaient purement et simplement effacées (mesuré : wrap à x=99, points
+   peints de x=82 à x=92 → aucun pixel de pastille à l'écran, la ligne du rail —
+   portée par .pf-sectionnav, hors du wrap — restant seule visible).
+   Aucune perte : le fondu ne sert qu'à la barre HORIZONTALE (≤1023px) ; en rail
+   vertical le track ne défile jamais, scroll-fade.js ne pose donc jamais
+   .is-scroll-left/-right et --pf-fade-l/-r restent à 0.
+   ⚠ Régression du passage du fondu peint (2 pseudo-éléments en opacity:0, sans
+   effet de rognage) au masque : celui-ci s'applique en permanence, à toute largeur. */
+@media (min-width: 1024px) {
+	.pf-sectionnav .pf-scroll-fade {
+		-webkit-mask-image: none;
+		        mask-image: none;
 	}
 }
 

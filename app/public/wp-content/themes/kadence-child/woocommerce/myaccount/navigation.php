@@ -31,7 +31,8 @@ do_action( 'woocommerce_before_account_navigation' );
 		<ul class="pf-sectionnav__track">
 			<?php foreach ( wc_get_account_menu_items() as $endpoint => $label ) : ?>
 				<li class="<?php echo wc_get_account_menu_item_classes( $endpoint ); ?>">
-					<a class="menu-item-link<?php echo wc_is_current_account_menu_item( $endpoint ) ? ' is-active' : ''; ?>" href="<?php echo esc_url( wc_get_account_endpoint_url( $endpoint ) ); ?>" <?php echo wc_is_current_account_menu_item( $endpoint ) ? 'aria-current="page"' : ''; ?>>
+					<?php // data-label : libellé recopié pour le double invisible en gras (`a::after`, style.css) qui réserve la largeur de l'état actif. ?>
+					<a class="menu-item-link<?php echo wc_is_current_account_menu_item( $endpoint ) ? ' is-active' : ''; ?>" data-label="<?php echo esc_attr( $label ); ?>" href="<?php echo esc_url( wc_get_account_endpoint_url( $endpoint ) ); ?>" <?php echo wc_is_current_account_menu_item( $endpoint ) ? 'aria-current="page"' : ''; ?>>
 						<?php echo esc_html( $label ); ?>
 					</a>
 				</li>
