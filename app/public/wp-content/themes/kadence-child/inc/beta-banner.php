@@ -40,7 +40,6 @@ function pf_beta_a_verifier() {
  */
 function pf_beta_bugs_connus() {
 	return [
-		'Sur mobile, pour les étagères en général, pas assez d’espaces autour des livres au sein des étagères',
 		'Design pas top pages de connexion, de panier, commande et commande passée',
 	];
 }
@@ -82,6 +81,8 @@ function pf_beta_mises_a_jour() {
 				'Baisse significative des temps de chargement',
 				'Amélioration de l’affichage des livres dans les étagères',
 				'Séparation de Connexion / Création de compte en deux pages',
+				'Ajout d’une animation pour la mise dans le panier',
+				'Toasts pour mise en panier et actions natives',
 			],
 		],
 		[
@@ -91,6 +92,15 @@ function pf_beta_mises_a_jour() {
 				'Menu du haut "collant" plus fiable',
 				'Amélioration de l’affichage des livres dans les étagères',
 				'Admin : on peut désormais dupliquer un événement',
+			],
+		],
+		[
+			'date'  => '29 juillet 2026 - 2h',
+			'items' => [
+				'Amélioration de l’affichage des livres dans les étagères, en particulier pour mobiles',
+				'Correction d’un bug affichant un événement dans le mauvais jour vue liste',
+				'Réduction de la hauteur max des images d’événements dans leur page',
+				'Maintenant l’URL d’un élément modifiable en admin suit le nom de l’élément',
 			],
 		],
 	];
