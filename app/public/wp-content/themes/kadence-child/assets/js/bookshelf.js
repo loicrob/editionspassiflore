@@ -604,13 +604,34 @@
 		function attemptReveal() {
 			clearReveal();
 			if (!hoverActive || !coverReady || overReco) return;
+
+			// PRÉCHAUFFAGE (cf. .pf-book--arming dans bookshelf.css). La
+			// couverture n'a encore jamais été peinte : sa 1re rastérisation
+			// tombait sur la 1re image du vol, que la transition — pilotée par
+			// l'horloge — ne rattrape jamais, d'où un départ escamoté (mesuré
+			// sur iPhone : le livre démarrait à ~30 % d'ouverture). On la rend
+			// peignable maintenant, alors que rien ne bouge encore.
+			book.classList.add('pf-book--arming');
+
 			var elapsed   = Date.now() - hoverStart;
 			var remaining = Math.max(0, REVEAL_DELAY_MS - elapsed);
 			revealTimer = setTimeout(function () {
 				revealTimer = null;
-				if (hoverActive) {
-					book.classList.add('pf-book--cover-revealed');
-				}
+				// Deux images de battement avant de lancer le vol : le temps
+				// que la couverture soit effectivement peinte. Au survol
+				// l'attente restante a déjà largement suffi, mais au TAP
+				// `remaining` vaut 0 (le début du survol est antidaté) — sans
+				// ce battement, préchauffage et vol tomberaient dans la même
+				// image et on n'aurait rien gagné. Coût : ~33 ms de latence
+				// après le tap, contre un départ d'animation propre.
+				requestAnimationFrame(function () {
+					requestAnimationFrame(function () {
+						book.classList.remove('pf-book--arming');
+						if (hoverActive) {
+							book.classList.add('pf-book--cover-revealed');
+						}
+					});
+				});
 			}, remaining);
 		}
 
@@ -680,6 +701,9 @@
 			// in-flight request, but at least we never queued it.
 			clearLoad();
 			clearReveal();
+			// Le préchauffage n'a de sens que juste avant un vol : parti sans
+			// saisir, le livre doit retrouver sa couverture éteinte.
+			book.classList.remove('pf-book--arming');
 			// Drop the class so the book closes back, and so the next
 			// hover gets a fresh REVEAL_DELAY_MS countdown. Le marquage doit
 			// précéder le retrait : il teste l'état saisi.

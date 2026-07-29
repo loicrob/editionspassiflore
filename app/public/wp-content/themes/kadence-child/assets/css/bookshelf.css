@@ -1145,6 +1145,41 @@
 	visibility: visible;
 }
 
+/* ─── Préchauffage : peindre la couverture AVANT que le vol ne parte ──
+   La couverture est `visibility: hidden` tant que le livre est sur le rayon,
+   donc jamais peinte : sa PREMIÈRE rastérisation tombait sur la première image
+   du vol. Une transition CSS étant pilotée par l'horloge et non par les images
+   rendues, ce temps n'est jamais rattrapé — l'animation reprend là où le temps
+   est rendu et escamote son début. Mesuré sur iPhone (DPR 3, couverture
+   ~618x930 pixels réels d'un coup) : la 1re image du vol repeignait déjà 78 %
+   de l'aire de la dernière, contre 5 % en local ; le livre démarrait à ~30 %
+   d'ouverture. Coût FIXE — d'où sa disparition quand on ralentit l'animation.
+
+   bookshelf.js pose cette classe dès que la couverture est chargée, et laisse
+   passer deux images avant de déclencher la saisie : la rastérisation se paie
+   là, pendant que rien ne bouge.
+
+   ⚠️ CETTE RÈGLE NE DOIT POSER QUE `visibility`. Une tentative précédente y
+   ajoutait `opacity: 0` (ceinture contre un éventuel filet d'antialiasing) et
+   `will-change` : les deux APLATISSENT un membre du groupe `preserve-3d`, ce
+   qui change sa composition avec le dos voisin — filet visible de 4 px de
+   large, écart mesuré jusqu'à 172/255. `visibility` seule ne touche pas à la
+   scène, et la couverture est de toute façon vue par la tranche à ce stade
+   (rotateY(90deg), largeur projetée nulle).
+
+   ⚠️ `visibility 0s 0s` OBLIGATOIRE : la règle de repos porte
+   `visibility 0s var(--pf-release-dur)`, un délai destiné au RETOUR (la
+   couverture ne doit s'éteindre qu'une fois refermée). Comme c'est le style
+   d'ARRIVÉE qui fournit la transition, ce délai s'appliquait aussi à
+   l'allumage — le préchauffage arrivait une demi-seconde trop tard, donc
+   après le vol (mesuré : couverture encore `hidden` 500 ms après le survol). */
+.pf-bookshelf--spines .pf-book--arming .pf-book-cover {
+	visibility: visible;
+	transition:
+		transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+		visibility 0s 0s;
+}
+
 /* Le livre a quitté la planche : son ombre de contact s'estompe. */
 .pf-bookshelf--spines .pf-book.pf-book--cover-revealed::after {
 	opacity: 0;
