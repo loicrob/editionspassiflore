@@ -764,6 +764,23 @@
 	transition: transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
 }
 
+/* Sur écran tactile, la couverture reste FERMÉE : il n'y a pas de curseur pour
+   la pousser, mais les événements de souris synthétisés au tap suffisaient à
+   laisser --cover-angle posé — le livre se dévoilait couverture entrouverte,
+   et elle y restait puisque plus rien ne bouge ensuite.
+   ⚠️ Déclaré sur la FEUILLE et non sur le livre : le JS pose la variable en
+   inline sur `.pf-book`, or l'héritage est de moindre priorité qu'une
+   déclaration portée par l'élément lui-même — c'est ce qui permet de la
+   neutraliser sans toucher au JS ni recourir à `!important`.
+   `.pf-cover-leaf` n'existe qu'en mode dos (cf. class-bookshelf.php) : le mode
+   couvertures, où l'ouverture au curseur garde tout son sens, n'est pas
+   concerné. */
+@media (hover: none) {
+	.pf-cover-leaf {
+		--cover-angle: 0deg;
+	}
+}
+
 /* Bloc pages : même plan que la couverture. Le z-fighting est arbitré par
    l'ordre de peinture (z-index) et NON par un retrait en profondeur : avec
    la caméra décalée à gauche, un retrait de 1.5px se projetterait de 1.5px
