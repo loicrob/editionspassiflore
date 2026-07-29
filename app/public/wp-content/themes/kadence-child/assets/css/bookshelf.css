@@ -10,7 +10,7 @@
 	   covers est une projection cavalière : reculer d'une profondeur d
 	   décale de (-d, -[--pf-obl] x d) à l'écran — d'où le skewY(18deg) du
 	   dos (tan 18° = 0.3249) et le parallélogramme du bandeau. Le
-	   mode spines règle sa perspective-origin sur la même valeur pour que
+	   mode spines cale sa caméra sur la même valeur pour que
 	   le livre posé retrouve le même angle de fuite (même construction, PAS
 	   la même taille : le mode spines dessine tout 1,5x plus grand). Une seule
 	   valeur à changer pour incliner l'étagère (cf. le 0.2309 / skewY(13deg)
@@ -67,10 +67,10 @@
 	   cette valeur par livre, juste assez pour que l'empreinte saisie tienne
 	   dans le rayon ; le dos AU REPOS garde sa taille, c'est sa lisibilité qui
 	   justifie le 1,5x. Valeur ici = repli sans JS et cas où tout tient.
-	   ⚠️ Elle apparaît AUSSI dans le perspective-origin de la saisie (terme
-	   `(scale - 1) x --book-h`, qui repère le haut du volume agrandi) et dans
-	   computeRevealShift() : les trois doivent rester d'accord, sinon
-	   l'atterrissage ne retombe plus sur la cavalière du mode couvertures. */
+	   ⚠️ Elle apparaît AUSSI dans le calcul de caméra de computeRevealShift()
+	   (terme `(scale - 1) x --book-h`, qui repère le haut du volume agrandi) :
+	   les deux doivent rester d'accord, sinon l'atterrissage ne retombe plus
+	   sur la cavalière du mode couvertures. */
 	--pf-reveal-scale: 1.1;
 
 	/* Durée du DÉVOILEMENT (saisie : le livre pivote et vient se présenter de
@@ -85,7 +85,7 @@
 
 	/* Durée du RETOUR AU REPOS depuis la saisie (mode dos) — source unique.
 	   Consommée par les trois règles de `.pf-book--releasing` (transform,
-	   perspective-origin, délai de commutation de perspective), par le délai
+	   délai de commutation de perspective), par le délai
 	   de `visibility` de la couverture, ET par bookshelf.js, qui en déduit
 	   combien de temps garder la classe (elle porte aussi le z-index du
 	   livre pendant le retour : la lâcher trop tôt ferait passer la
@@ -548,10 +548,31 @@
    RIEN N'EST FANTÔME ICI. Dos, couverture et face supérieure sont
    les faces d'un même volume rigide : elles suivent la rotation par
    construction, à chaque image, sans resynchronisation possible. C'est la
-   CAMÉRA qui bouge (perspective-origin, plus bas) pour que le livre posé
-   retrouve l'angle de fuite d'un livre covers — d'où l'absence de la vieille
-   déco plate .pf-book-held-deco, qui répliquait l'anatomie covers en 2D et
-   ne pouvait pas suivre la perspective en vol.
+   CAMÉRA qui bouge pour que le livre posé retrouve l'angle de fuite d'un livre
+   covers — d'où l'absence de la vieille déco plate .pf-book-held-deco, qui
+   répliquait l'anatomie covers en 2D et ne pouvait pas suivre la perspective
+   en vol.
+
+   ⚠️ CETTE CAMÉRA N'EST PLUS UNE ANIMATION DE `perspective-origin` : son
+   effet est REPLIÉ dans la transform, en tête de liste, sous forme d'un
+   cisaillement en z (le matrix3d des règles de bascule et de saisie, dont les
+   deux coefficients sont posés par bookshelf.js). Déplacer l'origine de
+   perspective de (a0,b0) vers (a,b) équivaut EXACTEMENT à prépendre
+       x' = x - (a-a0)/P . z ,  y' = y - (b-b0)/P . z
+   — le terme de translation se simplifie, et ce cisaillement commute avec les
+   translations en x/y, donc transform-origin ne s'en mêle pas. Vérifié : 768
+   valeurs de géométrie (4 livres x 2 largeurs x 8 avancements x 3 faces),
+   écart maximal 0,00 px avec l'ancienne formulation.
+
+   POURQUOI : `perspective-origin` est la seule propriété du vol que le
+   compositeur ne sait pas jouer. Elle n'avançait qu'aux recalculs de style du
+   fil principal pendant que la `transform` était interpolée par le
+   compositeur : chaque image mariait une rotation et une caméra issues de
+   deux horloges, et la géométrie avançait par pas inégaux — un fort, un
+   faible, en alternance. Mesuré sur trois vidéos iPhone (2026-07-29) : 81 à
+   92 % des images en alternance, 8 à 30 % d'écart à la moyenne des voisines ;
+   tremblement disparu dès qu'on cessait d'animer la caméra. Repliée dans la
+   transform, elle est compositable et les deux horloges n'en font plus qu'une.
 
    La largeur du wrapper reste --spine-w-base en permanence : les
    voisins ne bougent jamais, le livre saisi les recouvre simplement.
@@ -560,8 +581,8 @@
 
 .pf-bookshelf--spines .pf-book {
 	/* Distance de l'œil. N'AFFECTE PAS l'atterrissage : la formule de caméra
-	   (perspective-origin, plus bas) est exacte pour toute valeur, les termes
-	   (--persp + --spine-w) s'y annulant — vérifié de 1200 à 40000, épaisseur
+	   (les coefficients --pf-cam-*, cf. bookshelf.js) est exacte pour toute
+	   valeur, les termes (--persp + --spine-w) s'y annulant — vérifié de 1200 à 40000, épaisseur
 	   du bandeau et largeur de dos projetée identiques au centième.
 
 	   Elle règle en revanche la CONVERGENCE des arêtes de profondeur. Le mode
@@ -580,9 +601,14 @@
 	width: var(--spine-w-base);
 	min-width: 0;
 	perspective: var(--persp);
-	/* CAMÉRA MOBILE. Au repos l'œil est pile à hauteur du dessus du livre :
-	   la face supérieure est rasante, donc invisible — l'étagère au repos
-	   est inchangée, alors que le livre est bien un volume complet. */
+	/* Position de repos de l'œil, pile à hauteur du dessus du livre : la face
+	   supérieure y est rasante, donc invisible — l'étagère au repos est
+	   inchangée, alors que le livre est bien un volume complet.
+	   ⚠️ FIXE, et jamais animée : c'est le REPÈRE (a0,b0) à partir duquel
+	   bookshelf.js calcule les coefficients de cisaillement --pf-cam-*. La
+	   changer sans toucher au JS décalerait tout l'atterrissage — et le JS la
+	   LIT sur l'élément plutôt que de la recalculer, précisément pour qu'elle
+	   reste l'unique source. */
 	perspective-origin: 50% 0%;
 	/* ⚠️ `perspective` n'est JAMAIS interpolée dans le cycle de survol, elle
 	   est commutée à un instant où elle ne se voit pas — c'est-à-dire livre à
@@ -596,9 +622,7 @@
 	      l'impression que la perspective s'applique À LA FIN de la bascule.
 	   Ici, au RETOUR : durée nulle mais retardée de 0.3s, le temps que le
 	   livre se redresse. La pose à l'aller est dans la règle :hover. */
-	transition:
-		perspective 0s 0.3s,
-		perspective-origin 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+	transition: perspective 0s 0.3s;
 }
 
 .pf-bookshelf--spines .pf-book-inner {
@@ -926,7 +950,7 @@
 	   Les deux états ne sont PAS la même situation de vision — livre posé sur
 	   le rayon qui se penche vers vous d'un côté, livre tenu de face de l'autre
 	   — donc pas la même distance d'œil. L'atterrissage n'en souffre pas : le
-	   perspective-origin de la saisie est calculé sur --persp, et la saisie
+	   cisaillement de la saisie est calculé sur --persp, et la saisie
 	   rétablit --persp (cf. plus bas). */
 	--pf-tip-persp: 500px;
 
@@ -952,14 +976,13 @@
 	   la transition ici : sans ça la règle de repos s'applique, avec son délai
 	   de 0.3s destiné au retour — la perspective n'arriverait qu'une fois la
 	   bascule terminée, exactement le défaut qu'on corrige. */
-	transition:
-		perspective 0s 0s,
-		perspective-origin 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+	transition: perspective 0s 0s;
 }
 
 .pf-bookshelf--spines .pf-book:hover .pf-book-inner,
 .pf-bookshelf--spines .pf-book:focus-visible .pf-book-inner {
 	transform:
+		matrix3d(1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1)
 		translateX(0px)
 		translateY(0px)
 		scale(1)
@@ -987,31 +1010,30 @@
 }
 
 /* La caméra monte et se décale à gauche en même temps que le livre pivote,
-   pour atterrir pile sur la cavalière du mode covers.
+   pour atterrir pile sur la cavalière du mode covers — mais son effet passe
+   par le CISAILLEMENT en tête de transform (matrix3d ci-dessous), pas par une
+   animation de perspective-origin (cf. l'avertissement du bloc « saisie » plus
+   haut : c'est ce qui faisait trembler l'animation).
 
-   Un point à la profondeur p se projette avec le décalage
-   (px - x0) x p/(persp+p). En posant px = x0 - (persp + --spine-w), le
-   décalage à p = --spine-w vaut exactement -(--spine-w) : le dos
-   réapparaît à gauche à sa vraie largeur, comme le skewY de covers. Idem
-   en y avec le facteur --pf-obl pour l'épaisseur du bandeau de pages.
+   L'œil visé reste le même : un point à la profondeur p se projette avec le
+   décalage (px - x0) x p/(persp+p) ; en posant px = x0 - (persp + --spine-w),
+   le décalage à p = --spine-w vaut exactement -(--spine-w) — le dos réapparaît
+   à gauche à sa vraie largeur, comme le skewY de covers. Idem en y avec le
+   facteur --pf-obl pour l'épaisseur du bandeau de pages. x0 / y0 = le coin
+   haut-gauche du volume une fois posé, d'où la reprise de --reveal-dx /
+   --reveal-dy (recentrage JS) et du (scale - 1) x --book-h (le scale de
+   saisie, d'origine left bottom, remonte le haut du livre) ; sans ces termes
+   le bandeau perdrait ~10 % de son épaisseur, et le facteur n'étant plus
+   constant (--pf-reveal-scale), le terme doit le suivre.
 
-   x0 / y0 = le coin haut-gauche du volume une fois posé, d'où la reprise de
-   --reveal-dx / --reveal-dy (recentrage JS) et du (scale - 1) x --book-h (le
-   scale de saisie, d'origine left bottom, remonte le haut du livre). Sans ces
-   termes le bandeau perdrait ~10 % de son épaisseur. Le facteur n'est plus
-   constant : bookshelf.js l'abaisse quand la couverture ne tiendrait pas dans
-   le rayon (cf. --pf-reveal-scale), et ce terme doit le suivre. */
+   ⚠️ TOUTE CETTE FORMULE VIT MAINTENANT DANS bookshelf.js
+   (computeRevealShift), qui n'en publie que les deux coefficients --pf-cam-x
+   et --pf-cam-y. Elle ne peut pas revenir ici : CSS ne sait pas diviser une
+   longueur par une longueur, or les coefficients sont sans unité. */
 .pf-bookshelf--spines .pf-book.pf-book--cover-revealed {
-	perspective-origin:
-		calc(var(--reveal-dx, 0px) - (var(--persp) + var(--spine-w)))
-		calc(
-			var(--reveal-dy, 0px)
-			- (var(--pf-reveal-scale) - 1) * var(--book-h)
-			- var(--pf-obl) * (var(--persp) + var(--spine-w))
-		);
 	/* L'œil repart au loin : la saisie doit retrouver --persp, celui sur lequel
-	   son perspective-origin est calculé — sans ça le livre posé atterrirait
-	   avec la perspective rapprochée de la bascule.
+	   les coefficients de cisaillement sont calculés — sans ça le livre posé
+	   atterrirait avec la perspective rapprochée de la bascule.
 
 	   ⚠️ Rendu D'UN COUP au départ du vol (`0s 0s`), jamais interpolé — même
 	   principe qu'à l'aller, troisième et dernier endroit où `perspective`
@@ -1027,9 +1049,7 @@
 	   la rotation démarre, et son saut (6,4 px sur la 1re image) est du même
 	   ordre que le déplacement normal d'une image à l'autre (6,1 px). */
 	perspective: var(--persp);
-	transition:
-		perspective 0s 0s,
-		perspective-origin var(--pf-reveal-dur) cubic-bezier(0.22, 0.61, 0.36, 1);
+	transition: perspective 0s 0s;
 }
 
 /* Étape 2 — saisie : rotation rigide du volume autour de l'arête
@@ -1041,6 +1061,7 @@
    pivote, composante par composante (cf. l'avertissement là-haut). */
 .pf-bookshelf--spines .pf-book.pf-book--cover-revealed .pf-book-inner {
 	transform:
+		matrix3d(1,0,0,0, 0,1,0,0, var(--pf-cam-x, 0),var(--pf-cam-y, 0),1,0, 0,0,0,1)
 		translateX(var(--reveal-dx, 0px))
 		translateY(var(--reveal-dy, 0px))
 		scale(var(--pf-reveal-scale))
@@ -1066,7 +1087,7 @@
 }
 
 /* ⚠️ `perspective` REPOSÉE ICI, explicitement, et commutée SANS DÉLAI.
-   La formule de caméra (perspective-origin de la saisie) est exacte *à
+   La formule de caméra (les coefficients --pf-cam-*) est exacte *à
    condition* que la perspective en vigueur soit bien --persp : le décalage de
    l'œil y vaut -(--persp + --spine-w). Si la perspective en vigueur est
    l'autre — celle de la bascule, --pf-tip-persp — le cisaillement est
@@ -1089,9 +1110,7 @@
       où la perspective doit bien rester rapprochée jusqu'au redressement.) */
 .pf-bookshelf--spines .pf-book.pf-book--releasing {
 	perspective: var(--persp);
-	transition:
-		perspective 0s 0s,
-		perspective-origin var(--pf-release-dur) cubic-bezier(0.22, 0.61, 0.36, 1);
+	transition: perspective 0s 0s;
 }
 
 /* ─── Le repli est ininterruptible ──────────────────────────────
@@ -2100,39 +2119,3 @@ img.pf-spine-icon--white {
 	border-radius: var(--pf-radius);
 	box-shadow: var(--pf-focus-ring-accent);
 }
-
-/* ══════════════════════════════════════════════════════════════════════
-   ⚠️ TEMPORAIRE — TEST DU TREMBLEMENT. BLOC À SUPPRIMER EN ENTIER.
-   Rien d'autre à défaire : il ne fait que réécrire deux transitions
-   existantes, en s'appuyant sur l'ordre du fichier (mêmes sélecteurs,
-   même spécificité, placés plus bas donc gagnants).
-
-   Ce qu'on retire : l'ANIMATION de la caméra (`perspective-origin`), la
-   seule propriété du vol que le compositeur ne sait PAS jouer — elle
-   n'avance qu'aux recalculs de style du fil principal, pendant que la
-   `transform`, elle, est interpolée par le compositeur. Chaque image
-   affichée combine donc une rotation issue d'une horloge et une caméra
-   issue d'une autre : si les deux ne sont pas en phase, la géométrie
-   avance de façon inégale d'une image à l'autre. C'est exactement le
-   motif mesuré sur les vidéos (un pas fort, un pas faible, en alternance).
-
-   La caméra n'est plus interpolée mais COMMUTÉE, à un instant où elle ne
-   se voit pas — même principe que `perspective`, déjà traitée ainsi :
-   - saisie : tout de suite (le livre est encore à plat, tout est à z = 0,
-     la position de l'œil n'a alors aucun effet) ;
-   - repli : à la toute fin (délai = durée), une fois le livre reposé.
-   Entre les deux, la caméra reste à sa position cavalière : l'atterrissage
-   est donc inchangé, seul le milieu du vol est un peu plus cisaillé.
-   ══════════════════════════════════════════════════════════════════════ */
-.pf-bookshelf--spines .pf-book.pf-book--cover-revealed {
-	transition:
-		perspective 0s 0s,
-		perspective-origin 0s 0s;
-}
-
-.pf-bookshelf--spines .pf-book.pf-book--releasing {
-	transition:
-		perspective 0s 0s,
-		perspective-origin 0s var(--pf-release-dur);
-}
-/* ════════════ fin du bloc temporaire ════════════ */

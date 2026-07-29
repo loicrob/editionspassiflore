@@ -503,7 +503,10 @@
 		} else if (dx > maxDx) {
 			dx = maxDx;
 		}
-		book.style.setProperty('--reveal-dx', Math.round(dx) + 'px');
+		// Arrondi AVANT usage : c'est la valeur que le CSS reçoit, et la caméra
+		// (plus bas) doit être calculée sur exactement la même.
+		dx = Math.round(dx);
+		book.style.setProperty('--reveal-dx', dx + 'px');
 
 		// Vertical : uniquement en mode scroll, où le scroller rogne au
 		// padding-box (en shelves le livre déborde librement sur la rangée
@@ -521,7 +524,49 @@
 				dy = Math.min(overshoot, Math.max(0, box.bottom - 2 - rect.bottom));
 			}
 		}
-		book.style.setProperty('--reveal-dy', Math.round(dy) + 'px');
+		dy = Math.round(dy);
+		book.style.setProperty('--reveal-dy', dy + 'px');
+
+		/* ─── Caméra du vol, repliée dans la transform ─────────────────
+		   La caméra était une animation de `perspective-origin` — la SEULE
+		   propriété du vol que le compositeur ne sait pas jouer. Elle
+		   n'avançait qu'aux recalculs de style du fil principal pendant que la
+		   `transform`, elle, était interpolée par le compositeur : chaque image
+		   affichée mariait une rotation et une caméra issues de deux horloges
+		   différentes, et la géométrie avançait de façon inégale — un pas fort,
+		   un pas faible, en alternance. Mesuré sur les vidéos de l'utilisateur
+		   (2026-07-29) : 92 % d'images en alternance, ~30 % d'écart à la
+		   moyenne des voisines ; disparu dès qu'on cessait d'animer la caméra.
+
+		   Or déplacer l'origine de perspective de (a0,b0) vers (a,b) équivaut
+		   EXACTEMENT à un cisaillement en z prépendu à la transform :
+		       M(a,b) = M(a0,b0) · S,  S : x' = x - (a-a0)/P · z
+		                                   y' = y - (b-b0)/P · z
+		   (le terme de translation se simplifie, et S commute avec les
+		   translations en x/y — donc l'origine de transform ne s'en mêle pas.)
+		   Le cisaillement étant de la `transform`, tout le vol redevient
+		   compositable et les deux horloges n'en font plus qu'une.
+
+		   On ne pose ici que les DEUX COEFFICIENTS, sans unité : le CSS les
+		   place dans un matrix3d en tête de liste (cf. bookshelf.css). Ils sont
+		   nuls au repos et pendant la bascule — la caméra y est à sa position
+		   d'origine, il n'y a rien à corriger.
+
+		   ⚠️ Le repère (a0,b0) est LU sur l'élément, pas recalculé : c'est la
+		   valeur que le CSS applique réellement (`50% 0%` du livre), donc la
+		   seule dont on soit sûr qu'elle corresponde. */
+		var persp = cssVarPx(book, '--persp');
+		if (persp > 0) {
+			var org  = getComputedStyle(book).perspectiveOrigin.split(' ');
+			var a0   = parseFloat(org[0]) || 0;
+			var b0   = parseFloat(org[1]) || 0;
+			var bkH  = cssVarPx(book, '--book-h');
+			var recul = persp + cssVarPx(book, '--spine-w'); // le terme du CSS d'origine
+			var a = dx - recul;
+			var b = dy - (scale - 1) * bkH - oblique(book) * recul;
+			book.style.setProperty('--pf-cam-x', (-(a - a0) / persp).toFixed(6));
+			book.style.setProperty('--pf-cam-y', (-(b - b0) / persp).toFixed(6));
+		}
 	}
 
 	// Covers : au hover le livre est agrandi (scale 1.1, origine centre)
