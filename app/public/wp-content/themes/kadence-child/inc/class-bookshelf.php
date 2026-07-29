@@ -189,6 +189,20 @@ class Passiflore_Bookshelf {
 			true
 		);
 
+		// Composant global .pf-scroll-fade (ombres de bord d'un défilement
+		// horizontal) : dépendance des étagères en mode scroll, enqueué par
+		// render_scroll(). Enregistré ici plutôt qu'enqueué page par page —
+		// une étagère scroll peut apparaître n'importe où (shortcode).
+		// wp_register_script() ne fait rien si un autre appelant l'a déjà
+		// enregistré (functions.php le fait, avec le même fichier).
+		wp_register_script(
+			'pf-scroll-fade',
+			$theme_uri . '/assets/js/scroll-fade.js',
+			[],
+			filemtime( $theme_dir . '/assets/js/scroll-fade.js' ),
+			true
+		);
+
 		// Composant Toast global + interaction des signets « liste de lecture ».
 		// Enregistrés ici, enqueués à la demande par enqueue_bookmark_assets().
 		wp_register_script(
@@ -1598,7 +1612,20 @@ class Passiflore_Bookshelf {
 		$cat_class   = $cat_theme ? ' pf-bookshelf--cat-' . esc_attr( $cat_theme ) : '';
 		$price_class = $has_chevalet ? ' pf-bookshelf--show-price' : '';
 
+		// Ombres de bord (composant global .pf-scroll-fade) : le mode scroll est le
+		// seul où des livres peuvent sortir du champ — en shelves les rangées sont
+		// re-réparties pour la largeur réelle, il n'y a rien à signaler.
+		wp_enqueue_script( 'pf-scroll-fade' );
+
 		$html  = '<div class="pf-bookshelf pf-bookshelf--scroll' . $hero_class . $cat_class . $price_class . ' pf-bookshelf--' . esc_attr( $display ) . '">';
+		// Le wrapper du fondu s'intercale ENTRE le cadre (.pf-bookshelf : fond,
+		// bordure, rayon, ombre portée) et le scroller (.pf-shelf) : le masque ne
+		// doit dissoudre que les livres et la planche, jamais le cadre — porté par
+		// .pf-bookshelf, il y aurait effacé bordure et coins arrondis. Les deux
+		// partagent --wall-color, donc le fond ne bouge pas sous le fondu.
+		// Contrainte du composant : le scroller est l'unique enfant direct du
+		// wrapper (cf. scroll-fade.js).
+		$html .= '<div class="pf-scroll-fade">';
 		$html .= '<div class="pf-shelf">';
 		$html .= '<div class="pf-shelf-inner"><div class="pf-shelf-books">';
 
@@ -1608,7 +1635,7 @@ class Passiflore_Bookshelf {
 			$index++;
 		}
 
-		$html .= '</div><div class="pf-shelf-plank"></div>' . $this->render_libraires_link( $libraires_url ) . '</div></div></div>';
+		$html .= '</div><div class="pf-shelf-plank"></div>' . $this->render_libraires_link( $libraires_url ) . '</div></div></div></div>';
 		return $html;
 	}
 

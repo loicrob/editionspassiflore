@@ -159,6 +159,35 @@
 	z-index: 2;
 }
 
+/* Wrapper du fondu de bord (composant global .pf-scroll-fade, style.css), posé
+   par render_scroll() entre le cadre et le scroller. Il doit être TRANSPARENT à
+   la mise en page : l'accueil étire .pf-shelf sur la hauteur de son bloc
+   (`.pf-etagere-bloc .pf-bookshelf` en flex column, `.pf-shelf` en flex:1) — un
+   simple bloc intercalé romprait cette chaîne et le rayon retomberait à la
+   hauteur de son contenu. On la relaie donc d'un cran. Inerte ailleurs :
+   `flex`/`min-height` ne coûtent rien hors conteneur flex, et un flex column à
+   enfant unique se comporte comme un bloc (largeur étirée, hauteur du contenu). */
+.pf-bookshelf--scroll > .pf-scroll-fade {
+	flex: 1;
+	min-height: 0;
+	display: flex;
+	flex-direction: column;
+}
+
+/* Longueur de la rampe — seul réglage prévu par le composant. Les 60px du
+   défaut sont calés sur un rayon d'ordinateur (~1216px de fenêtre visible, soit
+   5%) ; à 390px ils en feraient 18%, c'est-à-dire un tiers de couverture effacé
+   de chaque côté. On la réduit donc avec la fenêtre, pour garder un fondu qui
+   reste de l'ordre de quelques pour cent du rayon — assez pour dire « ça
+   continue », jamais assez pour manger un livre. */
+@media (max-width: 1023px) {
+	.pf-bookshelf--scroll > .pf-scroll-fade { --pf-fade-size: 40px; }
+}
+
+@media (max-width: 767px) {
+	.pf-bookshelf--scroll > .pf-scroll-fade { --pf-fade-size: 28px; }
+}
+
 .pf-bookshelf--scroll .pf-shelf {
 	/* Un scroller rogne TOUJOURS au padding-box, sur les deux axes
 	   (overflow-y:clip serait converti en hidden, et overflow-clip-margin

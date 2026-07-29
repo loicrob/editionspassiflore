@@ -1071,12 +1071,11 @@ Workaround: stack two pseudo-elements. ::before is the base gradient (always vis
     --pf-intro-scale: 1.2;
 }
 
-/* Covers : livre absent (visibility) + couverture ouverte (pose de survol) + agrandi */
+/* Covers : livre absent (visibility) + agrandi. La couverture reste FERMÉE, à sa
+   pose de repos : elle ne s'ouvre qu'au survol (cf. bookshelf.css) — l'entrée du
+   livre n'a pas à emprunter ce geste. */
 .pf-bookshelf-armed.pf-bookshelf--covers .pf-book {
     visibility: hidden;
-}
-.pf-bookshelf-armed.pf-bookshelf--covers .pf-book-cover {
-    transform: rotateY(-25deg);
 }
 .pf-bookshelf-armed.pf-bookshelf--covers .pf-book-inner {
     transform: scale(var(--pf-intro-scale));
@@ -1089,10 +1088,6 @@ Workaround: stack two pseudo-elements. ::before is the base gradient (always vis
 }
 
 /* Keyframes de retour au repos */
-@keyframes pf-cover-settle {
-    from { transform: rotateY(-25deg); }
-    to   { transform: rotateY(0); }
-}
 @keyframes pf-cover-inner-settle {
     from { transform: scale(var(--pf-intro-scale)); }
     to   { transform: scale(1); }
@@ -1116,15 +1111,11 @@ Workaround: stack two pseudo-elements. ::before is the base gradient (always vis
    revient à l'état natif → le survol refonctionne (pas de transform figé). Le JS retire
    `pf-bookshelf-armed` au même instant : l'anim prend le relais sans à-coup. */
 .pf-bookshelf-intro.pf-bookshelf--covers .pf-book {
-    animation: pf-book-appear 1.5s cubic-bezier(0.22, 0.61, 0.36, 1) backwards;
-    animation-delay: var(--pf-intro-delay, 0s);
-}
-.pf-bookshelf-intro.pf-bookshelf--covers .pf-book-cover {
-    animation: pf-cover-settle 1.5s cubic-bezier(0.22, 0.61, 0.36, 1) backwards;
+    animation: pf-book-appear 0.6s cubic-bezier(0.22, 0.61, 0.36, 1) backwards;
     animation-delay: var(--pf-intro-delay, 0s);
 }
 .pf-bookshelf-intro.pf-bookshelf--covers .pf-book-inner {
-    animation: pf-cover-inner-settle 1.5s cubic-bezier(0.22, 0.61, 0.36, 1) backwards;
+    animation: pf-cover-inner-settle 0.6s cubic-bezier(0.22, 0.61, 0.36, 1) backwards;
     animation-delay: var(--pf-intro-delay, 0s);
 }
 .pf-bookshelf-intro.pf-bookshelf--spines .pf-book {
@@ -1133,15 +1124,9 @@ Workaround: stack two pseudo-elements. ::before is the base gradient (always vis
     animation-delay: var(--pf-intro-delay, 0s);
 }
 
-/* Exception liseuses (livres numériques) : l'écran ne s'ouvre pas → on garde le scale
-   (sur .pf-book-inner) mais on neutralise la rotation de couverture, pose de base et anim.
-   Sélecteur plus spécifique (.pf-book--ereader) → l'emporte sur les règles ci-dessus. */
-.pf-bookshelf-armed.pf-bookshelf--covers .pf-book--ereader .pf-book-cover {
-    transform: none;
-}
-.pf-bookshelf-intro.pf-bookshelf--covers .pf-book--ereader .pf-book-cover {
-    animation: none;
-}
+/* (Plus d'exception liseuses : elle ne servait qu'à neutraliser l'ouverture de
+   couverture de la pose de départ, retirée — l'écran d'une liseuse ne s'ouvre pas.
+   Le scale, lui, s'applique bien aux deux, il est porté par .pf-book-inner.) */
 
 /* ── 6. Responsive ──────────────────────────────────────────────────────────── */
 

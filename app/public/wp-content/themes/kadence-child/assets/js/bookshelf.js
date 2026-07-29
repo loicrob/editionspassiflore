@@ -86,7 +86,24 @@
 		touchOpenBook = null;
 	}
 
+	// ⚠️ Date du dernier contact tactile, GLOBALE — et surtout pas un drapeau
+	// posé par le livre au touchstart. Un `click` issu d'un tap n'arrive pas
+	// forcément sur l'élément qui a reçu le touchstart : sur les petites cibles,
+	// Safari iOS recale le clic vers le lien le plus proche (tap target
+	// adjustment) alors que le touchstart, lui, part sur la cible réelle. Or un
+	// dos ne fait que 10 à 30 px de large, séparé du suivant par 12 px de
+	// gouttière : un tap tombe très souvent À CÔTÉ du livre. Le livre recevait
+	// alors un clic sans avoir jamais vu de touchstart, son drapeau restait
+	// faux, le gestionnaire laissait filer — et la fiche s'ouvrait sans que la
+	// couverture ait été dévoilée (constaté sur iPhone le 2026-07-29).
+	// Dater le tap globalement est insensible à ce reciblage.
+	var lastTouchAt = 0;
+	// Le clic synthétisé suit le tap de ~50 à 300 ms ; large fenêtre, sans
+	// risque : sur un appareil à souris le survol a de toute façon déjà tranché.
+	var TOUCH_CLICK_MS = 1000;
+
 	document.addEventListener('touchstart', function (e) {
+		lastTouchAt = Date.now();
 		if (touchOpenBook && !touchOpenBook.contains(e.target)) {
 			closeTouchBook();
 		}
@@ -564,7 +581,6 @@
 		var hoverStart  = 0;       // ms timestamp of the latest enter
 		var loadTimer   = null;    // pending fetch-start setTimeout id
 		var revealTimer = null;    // pending reveal setTimeout id
-		var touchIntent = false;   // last interaction began with a touch
 		var overReco    = false;   // pointer currently on the reco badge/explanation
 
 		function clearLoad() {
@@ -699,15 +715,24 @@
 
 		// Tactile : le 1er tap saisit le livre (et annule la navigation),
 		// le 2e tap — livre déjà ouvert — suit le lien.
-		book.addEventListener('touchstart', function () {
-			touchIntent = true;
-		}, { passive: true });
-
+		//
+		// ⚠️ L'origine tactile se lit sur `lastTouchAt` (global, cf. plus haut)
+		// et NON sur un drapeau que ce livre aurait posé lui-même : le clic peut
+		// lui être recalé par le navigateur sans qu'il ait vu le touchstart, et
+		// il partait alors en navigation directe.
 		book.addEventListener('click', function (e) {
-			if (!touchIntent) return;
-			touchIntent = false;
+			// Pas de tap récent → vraie souris : le survol a déjà tranché (livre
+			// dévoilé, ou clic délibéré avant le délai de saisie).
+			if (Date.now() - lastTouchAt > TOUCH_CLICK_MS) return;
+			// Livre déjà saisi → 2e tap : on suit le lien.
 			if (book.classList.contains('pf-book--cover-revealed')) return;
 			e.preventDefault();
+			// Tap dans la gouttière voisine d'un livre ouvert : le touchstart
+			// vient de le refermer (closeTouchBook) et le clic nous est recalé
+			// dessus. Le geste voulait fermer, pas rouvrir — on l'absorbe.
+			// C'est le pendant tactile du `pointer-events: none` qui rend le
+			// repli ininterruptible à la souris.
+			if (book.classList.contains('pf-book--releasing')) return;
 			closeTouchBook();
 			touchOpenBook = book;
 			hoverActive   = true;
@@ -777,6 +802,16 @@
 
 		document.querySelectorAll('.pf-bookshelf:not(.pf-bookshelf--hero) .pf-book')
 			.forEach(setupCursorReveal);
+
+		// Ombres de bord du défilement horizontal (composant global
+		// .pf-scroll-fade). Rejoué ici plutôt que laissé au seul scan
+		// DOMContentLoaded de scroll-fade.js : celui-ci ne voit pas les étagères
+		// injectées par AJAX (filtres du catalogue, bascule Couvertures/Dos).
+		// APRÈS relayoutAll() : c'est lui qui fixe la largeur des livres, donc le
+		// scrollWidth que le composant compare à la fenêtre. Idempotent (garde
+		// _pfFadeWired) ; absent si le script n'est pas chargé (aucune étagère
+		// scroll sur la page) — d'où le typeof.
+		if (typeof window.pfScrollFade === 'function') window.pfScrollFade(document);
 	}
 
 	if (document.readyState === 'loading') {

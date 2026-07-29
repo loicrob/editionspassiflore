@@ -400,16 +400,15 @@ function initBookshelfIntro() {
 
     var STEP_COVERS = 0.2; // s entre deux livres — mode covers
     var STEP_SPINES = 0.04; // s entre deux livres — mode spines
-    // Un livre en covers reste invisible tant que son tour n'est pas venu : sur un
-    // rayon long (le rayon « numérique » en compte 64), 0,2 s/livre laisserait le
-    // dernier apparaître 13 s après le déclenchement. Le pas est donc resserré pour
-    // que la cascade tienne dans ce budget (2,4 s = 12 livres au pas nominal, soit
-    // le nb_books_first_displayed par défaut). Spines non concerné : ses dos sont
-    // visibles dès le départ, seule leur inclinaison se redresse.
-    var CASCADE_MAX_COVERS = 2.4; // s — durée totale max de la cascade, mode covers
+    // Pas FIXE, sans plafond de durée totale : les étagères de l'accueil sont des
+    // scrollers horizontaux, seuls les premiers livres sont dans le champ — les
+    // suivants apparaissent hors écran, à droite du conteneur. La longueur du rayon
+    // (le « numérique » compte 64 livres) n'a donc aucune incidence sur ce qu'on
+    // voit, et resserrer le pas pour tenir un budget global ne ferait qu'accélérer
+    // la seule partie visible de la cascade.
 
     // Pose de départ posée dès le chargement, avant le scroll de déclenchement :
-    // covers = livre absent (visibility) en couverture ouverte + agrandi, spines =
+    // covers = livre absent (visibility) et agrandi, couverture fermée ; spines =
     // dos penché (visible, lui).
     shelves.forEach( function ( shelf ) { shelf.classList.add( 'pf-bookshelf-armed' ); } );
 
@@ -418,12 +417,7 @@ function initBookshelfIntro() {
             if ( ! entry.isIntersecting ) return;
             var shelf = entry.target;
             var books = shelf.querySelectorAll( '.pf-book' );
-            var step;
-            if ( shelf.classList.contains( 'pf-bookshelf--spines' ) ) {
-                step = STEP_SPINES;
-            } else {
-                step = Math.min( STEP_COVERS, CASCADE_MAX_COVERS / Math.max( 1, books.length - 1 ) );
-            }
+            var step = shelf.classList.contains( 'pf-bookshelf--spines' ) ? STEP_SPINES : STEP_COVERS;
             books.forEach( function ( book, i ) {
                 book.style.setProperty( '--pf-intro-delay', ( i * step ).toFixed( 2 ) + 's' );
             } );
