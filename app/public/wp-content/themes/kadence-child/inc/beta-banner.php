@@ -68,6 +68,13 @@ function pf_beta_choses_prevues() {
 function pf_beta_mises_a_jour() {
 	return [
 		[
+			'date'  => '30 juillet 2026',
+			'items' => [
+				'"Mon compte" : l’accueil devient un sommaire de votre espace (les suggestions de lecture ont été retirées)',
+				'Nouvelle page "Livres numériques" : vos ePub achetés s’ouvrent et se lisent directement dans le navigateur, et retrouvent la page où vous vous étiez arrêté',
+			],
+		],
+		[
 			'date'  => '23 juillet 2026 - 16h',
 			'items' => [
 				'"Mon compte" : suggestions en page d’accueil, possibilité d’ajouter directement des livres dans la liste de lecture, affichage du catalogue sous la liste de lecture',
@@ -88,7 +95,7 @@ function pf_beta_mises_a_jour() {
 		[
 			'date'  => '28 juillet 2026 - 17h',
 			'items' => [
-				'Accueil : meilleur affichage du contenu (après la vue d’arrivée) ; ajout de petits textes synthétiques et d’une étagère "Prix et distinctions"',
+				'Accueil : meilleur affichage du contenu (après la vue d’arrivée) ; ajout de petits textes synthétiques et d’une étagère "Distinctions"',
 				'Menu du haut "collant" plus fiable',
 				'Amélioration de l’affichage des livres dans les étagères',
 				'Admin : on peut désormais dupliquer un événement',
@@ -101,6 +108,19 @@ function pf_beta_mises_a_jour() {
 				'Correction d’un bug affichant un événement dans le mauvais jour vue liste',
 				'Réduction de la hauteur max des images d’événements dans leur page',
 				'Maintenant l’URL d’un élément modifiable en admin suit le nom de l’élément',
+			],
+		],
+		[
+			'date'  => '3 août 2026',
+			'items' => [
+				'Accueil : sur mobile, les actualités ont désormais une hauteur max pour meilleur confort d’affichage et navigation',
+				'Page d’un livre : désormais il y a une étagère de même thématique à la fin',
+				'Compte : refonte de l’accueil (désormais tableau de bord au lieu de suggestions de livres)',
+				'Compte : on peut désormais lire directement depuis son compte les livres numériques achetés',
+				'Compte : plus de page "avis laissés", désormais les avis se gèrent directement là où ils sont laissés',
+				'Un livre épuisé n’est maintenant plus retourné par la recherche globale (un autre format disponible est retourné à la place le cas échéant)',
+				'Dans la même idée, le catalogue ne montre que les formats disponibles (retour à format principal si tous formats épuisés)',
+				'Admin : on a désormais un écran pour gérer l’ordre des livres des étagères Distinctions (Groupes de livres > Tri des livres avec distinction)'
 			],
 		],
 	];

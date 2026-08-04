@@ -1,0 +1,215 @@
+/* ─── Passiflore — Lecteur ePub (page /mon-compte/livres-numeriques) ───────── */
+/* Overlay plein écran ouvert au clic sur une liseuse de l'étagère.
+   Comportement dans assets/js/epub-reader.js, rendu du conteneur par
+   Passiflore_Ebooks::render_account() (inc/class-ebooks.php).
+
+   ⚠️ Duplication VISUELLE assumée avec `.bs-flipbook-overlay`
+   (assets/css/book-single.css) : on ne l'a délibérément pas partagé. Ce
+   composant-là est `.bs-*`, donc legacy gelé (règle CSS 2 du design system), il
+   est écrit en rgba() en dur (règle 1), et sa géométrie n'existe que parce que
+   StPageFlip exige un canevas en pixels fixes redimensionné en JS — epub.js, lui,
+   reflue tout seul dans une boîte en pourcentage. Extraire l'un pour l'autre
+   demanderait de refondre du legacy gelé au profit d'un unique consommateur.
+   On ne promeut un `.pf-overlay` partagé que s'il apparaît un TROISIÈME overlay.
+
+   Ce qui EST réutilisé : .pf-roundbtn / --outline (style.css) pour les boutons,
+   les tokens --pf-* pour tout le reste, --pf-adminbar pour l'offset du haut. */
+
+/* ─── Étagère et liste de fichiers ────────────────────────────────────────── */
+
+.pf-epub-library {
+	display: flex;
+	flex-direction: column;
+	gap: var(--pf-space-6);
+}
+
+/* Repli dépliable des téléchargements directs : l'étagère est le geste
+   principal, le fichier reste disponible sans encombrer. */
+.pf-epub-files {
+	border-top: 1px solid var(--pf-border);
+	padding-top: var(--pf-space-4);
+}
+
+.pf-epub-files > summary {
+	cursor: pointer;
+	font-weight: var(--pf-weight-semibold);
+	color: var(--pf-heading);
+}
+
+.pf-epub-files > summary:hover {
+	color: var(--pf-accent);
+}
+
+.pf-epub-file-list {
+	margin: var(--pf-space-3) 0 0;
+	padding-left: var(--pf-space-5);
+}
+
+.pf-epub-file-list li {
+	margin-bottom: var(--pf-space-2);
+}
+
+.pf-epub-size {
+	color: var(--pf-muted);
+	font-size: var(--pf-text-sm);
+}
+
+/* Ce que fait un clic sur une liseuse, dit une fois pour toutes.
+   Préféré à un indice au survol : le survol n'existe pas au tactile, et il
+   aurait fallu coupler du CSS à la géométrie interne de la liseuse (dont les
+   ratios bezel/chin sont documentés comme délicats dans bookshelf.css). */
+.pf-epub-intro {
+	margin: 0;
+	color: var(--pf-muted);
+	font-size: var(--pf-text-sm);
+}
+
+/* ─── Overlay ─────────────────────────────────────────────────────────────── */
+
+.pf-epub-overlay {
+	display: none;
+	position: fixed;
+	inset: 0;
+	/* Sous les toasts (10001), au-dessus de tout le reste du thème (max 10000). */
+	z-index: 10000;
+	flex-direction: column;
+	/* OPAQUE, volontairement. Une translucidité même faible laisse transparaître
+	   le décor du site derrière la page lue — vérifié : à 94 %, le bandeau bêta et
+	   le bloc newsletter restaient lisibles à travers. Une surface de lecture doit
+	   isoler. (Aucun contexte d'empilement parasite au-dessus : la chaîne
+	   d'ancêtres a été vérifiée, z-index 10000 s'applique bien au niveau racine.) */
+	background: var(--pf-heading);
+	padding-top: var(--pf-adminbar);
+}
+
+.pf-epub-overlay.is-open {
+	display: flex;
+}
+
+/* ─── Barre supérieure ────────────────────────────────────────────────────── */
+
+.pf-epub-bar {
+	display: flex;
+	align-items: center;
+	gap: var(--pf-space-4);
+	padding: var(--pf-space-3) var(--pf-space-4);
+	color: var(--pf-cream);
+}
+
+.pf-epub-title {
+	flex: 1 1 auto;
+	min-width: 0;
+	margin: 0;
+	overflow: hidden;
+	color: var(--pf-cream);
+	font-family: var(--pf-font-heading);
+	font-size: var(--pf-text-base);
+	font-weight: var(--pf-weight-semibold);
+	line-height: var(--pf-leading-snug);
+	white-space: nowrap;
+	text-overflow: ellipsis;
+}
+
+.pf-epub-progress {
+	flex: 0 0 auto;
+	color: color-mix(in srgb, var(--pf-cream) 72%, transparent);
+	font-size: var(--pf-text-sm);
+	font-variant-numeric: tabular-nums;
+}
+
+/* ─── Zone de lecture ─────────────────────────────────────────────────────── */
+
+.pf-epub-viewport {
+	position: relative;
+	flex: 1 1 auto;
+	min-height: 0;
+	margin: 0 var(--pf-space-4);
+	border-radius: var(--pf-radius-lg);
+	background: var(--pf-surface);
+	overflow: hidden;
+}
+
+/* epub.js rend le texte dans une <iframe> qu'il dimensionne lui-même. */
+.pf-epub-viewport iframe {
+	border: 0;
+}
+
+.pf-epub-state {
+	position: absolute;
+	inset: 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: var(--pf-space-3);
+	padding: var(--pf-space-6);
+	color: var(--pf-text);
+	text-align: center;
+}
+
+.pf-epub-state[hidden] {
+	display: none;
+}
+
+/* ─── Pagination ──────────────────────────────────────────────────────────── */
+
+.pf-epub-nav {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: var(--pf-space-4);
+	padding: var(--pf-space-3) var(--pf-space-4) var(--pf-space-4);
+}
+
+/* Les boutons de pagination sont en --outline sur fond sombre : on inverse
+   l'encre du composant, dont la variante est pensée pour un fond clair. */
+.pf-epub-nav .pf-roundbtn--outline {
+	border-color: color-mix(in srgb, var(--pf-cream) 55%, transparent) !important;
+	color: var(--pf-cream) !important;
+}
+
+.pf-epub-nav .pf-roundbtn--outline:hover,
+.pf-epub-nav .pf-roundbtn--outline:focus-visible {
+	border-color: var(--pf-cream) !important;
+	background: color-mix(in srgb, var(--pf-cream) 14%, transparent) !important;
+}
+
+.pf-epub-nav .pf-roundbtn[disabled] {
+	opacity: 0.35;
+	cursor: default;
+	pointer-events: none;
+}
+
+.pf-epub-nav svg {
+	width: 20px;
+	height: 20px;
+	fill: currentColor;
+}
+
+.pf-epub-close svg {
+	width: 22px;
+	height: 22px;
+	fill: currentColor;
+}
+
+/* ─── Mobile ──────────────────────────────────────────────────────────────── */
+
+@media (max-width: 767px) {
+	.pf-epub-viewport {
+		margin: 0 var(--pf-space-2);
+	}
+
+	.pf-epub-bar {
+		gap: var(--pf-space-3);
+		padding: var(--pf-space-2) var(--pf-space-3);
+	}
+
+	/* La barre garde le titre et la fermeture ; la progression passe sous le
+	   texte lu, où elle ne dispute plus la place au titre. */
+	.pf-epub-progress {
+		display: none;
+	}
+
+	.pf-epub-nav {
+		padding: var(--pf-space-2) var(--pf-space-3) var(--pf-space-3);
+	}
+}

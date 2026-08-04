@@ -105,6 +105,7 @@
     gap: var(--pf-space-3);
     --pf-marque-logo-h: clamp(3.5rem, 5.5vw, 5.5rem);
     --pf-marque-wordmark-h: clamp(2rem, 3vw, 2.4rem);
+    animation: pf-hero-fade-up 0.7s cubic-bezier(0.22, 0.61, 0.36, 1) backwards;
 }
 
 .pf-hero-logo-wrap {
@@ -294,14 +295,15 @@
     overflow: visible;
     border: 1px solid var(--pf-accent);
     /* .pf-card (style.css) transitionne déjà box-shadow ; on y ajoute
-       border-color plutôt que d'écraser la déclaration (shorthand non additif). */
-    transition: box-shadow var(--pf-transition), border-color var(--pf-transition);
+       border-color/transform plutôt que d'écraser la déclaration (shorthand non additif). */
+    transition: box-shadow var(--pf-transition), border-color var(--pf-transition), transform var(--pf-transition);
 }
 
 .pf-hero-cat:hover,
 .pf-hero-cat:focus,
 .pf-hero-cat:focus-within {
     border-color: var(--pf-accent-dark);
+    transform: translateY(-3px);
 }
 
 .pf-hero-cat .pf-card-content {
@@ -466,6 +468,14 @@
            recentre alors cette boîte plus courte au milieu de la colonne, pour que
            les flèches suivent la carte au lieu d'être collées tout en bas. */
         justify-content: center;
+        /* Colonne indépendante de la tagline tapée à gauche : entrée précoce,
+           pas d'attente. Fade seul (pas de scale) : Splide mesure la largeur
+           du carousel à son montage (DOMContentLoaded, quasi simultané avec
+           le début de cette anim) via getBoundingClientRect(), qui reflète
+           les transforms — un scale() en cours faussait cette mesure et
+           produisait un sursaut au premier rendu (bord d'une slide voisine
+           visible). translateY ne touche pas la largeur, donc rien à corriger. */
+        animation: pf-hero-fade-up 0.7s cubic-bezier(0.22, 0.61, 0.36, 1) 0.15s backwards;
     }
 }
 
@@ -628,6 +638,65 @@ Workaround: stack two pseudo-elements. ::before is the base gradient (always vis
     transform: scale(1.2);
 }
 
+/* ── Animation d'entrée du hero ────────────────────────────────────────────────
+   Marque + encart actualités : délai fixe au chargement (colonnes autonomes,
+   pas d'attente sur la tagline tapée). Présentation + cartes catégories :
+   doivent apparaître APRÈS la fin du typing (accueil.js) — un délai fixe
+   estimé sur sa durée moyenne se désynchronise dès que le texte change ou que
+   le jitter aléatoire du typing tire vers le haut. Gate `.pf-hero-anim-js`
+   posée par un script inline en tête du hero (avant 1er paint, idiome
+   partagé avec .pf-shelves-js/.pf-notices-js) : sans elle, présentation et
+   cartes restent visibles normalement (JS absent/en échec). `.pf-hero-reveal`
+   déclenche l'anim, posée par accueil.js sur `typingDone`, avec un filet
+   `setTimeout` dans le même script inline si accueil.js ne s'exécute jamais. ── */
+
+@keyframes pf-hero-fade-up {
+    from { opacity: 0; transform: translateY(14px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+.pf-hero-anim-js .pf-hero-presentation,
+.pf-hero-anim-js .pf-hero-cat {
+    opacity: 0;
+    transform: translateY(14px);
+}
+
+.pf-hero-anim-js.pf-hero-reveal .pf-hero-presentation,
+.pf-hero-anim-js.pf-hero-reveal .pf-hero-cat {
+    opacity: 1;
+    transform: translateY(0);
+    /* `backwards` OBLIGATOIRE avec animation-delay (cartes, ci-dessous) : sans
+       lui, pendant le délai l'anim n'agit pas encore sur la propriété, qui
+       retombe sur les valeurs déclarées juste au-dessus (l'état D'ARRIVÉE,
+       ici même règle) — la carte se peint donc en place puis saute au `from`
+       du keyframe quand l'anim démarre enfin. `backwards` tient le `from`
+       pendant tout le délai à la place. Accessoirement referme aussi le
+       conflit avec la transition du lift au survol (transform) plus bas :
+       plus de changement de valeur au passage de .pf-hero-reveal, donc plus
+       rien à concurrencer. */
+    animation: pf-hero-fade-up 0.6s cubic-bezier(0.22, 0.61, 0.36, 1) backwards;
+}
+
+.pf-hero-anim-js.pf-hero-reveal .pf-hero-cat:nth-child(1) { animation-delay: 0.1s; }
+.pf-hero-anim-js.pf-hero-reveal .pf-hero-cat:nth-child(2) { animation-delay: 0.25s; }
+
+@media (prefers-reduced-motion: reduce) {
+    .pf-hero-marque,
+    .pf-hero-actualites-slot .pf-en-ce-moment-actualites,
+    .pf-hero-anim-js.pf-hero-reveal .pf-hero-presentation,
+    .pf-hero-anim-js.pf-hero-reveal .pf-hero-cat {
+        animation: none;
+    }
+    .pf-hero-anim-js .pf-hero-presentation,
+    .pf-hero-anim-js .pf-hero-cat {
+        opacity: 1;
+        transform: none;
+    }
+    .pf-hero-cat {
+        transition: none;
+    }
+}
+
 /* ── 2. Section dividers ────────────────────────────────────────────────────── */
 
 .pf-section-header {
@@ -762,25 +831,6 @@ Workaround: stack two pseudo-elements. ::before is the base gradient (always vis
     padding-bottom: var(--pf-space-12);  /* 48 */
 }
 
-/* Accroche sous le titre de section (centrée avec lui). */
-.pf-section-accroche {
-    margin: var(--pf-space-3) auto 0;
-    max-width: 60ch;
-    font-size: var(--pf-text-base);
-    line-height: var(--pf-leading-snug);
-    color: var(--pf-muted);
-}
-
-/* « En ce moment… » : l'accroche cite les actualités uniquement quand l'encart
-   est effectivement DANS la section. C'est initRelocateActualites() qui l'y
-   reloge, sur (min-width: 769px) → hero, sinon → section. PHP ne peut pas le
-   savoir : les deux phrases sont rendues et la coupure choisit.
-   ⚠️ Ce point de rupture DOIT rester le complément exact du matchMedia de
-   accueil.js — les désynchroniser afficherait la mauvaise phrase, ou les deux. */
-.pf-section-accroche--actus-dedans {
-    display: none;
-}
-
 /* ── Bandes de fond alternées (pleine largeur) ───────────────────────────────
    « En ce moment » sur crème soutenu, « Au catalogue » sur le fond de page :
    au défilement, la structure se lit par bandes au lieu d'une nappe uniforme.
@@ -882,13 +932,15 @@ Workaround: stack two pseudo-elements. ::before is the base gradient (always vis
     padding: 0.2rem 0.2rem 3rem 0.2rem;
 }
 
-/* Carousel sans flèches ni pagination (classe posée par accueil.js sur appareil
-   tactile) : plus rien à réserver en bas. Piloté par la classe et non par une
-   media query, pour que la réserve suive TOUJOURS la présence réelle des
-   contrôles — c'est aussi ce padding que lit initActualiteFit() pour calculer la
-   hauteur de la carte et de la boîte du carousel. */
-.pf-actualites-carousel--sans-controles .pf-actualite-slide {
-    padding-bottom: 0.2rem;
+/* Carousel sans flèches (classe posée par accueil.js sur appareil tactile) : la
+   pagination reste affichée, donc la réserve se réduit à SA hauteur (dots 8px +
+   3px de marge de chaque côté = 14px, posés à 0.75rem du bas), pas à zéro.
+   Piloté par la classe et non par une media query, pour que la réserve suive
+   TOUJOURS la présence réelle des flèches — c'est aussi ce padding que lit
+   initActualiteFit() pour calculer la hauteur de la carte et de la boîte du
+   carousel. */
+.pf-actualites-carousel--sans-fleches .pf-actualite-slide {
+    padding-bottom: 2.25rem;
 }
 
 /* Polaroid stylé, taille NATURELLE plafonnée (≠ imposée) : height:100% a été
@@ -962,10 +1014,16 @@ Workaround: stack two pseudo-elements. ::before is the base gradient (always vis
     gap: 1rem;
 }
 
+/* max-height posé en JS (initActualiteFit → fitOne) quand titre+texte ne
+   tiennent pas dans le budget de la carte : ce bloc défile plutôt que
+   d'agrandir la carte (et avec elle toute la boîte du carrousel, cf. fitAll).
+   overflow-y:auto est sans effet tant qu'aucune max-height n'est posée. */
 .pf-en-ce-moment-actualites .pf-actualite-corps {
     display: flex;
     flex-direction: column;
     gap: 0.35rem;
+    overflow-y: auto;
+    overscroll-behavior: contain;
 }
 
 .pf-en-ce-moment-actualites .pf-actualite-titre {
@@ -1004,6 +1062,19 @@ Workaround: stack two pseudo-elements. ::before is the base gradient (always vis
    après accueil.css — la spécificité tranche, pas l'ordre. */
 .pf-en-ce-moment-events .pf-event-tiles-scroll {
     padding: var(--pf-space-5) var(--pf-space-3) var(--pf-space-3);
+}
+
+/* Entrée au scroll (cf. initEventTilesIntro(), accueil.js) : réutilise le
+   keyframe du hero (fondu + montée), scopée à .pf-en-ce-moment-events —
+   .pf-event-tile sert aussi ailleurs (fiche livre, popup carte), où cette
+   entrée n'a pas lieu d'être. */
+.pf-en-ce-moment-events .pf-event-tiles-armed .pf-event-tile {
+    opacity: 0;
+}
+
+.pf-en-ce-moment-events .pf-event-tiles-intro .pf-event-tile {
+    animation: pf-hero-fade-up 0.5s cubic-bezier(0.22, 0.61, 0.36, 1) backwards;
+    animation-delay: var(--pf-intro-delay, 0s);
 }
 
 .pf-etagere-emoji {
@@ -1111,16 +1182,16 @@ Workaround: stack two pseudo-elements. ::before is the base gradient (always vis
    revient à l'état natif → le survol refonctionne (pas de transform figé). Le JS retire
    `pf-bookshelf-armed` au même instant : l'anim prend le relais sans à-coup. */
 .pf-bookshelf-intro.pf-bookshelf--covers .pf-book {
-    animation: pf-book-appear 0.6s cubic-bezier(0.22, 0.61, 0.36, 1) backwards;
+    animation: pf-book-appear 0.45s cubic-bezier(0.22, 0.61, 0.36, 1) backwards;
     animation-delay: var(--pf-intro-delay, 0s);
 }
 .pf-bookshelf-intro.pf-bookshelf--covers .pf-book-inner {
-    animation: pf-cover-inner-settle 0.6s cubic-bezier(0.22, 0.61, 0.36, 1) backwards;
+    animation: pf-cover-inner-settle 0.45s cubic-bezier(0.22, 0.61, 0.36, 1) backwards;
     animation-delay: var(--pf-intro-delay, 0s);
 }
 .pf-bookshelf-intro.pf-bookshelf--spines .pf-book {
     transform-origin: right bottom;
-    animation: pf-spine-settle 0.4s cubic-bezier(0.22, 0.61, 0.36, 1) backwards;
+    animation: pf-spine-settle 0.3s cubic-bezier(0.22, 0.61, 0.36, 1) backwards;
     animation-delay: var(--pf-intro-delay, 0s);
 }
 
@@ -1131,11 +1202,6 @@ Workaround: stack two pseudo-elements. ::before is the base gradient (always vis
 /* ── 6. Responsive ──────────────────────────────────────────────────────────── */
 
 @media ( max-width: 768px ) {
-    /* Complément exact du matchMedia de initRelocateActualites() : ici l'encart
-       actualités est dans la section, l'accroche les mentionne donc. */
-    .pf-section-accroche--actus-dedans { display: block; }
-    .pf-section-accroche--actus-dehors { display: none; }
-
     /* Sur mobile, l'ordre devient : titre, accroche, CONTENU (étagère, rangée
        de tuiles), puis « Tout voir ➜ » calé à droite tout en bas.
        « Tout voir » vit dans .pf-etagere-head, donc dans un autre contexte de

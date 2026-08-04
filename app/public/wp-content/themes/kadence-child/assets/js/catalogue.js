@@ -30,6 +30,21 @@
 
 		const state           = Object.assign({}, config.state || {});
 		const categoryParents = config.category_parents || {};
+
+		// Statut "par défaut" du tri, contextuel — miroir de
+		// default_orderby()/default_order_for()/is_default_sort() côté PHP
+		// (class-catalogue.php). Le critère silencieux devient `defaut` (ordre
+		// curé) quand Distinctions est actif ; la direction silencieuse d'un
+		// critère est DESC pour date/défaut, ASC pour le reste.
+		function defaultOrderby() {
+			return state.decouvrir === 'distinctions' ? 'defaut' : DEFAULTS.orderby;
+		}
+		function defaultOrderFor(orderby) {
+			return ( orderby === 'date' || orderby === 'defaut' ) ? 'DESC' : 'ASC';
+		}
+		function isDefaultSort() {
+			return state.orderby === defaultOrderby() && state.order === defaultOrderFor(state.orderby);
+		}
 		const grid            = root.querySelector('.pf-catalogue-grid');
 		const sticky          = root.querySelector('.pf-catalogue-sticky');
 		const bar             = root.querySelector('.pf-catalogue-bar:not(.pf-catalogue-bar-top)');
@@ -174,7 +189,7 @@
 				if (state[k]) n += String(state[k]).split(',').filter(Boolean).length;
 			});
 			if (state.decouvrir) n++;
-			if (state.orderby !== DEFAULTS.orderby || state.order !== DEFAULTS.order) n++;
+			if (!isDefaultSort()) n++;
 			return n;
 		}
 		function updateFilterBadge() {
@@ -322,6 +337,28 @@
 				}
 				setSelectedInDropdown(dd, next, false);
 				closeAllDropdowns();
+
+				// Choix explicite d'un critère : la direction repart de son défaut
+				// naturel (DESC pour date/défaut, ASC pour titre/prix/pages) — ne
+				// pas conserver la direction du critère précédent.
+				if (filterKey === 'orderby') {
+					setFilters({ orderby: next, order: defaultOrderFor(next) });
+					return;
+				}
+				// Distinctions ON/OFF fait glisser silencieusement le tri entre
+				// `date` et `defaut` (l'ordre curé), UNIQUEMENT si le tri actif
+				// était encore sur l'autre membre de cette paire — un tri explicite
+				// (titre/prix/pages) n'est jamais touché. La direction, elle,
+				// n'est jamais réinitialisée ici (cf. discussion : reste sur ASC).
+				// Couvre aussi bien la désélection (next === '') que le passage
+				// direct à un autre Découvrir (ex. Distinctions → Nouveautés).
+				if (filterKey === 'decouvrir') {
+					const patch = { decouvrir: next };
+					if (next === 'distinctions' && state.orderby === 'date')       patch.orderby = 'defaut';
+					else if (next !== 'distinctions' && state.orderby === 'defaut') patch.orderby = 'date';
+					setFilters(patch);
+					return;
+				}
 				setFilter(filterKey, next);
 			});
 		});
@@ -362,13 +399,15 @@
 		const dirBtn = root.querySelector('.pf-cat-sort-dir');
 		if (dirBtn) {
 			dirBtn.addEventListener('click', () => {
-				const next = state.order === 'ASC' ? 'DESC' : 'ASC';
-				dirBtn.dataset.sens = next;
-				dirBtn.setAttribute('aria-label', next === 'ASC' ? 'Ordre croissant' : 'Ordre décroissant');
-				dirBtn.classList.toggle('is-active', next === 'ASC');
-				setFilter('order', next);
+				// UI resync (dataset.sens, aria-label, is-active) delegated to
+				// syncSortUI(), called by setFilters() below.
+				setFilter('order', state.order === 'ASC' ? 'DESC' : 'ASC');
 			});
 		}
+		// SSR renders the correct initial classes already; this just guards
+		// against drift (e.g. the "défaut" option's visibility, computed here
+		// rather than in PHP-rendered markup alone).
+		syncSortUI();
 
 		// ── Search (debounced)
 		// "is-searching" = input is focused OR has text. Triggers the
@@ -433,8 +472,7 @@
 					const f = chip.dataset.filter;
 					const v = chip.dataset.value;
 					if (f === 'sort') {
-						setFilters({ orderby: DEFAULTS.orderby, order: DEFAULTS.order });
-						syncSortUI();
+						setFilters({ orderby: defaultOrderby(), order: defaultOrderFor(defaultOrderby()) });
 					} else if (f === 'univers') {
 						// Retirer le chip « rayon » efface rayon ET thématique
 						// → page /catalogue (cf. goTo).
@@ -448,6 +486,14 @@
 						setFilter(f, next);
 						const dd = root.querySelector('.pf-cat-dropdown[data-filter="' + f + '"]');
 						if (dd) setSelectedInDropdown(dd, next, true);
+					} else if (f === 'decouvrir') {
+						// Retirer le chip Découvrir revient à désélectionner Distinctions
+						// dans le dropdown : même bascule de tri (cf. handler du dropdown).
+						const patch = { decouvrir: '' };
+						if (state.orderby === 'defaut') patch.orderby = 'date';
+						setFilters(patch);
+						const dd = root.querySelector('.pf-cat-dropdown[data-filter="decouvrir"]');
+						if (dd) setSelectedInDropdown(dd, '', false);
 					} else {
 						setFilter(f, '');
 						const dd = root.querySelector('.pf-cat-dropdown[data-filter="' + f + '"]');
@@ -462,14 +508,27 @@
 		function syncSortUI() {
 			if (dirBtn) {
 				dirBtn.dataset.sens = state.order;
-				dirBtn.classList.toggle('is-active', state.order === 'ASC');
+				dirBtn.classList.toggle('is-active', state.order !== defaultOrderFor(state.orderby));
 				dirBtn.setAttribute('aria-label', state.order === 'ASC' ? 'Ordre croissant' : 'Ordre décroissant');
 			}
 			const tri = root.querySelector('.pf-cat-dropdown[data-filter="orderby"]');
 			if (tri) {
 				setSelectedInDropdown(tri, state.orderby, false);
-				tri.classList.toggle('is-active', state.orderby !== DEFAULTS.orderby);
+				tri.classList.toggle('is-active', state.orderby !== defaultOrderby());
 			}
+			syncTriDefautOption();
+		}
+
+		// Option "Par défaut" du tri : rendue en PHP dans tous les cas (SSR
+		// correct au 1er paint), montrée/cachée ici en direct — la grille se
+		// recharge en AJAX, où un re-rendu PHP de la barre n'a pas lieu.
+		function syncTriDefautOption() {
+			const tri = root.querySelector('.pf-cat-dropdown[data-filter="orderby"]');
+			if (!tri) return;
+			const menu = menus[tri.dataset.menuId];
+			if (!menu) return;
+			const opt = menu.querySelector('.pf-cat-option[data-value="defaut"]');
+			if (opt) opt.classList.toggle('is-hidden', state.decouvrir !== 'distinctions');
 		}
 
 		function syncFormatUI() {
@@ -546,9 +605,7 @@
 				catDd.classList.toggle('is-active', active);
 			});
 			syncFormatUI();
-			// Tri trigger: is-active when criterion non-default
-			const triDd = root.querySelector('.pf-cat-dropdown[data-filter="orderby"]');
-			if (triDd) triDd.classList.toggle('is-active', state.orderby !== DEFAULTS.orderby);
+			syncSortUI();
 			// Other single-select dropdowns
 			['public','decouvrir'].forEach(k => {
 				const dd = root.querySelector('.pf-cat-dropdown[data-filter="' + k + '"]');
@@ -584,7 +641,13 @@
 			Object.entries(URL_KEYS).forEach(([attKey, urlKey]) => {
 				const v    = s[attKey];
 				const urlV = URL_VALUE_OUT[attKey] ? (URL_VALUE_OUT[attKey][v] ?? v) : v;
-				const def  = DEFAULTS[attKey] !== undefined ? DEFAULTS[attKey] : '';
+				// orderby/order: défaut contextuel (sur `s`, pas le `state` externe —
+				// `overrides` peut porter un decouvrir pas encore appliqué), pas le
+				// DEFAULTS plat — sinon `tri=defaut`/`sens=ASC` s'incrustent dans
+				// l'URL alors qu'ils sont silencieux dans ce contexte.
+				let def = DEFAULTS[attKey] !== undefined ? DEFAULTS[attKey] : '';
+				if (attKey === 'orderby') def = (s.decouvrir === 'distinctions') ? 'defaut' : DEFAULTS.orderby;
+				else if (attKey === 'order') def = defaultOrderFor(s.orderby);
 				const urlDef = URL_VALUE_OUT[attKey] ? (URL_VALUE_OUT[attKey][def] ?? def) : def;
 				if (urlV === '' || urlV === urlDef || urlV == null) url.searchParams.delete(urlKey);
 				else                                                url.searchParams.set(urlKey, urlV);
@@ -629,8 +692,17 @@
 				const parts = url.pathname.replace(/^\/catalogue\//, '').split('/').filter(Boolean);
 				state.univers  = parts[0] || '';
 				state.category = parts[1] || '';
+				// decouvrir/orderby résolus AVANT la boucle : URL_KEYS traite `tri`
+				// avant `decouvrir`, et le défaut contextuel de `tri`/`sens` a besoin
+				// de connaître `decouvrir` (lu directement dans l'URL, `state.decouvrir`
+				// n'étant pas encore à jour à ce point de la boucle).
+				const decouvrirRaw = url.searchParams.get('decouvrir') || '';
+				const orderbyRaw   = url.searchParams.get('tri') || ( decouvrirRaw === 'distinctions' ? 'defaut' : DEFAULTS.orderby );
 				Object.entries(URL_KEYS).forEach(([attKey, urlKey]) => {
-					const raw = url.searchParams.get(urlKey) || (DEFAULTS[attKey] || '');
+					let fallback = DEFAULTS[attKey] !== undefined ? DEFAULTS[attKey] : '';
+					if (attKey === 'orderby') fallback = orderbyRaw;
+					else if (attKey === 'order') fallback = defaultOrderFor(orderbyRaw);
+					const raw = url.searchParams.get(urlKey) || fallback;
 					state[attKey] = URL_VALUE_IN[attKey] ? (URL_VALUE_IN[attKey][raw] ?? raw) : raw;
 				});
 			}
@@ -639,6 +711,7 @@
 			syncFormatUI();
 			syncDisplayUI();
 			syncNavMenu();
+			syncSortUI();
 			fetchAndUpdate();
 		});
 
@@ -785,12 +858,12 @@
 			});
 			if (state.decouvrir) {
 				const labels = {
-					'nouveautes': 'Nouveautés', 'prix-litteraires': 'Prix et distinctions', 'a-paraitre': 'À paraître',
+					'nouveautes': 'Nouveautés', 'distinctions': 'Distinctions', 'a-paraitre': 'À paraître',
 				};
 				out.push({ filter: 'decouvrir', value: state.decouvrir, label: 'Découvrir : ' + (labels[state.decouvrir] || state.decouvrir) });
 			}
-			if (!state.search && (state.orderby !== DEFAULTS.orderby || state.order !== DEFAULTS.order)) {
-				const sortLabels = { date: 'Parution', titre: 'Titre', prix: 'Prix', pages: 'Nombre de pages' };
+			if (!state.search && !isDefaultSort()) {
+				const sortLabels = { defaut: 'Par défaut', date: 'Parution', titre: 'Titre', prix: 'Prix', pages: 'Nombre de pages' };
 				const arrow = state.order === 'ASC' ? '↓' : '↑';
 				out.push({ filter: 'sort', value: '', label: 'Tri : ' + (sortLabels[state.orderby] || state.orderby) + ' ' + arrow });
 			}

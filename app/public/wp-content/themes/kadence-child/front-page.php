@@ -58,33 +58,13 @@ $etagere_head = static function ( $titre, $url = '', $accroche = '' ) {
 	<?php return ob_get_clean();
 };
 
-// Accroche de la section « Au catalogue » : le compte est DÉDUPLIQUÉ par
-// format_groupe (une œuvre, pas une édition) — c'est le nombre que le catalogue
-// affiche lui-même en mode format par défaut.
-$nb_oeuvres         = class_exists( 'Passiflore_Bookshelf' ) ? Passiflore_Bookshelf::count_oeuvres() : 0;
-$accroche_catalogue = $nb_oeuvres
-	? sprintf(
-		'%s %s, de la littérature au patrimoine régional.',
-		number_format_i18n( $nb_oeuvres ),
-		$nb_oeuvres > 1 ? 'ouvrages' : 'ouvrage'
-	)
-	: '';
-
-// Accroche de « En ce moment… ». Elle dépend de la présence de l'encart
-// actualités DANS la section — or ce déplacement est fait en JS par
-// initRelocateActualites() selon la largeur d'écran, que PHP ignore. Les deux
-// formulations sont donc rendues quand il y a des diapos, et c'est le CSS qui
-// tranche sur le même point de rupture (cf. accueil.css).
-$accroche_ecm_avec_actus = 'Nos actualités récentes, événements à venir et les dernières nouveautés de nos rayons.';
-$accroche_ecm_sans_actus = 'Nos événements à venir et les dernières nouveautés de nos rayons.';
-
 // Accroches des étagères de « Au catalogue ». Les deux premières reprennent le
 // texte des cartes de catégorie du hero (même promesse, même voix).
 $accroche_litterature = 'Des romans exigeants et accessibles, générateurs d’émotions.';
 $accroche_culture     = 'Des beaux livres et des ouvrages sur nos sports et notre patrimoine.';
 $accroche_prix        = 'Des autrices et des auteurs récompensés pour la qualité de leur ouvrage.';
-$accroche_gc          = 'Plus de confort de lecture pour celles et ceux qui peinent parfois à lire des textes resserrés.';
-$accroche_numerique   = 'Pour avoir votre lecture partout avec vous, sur votre liseuse, smartphone ou tablette.';
+$accroche_gc          = 'Pour un meilleur confort de lecture.';
+$accroche_numerique   = 'Pour liseuse, smartphone ou tablette (ePub).';
 
 // Seconde phrase ajoutée seulement si l'offre « version numérique » est active
 // (elle est dormante par défaut → l'accroche se réduit d'elle-même).
@@ -135,6 +115,11 @@ if ( function_exists( 'pf_numerique_offer_teaser' ) ) {
             style="--pf-hero-bg: url('<?php echo esc_url( $hero_image_url ); ?>')"
             <?php endif; ?>
         >
+            <?php // Gate .pf-hero-anim-js posée avant 1er paint (idiome .pf-shelves-js/.pf-notices-js) :
+            // sans elle, présentation + cartes catégories restent visibles normalement. Filet
+            // setTimeout : révèle quand même si accueil.js ne s'exécute jamais (accueil.js pose
+            // .pf-hero-reveal plus tôt, sur la fin réelle du typing). ?>
+            <script>(function(el){el.classList.add('pf-hero-anim-js');setTimeout(function(){el.classList.add('pf-hero-reveal');},5000);})(document.currentScript.parentNode);</script>
             <div class="pf-hero-inner site-container">
             <div class="pf-hero-haut">
             <div class="pf-hero-contenu">
@@ -301,12 +286,6 @@ if ( function_exists( 'pf_numerique_offer_teaser' ) ) {
 
             <header class="pf-section-header">
                 <h2 class="pf-section-titre pf-titre-2">En ce moment chez Passiflore…</h2>
-                <?php if ( $has_slides ) : ?>
-                <p class="pf-section-accroche pf-section-accroche--actus-dedans"><?php echo esc_html( $accroche_ecm_avec_actus ); ?></p>
-                <p class="pf-section-accroche pf-section-accroche--actus-dehors"><?php echo esc_html( $accroche_ecm_sans_actus ); ?></p>
-                <?php else : ?>
-                <p class="pf-section-accroche"><?php echo esc_html( $accroche_ecm_sans_actus ); ?></p>
-                <?php endif; ?>
             </header>
 
             <?php if ( $has_slides || ! empty( $events ) ) : ?>
@@ -347,9 +326,6 @@ if ( function_exists( 'pf_numerique_offer_teaser' ) ) {
 
             <header class="pf-section-header">
                 <h2 class="pf-section-titre pf-titre-2">Au catalogue</h2>
-                <?php if ( $accroche_catalogue ) : ?>
-                <p class="pf-section-accroche"><?php echo esc_html( $accroche_catalogue ); ?></p>
-                <?php endif; ?>
             </header>
 
             <div class="pf-etagere-bloc">
@@ -366,8 +342,8 @@ if ( function_exists( 'pf_numerique_offer_teaser' ) ) {
                      qu'une fois, quelle que soit l'édition qui porte la distinction.
                      `display="covers"` — un prix se lit sur la couverture (bandeau). */ ?>
             <div class="pf-etagere-bloc">
-                <?php echo $etagere_head( 'Prix et distinctions', add_query_arg( 'decouvrir', 'prix-litteraires', $catalogue_url ), $accroche_prix ); ?>
-                <?php echo do_shortcode( '[passiflore_etagere mode="scroll" display="covers" decouvrir="prix-litteraires"]' ); ?>
+                <?php echo $etagere_head( 'Distinctions', add_query_arg( 'decouvrir', 'distinctions', $catalogue_url ), $accroche_prix ); ?>
+                <?php echo do_shortcode( '[passiflore_etagere mode="scroll" display="covers" decouvrir="distinctions" orderby="defaut"]' ); ?>
             </div>
 
             <div class="pf-etagere-bloc">

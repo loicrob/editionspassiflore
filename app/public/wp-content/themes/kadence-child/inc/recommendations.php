@@ -2,322 +2,22 @@
 if ( ! defined( 'ABSPATH' ) ) exit;
 
 /**
- * Espace « Mon compte » — suggestions de livres + agencement du menu.
+ * Espace « Mon compte » — plomberie transverse.
  *
- * Moteur de recommandation (lecture seule, sans état → procédural pf_reco_*) :
- * croise les achats du client et sa liste de lecture, agrège les œuvres liées
- * (vous aimerez aussi, série, traductions, même auteur, mêmes mots-clés/étiquettes),
- * classe par nombre de
- * « graines » contributrices, exclut le déjà-possédé, et rend l'étagère 3D avec
- * une explication par livre (« Parce que vous avez commandé… »).
+ * Contient : la bascule d'affichage des étagères (Couvertures | Dos), l'ordre et
+ * les conditions du menu du compte, le retrait du chrome de navigation de
+ * Kadence, les champs Prénom/Nom à l'inscription, et la suppression de compte
+ * (RGPD).
  *
- * Réutilise les helpers existants :
- *  - pf_bg_representative() / pf_bg_dedup() / pf_bg_group_member_reps()  (book-groups-admin.php)
- *  - passiflore_get_product_author_ids() / passiflore_product_ids_by_auteur_terms()  (author-books-grouping.php)
- *  - Passiflore_Reading_List::get_ids()  (class-reading-list.php)
- *  - [passiflore_etagere] + Passiflore_Bookshelf::set_reco_annotations()  (class-bookshelf.php)
- *
- * Pas de cache : le calcul n'a lieu que lorsqu'un client connecté ouvre son
- * tableau de bord ou sa liste de lecture (faible fréquence, jamais pour un
- * invité). Une transient imposerait une invalidation transverse (commande,
- * toggle liste, édition des relations) hors de proportion. Si un profilage le
- * justifiait, une transient courte SANS invalidation (la fraîcheur des recos
- * étant sans enjeu) suffirait.
+ * ⚠️ Le NOM DU FICHIER est historique : il abritait un moteur de
+ * recommandation, retiré le 2026-07-30 (les suggestions de l'accueil du compte
+ * n'ont pas convaincu). Renommer le fichier toucherait functions.php et la
+ * documentation pour zéro changement de comportement — noté comme suivi plutôt
+ * que fait au passage. Ce qui a disparu avec le moteur : les sept fonctions
+ * `pf_reco_*`, l'entrée `reco` de pf_shelf_display_specs(),
+ * assets/js/account-reco.js, et le canal d'annotations de Passiflore_Bookshelf.
+ * L'accueil du compte est désormais une grille de tuiles — cf. inc/account-hub.php.
  */
-
-/* ═══════════════════════════════════════════════════════════════
-   Moteur de recommandation
-   ═══════════════════════════════════════════════════════════════ */
-
-/**
- * Représentants d'œuvre des livres achetés par le client (commandes payées).
- *
- * @return int[]
- */
-function pf_reco_purchased_ids( int $user_id ): array {
-	if ( ! $user_id || ! function_exists( 'wc_get_orders' ) ) {
-		return [];
-	}
-	$order_ids = wc_get_orders( [
-		'customer_id' => $user_id,
-		'status'      => wc_get_is_paid_statuses(),
-		'limit'       => -1,
-		'return'      => 'ids',
-	] );
-
-	$product_ids = [];
-	foreach ( $order_ids as $oid ) {
-		$order = wc_get_order( $oid );
-		if ( ! $order ) {
-			continue;
-		}
-		foreach ( $order->get_items() as $item ) {
-			$pid = (int) $item->get_product_id();
-			if ( $pid ) {
-				$product_ids[] = $pid;
-			}
-		}
-	}
-	return array_values( array_unique( $product_ids ) );
-}
-
-/**
- * Graines de recommandation, avec leur provenance.
- * Achats et liste de lecture, ramenés au représentant d'œuvre. Une œuvre à la
- * fois achetée et en liste est marquée « achat » (provenance la plus forte).
- *
- * @return array<int,string> [ rep_id => 'achat'|'liste' ]
- */
-function pf_reco_seed_sources( int $user_id ): array {
-	$sources = [];
-
-	foreach ( pf_reco_purchased_ids( $user_id ) as $pid ) {
-		$sources[ pf_bg_representative( $pid ) ] = 'achat';
-	}
-
-	if ( class_exists( 'Passiflore_Reading_List' ) ) {
-		foreach ( Passiflore_Reading_List::get_ids( $user_id ) as $pid ) {
-			$rep = pf_bg_representative( $pid );
-			if ( ! isset( $sources[ $rep ] ) ) {
-				$sources[ $rep ] = 'liste';
-			}
-		}
-	}
-
-	return $sources;
-}
-
-/**
- * Candidats bruts d'une œuvre-graine, chacun étiqueté de sa relation.
- * Calque (sans rendu) de la collecte de passiflore_get_livres_lies_sections().
- *
- * @return array<int,array{id:int,relation:string}>
- */
-function pf_reco_candidates_for_seed( int $seed_id ): array {
-	$rep = pf_bg_representative( $seed_id );
-
-	// Exclusion : la graine et toutes ses éditions sœurs (mêmes format_groupe).
-	$exclude = [ $seed_id => true, $rep => true ];
-	if ( function_exists( 'passiflore_get_format_groupe_product_ids' ) ) {
-		foreach ( passiflore_get_format_groupe_product_ids( $seed_id ) as $sib ) {
-			$exclude[ (int) $sib ] = true;
-		}
-	}
-
-	$out = [];
-	$add = function ( $ids, $relation ) use ( &$out, $exclude ) {
-		foreach ( (array) $ids as $id ) {
-			$id = (int) $id;
-			if ( ! $id || isset( $exclude[ $id ] ) ) {
-				continue;
-			}
-			$out[] = [ 'id' => $id, 'relation' => $relation ];
-		}
-	};
-
-	// Vous aimerez aussi (post meta sur le représentant).
-	$add( (array) get_post_meta( $rep, '_pf_vous_aimerez', true ), 'aimerez' );
-
-	// Même série.
-	$serie_terms = wp_get_object_terms( $seed_id, 'pf_serie', [ 'fields' => 'ids' ] );
-	if ( ! is_wp_error( $serie_terms ) && ! empty( $serie_terms ) ) {
-		$add( pf_bg_group_member_reps( 'pf_serie', '_pf_serie_order', (int) $serie_terms[0] ), 'serie' );
-	}
-
-	// Traductions.
-	$trad_terms = wp_get_object_terms( $seed_id, 'pf_traduction', [ 'fields' => 'ids' ] );
-	if ( ! is_wp_error( $trad_terms ) && ! empty( $trad_terms ) ) {
-		$add( pf_bg_group_member_reps( 'pf_traduction', '_pf_traduction_order', (int) $trad_terms[0] ), 'traduction' );
-	}
-
-	// Même(s) auteur(s).
-	if ( function_exists( 'passiflore_get_product_author_ids' ) ) {
-		$auteur_ids = passiflore_get_product_author_ids( $seed_id );
-		if ( $auteur_ids ) {
-			$add( pf_bg_dedup( passiflore_product_ids_by_auteur_terms( $auteur_ids ) ), 'auteur' );
-		}
-	}
-
-	// Mêmes mots-clés (étiquettes produit WooCommerce, ex. « Landes »). Une seule
-	// requête indexée par graine (tax_query sur wp_term_relationships), pas de
-	// parcours du catalogue. À égalité avec les autres relations (choix acté).
-	$tag_terms = wp_get_object_terms( $seed_id, 'product_tag', [ 'fields' => 'ids' ] );
-	if ( ! is_wp_error( $tag_terms ) && ! empty( $tag_terms ) ) {
-		$tagged = get_posts( [
-			'post_type'      => 'product',
-			'post_status'    => 'publish',
-			'posts_per_page' => -1,
-			'fields'         => 'ids',
-			'no_found_rows'  => true,
-			'tax_query'      => [ [
-				'taxonomy' => 'product_tag',
-				'field'    => 'term_id',
-				'terms'    => $tag_terms,
-			] ],
-		] );
-		$add( pf_bg_dedup( $tagged ), 'mots-cles' );
-	}
-
-	return $out;
-}
-
-/**
- * Recommandations ordonnées pour un client.
- * Score = nombre de graines distinctes ayant produit le candidat. Tri : score
- * décroissant, puis date de parution décroissante. Exclut le déjà-acheté /
- * déjà-en-liste et les brouillons. Le stock est laissé à l'étagère (rendu).
- *
- * @return array<int,array{id:int,score:int,reasons:array}>
- */
-function pf_reco_get_recommendations( int $user_id, int $limit = 12 ): array {
-	$sources = pf_reco_seed_sources( $user_id );
-	if ( empty( $sources ) ) {
-		return [];
-	}
-
-	$exclude = $sources; // les œuvres déjà possédées / en liste (clés = rep_ids)
-	$cand    = [];        // rep_id => [ 'seeds' => [seed_id=>true], 'reasons' => [...] ]
-
-	foreach ( $sources as $seed_id => $source ) {
-		$seed_title = get_the_title( $seed_id );
-		foreach ( pf_reco_candidates_for_seed( $seed_id ) as $c ) {
-			$rep = pf_bg_representative( $c['id'] );
-			if ( isset( $exclude[ $rep ] ) ) {
-				continue;
-			}
-			if ( get_post_status( $rep ) !== 'publish' ) {
-				continue;
-			}
-			if ( ! isset( $cand[ $rep ] ) ) {
-				$cand[ $rep ] = [ 'seeds' => [], 'reasons' => [] ];
-			}
-			$cand[ $rep ]['seeds'][ $seed_id ] = true;
-			$cand[ $rep ]['reasons'][]         = [
-				'seed_id'  => (int) $seed_id,
-				'title'    => $seed_title,
-				'source'   => $source,
-				'relation' => $c['relation'],
-			];
-		}
-	}
-
-	if ( empty( $cand ) ) {
-		return [];
-	}
-
-	$recos = [];
-	foreach ( $cand as $rep => $data ) {
-		$recos[] = [
-			'id'      => (int) $rep,
-			'score'   => count( $data['seeds'] ),
-			'reasons' => $data['reasons'],
-		];
-	}
-
-	usort( $recos, function ( $a, $b ) {
-		if ( $a['score'] !== $b['score'] ) {
-			return $b['score'] <=> $a['score'];
-		}
-		$da = (string) get_post_meta( $a['id'], 'date_de_parution', true );
-		$db = (string) get_post_meta( $b['id'], 'date_de_parution', true );
-		return strcmp( $db, $da );
-	} );
-
-	return array_slice( $recos, 0, max( 1, $limit ) );
-}
-
-/**
- * Phrase d'explication (FR) d'un candidat. Titres en gras + italique, regroupés
- * par provenance (liste de lecture, puis achats), ex. :
- * « Suggéré parce que <em>A</em> et <em>B</em> sont dans votre liste de lecture
- *   et parce que vous avez commandé <em>C</em>. » Accord est/sont géré. Au-delà de
- * 3 titres par groupe, le surplus est résumé (« et N autres livres ») pour borner la
- * longueur quand beaucoup de graines contribuent.
- * ⚠ Contient du HTML (<strong>/<em>) → à rendre via wp_kses, pas esc_html.
- */
-function pf_reco_explanation( array $reasons ): string {
-	// Titres regroupés par provenance, dédupliqués par graine.
-	$groups = [ 'liste' => [], 'achat' => [] ];
-	$seen   = [];
-	foreach ( $reasons as $r ) {
-		$sid = (int) $r['seed_id'];
-		if ( isset( $seen[ $sid ] ) ) {
-			continue;
-		}
-		$seen[ $sid ] = true;
-		$src              = ( 'achat' === $r['source'] ) ? 'achat' : 'liste';
-		$groups[ $src ][] = (string) $r['title'];
-	}
-
-	$clauses = [];
-	// Ordre imposé par le pattern : liste de lecture, puis achats.
-	if ( $groups['liste'] ) {
-		$verb      = ( count( $groups['liste'] ) > 1 ) ? 'sont' : 'est';
-		$clauses[] = pf_reco_format_titles( $groups['liste'] ) . ' ' . $verb . ' dans votre liste de lecture';
-	}
-	if ( $groups['achat'] ) {
-		$clauses[] = 'vous avez commandé ' . pf_reco_format_titles( $groups['achat'] );
-	}
-	if ( empty( $clauses ) ) {
-		return '';
-	}
-
-	return 'Suggéré parce que ' . implode( ' et parce que ', $clauses ) . '.';
-}
-
-/**
- * Titres en gras + italique, joints « A, B et C » (passiflore_join_with_et).
- * Au-delà de 3, le surplus est résumé en « et N autres livres » — on ne résume qu'à
- * partir de 5 titres (à 4, « et 1 autre » n'économiserait rien : on les liste
- * tous). Titres échappés (esc_html) avant d'être enveloppés de <strong><em>.
- */
-function pf_reco_format_titles( array $titles ): string {
-	$max = 3;
-	if ( count( $titles ) > $max + 1 ) {
-		$extra  = count( $titles ) - $max;
-		$titles = array_slice( $titles, 0, $max );
-	} else {
-		$extra = 0;
-	}
-	$items = array_map( static function ( $t ) {
-		return '<strong><em>' . esc_html( $t ) . '</em></strong>';
-	}, $titles );
-	if ( $extra > 0 ) {
-		$s       = ( $extra > 1 ) ? 's' : '';
-		$items[] = $extra . ' autre' . $s . ' livre' . $s;
-	}
-	return passiflore_join_with_et( $items );
-}
-
-/**
- * Rend l'étagère de suggestions (annotée), ou un repli « nouveautés » pour un
- * client sans historique exploitable.
- */
-function pf_reco_render( int $user_id = 0, int $limit = 12, string $display = 'covers' ): string {
-	$user_id = $user_id ?: get_current_user_id();
-	$display = ( 'spines' === $display ) ? 'spines' : 'covers';
-	$recos   = pf_reco_get_recommendations( $user_id, $limit );
-
-	if ( ! empty( $recos ) ) {
-		$ids = [];
-		$ann = [];
-		foreach ( $recos as $r ) {
-			$ids[]            = $r['id'];
-			$ann[ $r['id'] ]  = [ 'score' => $r['score'], 'why' => pf_reco_explanation( $r['reasons'] ) ];
-		}
-		if ( class_exists( 'Passiflore_Bookshelf' ) ) {
-			Passiflore_Bookshelf::set_reco_annotations( $ann );
-		}
-		$html = do_shortcode( '[passiflore_etagere ids="' . implode( ',', $ids ) . '" mode="shelves" display="' . $display . '" show_price="true" show-bookmarks="true"]' );
-		if ( class_exists( 'Passiflore_Bookshelf' ) ) {
-			Passiflore_Bookshelf::set_reco_annotations( [] );
-		}
-		return $html;
-	}
-
-	// Repli : aucun historique exploitable → nouveautés.
-	return do_shortcode( '[passiflore_etagere decouvrir="nouveautes" mode="shelves" display="' . $display . '" show_price="true" show-bookmarks="true"]' );
-}
 
 /* ═══════════════════════════════════════════════════════════════
    Bascule d'affichage des étagères du compte (Couvertures | Dos)
@@ -326,8 +26,9 @@ function pf_reco_render( int $user_id = 0, int $limit = 12, string $display = 'c
    « covers » ou « spines » via AJAX. Les deux affichages diffèrent au rendu
    SERVEUR (épaisseur des dos ×1,5, packing des rangées, signets/prix/badges
    propres aux couvertures) → un simple toggle CSS ne suffirait pas.
-   Étagères concernées : Suggestions (accueil compte), Ma liste de lecture et
-   Catalogue (page /liste-de-lecture).
+   Étagères concernées : Ma liste de lecture et Catalogue, toutes deux sur la
+   page /liste-de-lecture. (L'étagère des livres numériques n'en a pas : une
+   rangée de liseuses vue de dos est une rangée de bandes noires.)
    ═══════════════════════════════════════════════════════════════ */
 
 /**
@@ -338,9 +39,6 @@ function pf_reco_render( int $user_id = 0, int $limit = 12, string $display = 'c
  */
 function pf_shelf_display_specs(): array {
 	return [
-		'reco'      => static function ( string $display ): string {
-			return function_exists( 'pf_reco_render' ) ? pf_reco_render( get_current_user_id(), 12, $display ) : '';
-		},
 		'readlist'  => static function ( string $display ): string {
 			return class_exists( 'Passiflore_Reading_List' ) ? Passiflore_Reading_List::render_shelf_inner( $display ) : '';
 		},
@@ -428,12 +126,14 @@ function pf_account_menu_reorder( $items ) {
 		return $items;
 	}
 
-	if ( isset( $items['dashboard'] ) ) {
-		$items['dashboard'] = 'Accueil';
-	}
+	// « Accueil » (dashboard) retiré de la sectionnav : le hub (inc/account-hub.php)
+	// est déjà la page d'atterrissage du compte, ce lien de retour était redondant.
+	unset( $items['dashboard'] );
 
-	// Téléchargements fusionnés dans « Commandes » — endpoint conservé.
-	unset( $items['downloads'] );
+	// L'entrée `downloads` est devenue « Livres numériques », une vraie page avec
+	// son étagère de liseuses : c'est Passiflore_Ebooks qui la libelle et la
+	// masque quand le client n'a aucun ePub (inc/class-ebooks.php). Ici, on ne
+	// décide plus que de sa POSITION, dans $order ci-dessous.
 
 	$uid = get_current_user_id();
 
@@ -453,13 +153,7 @@ function pf_account_menu_reorder( $items ) {
 		}
 	}
 
-	// « Avis laissés » seulement s'il y a au moins un avis.
-	if ( isset( $items['avis-laisses'] ) && class_exists( 'Passiflore_Mes_Avis' )
-		&& ! Passiflore_Mes_Avis::get_user_reviews() ) {
-		unset( $items['avis-laisses'] );
-	}
-
-	$order = [ 'dashboard', 'liste-de-lecture', 'avis-laisses', 'orders', 'edit-address', 'payment-methods', 'edit-account', 'customer-logout' ];
+	$order = [ 'downloads', 'liste-de-lecture', 'orders', 'edit-address', 'payment-methods', 'edit-account', 'customer-logout' ];
 	$out   = [];
 	foreach ( $order as $k ) {
 		if ( isset( $items[ $k ] ) ) {
@@ -502,23 +196,6 @@ function pf_account_strip_kadence_nav_chrome() {
 	remove_action( 'woocommerce_before_account_navigation', [ $wc, 'myaccount_nav_avatar' ], 20 );
 	remove_action( 'woocommerce_before_account_navigation', [ $wc, 'myaccount_nav_wrap_start' ], 2 );
 	remove_action( 'woocommerce_after_account_navigation', [ $wc, 'myaccount_nav_wrap_end' ], 50 );
-}
-
-/**
- * Fusion « Téléchargements » → page « Commandes » : table des téléchargements
- * sous la liste des commandes, uniquement s'il en existe (et donc pas sur une
- * commande individuelle, où ce hook ne se déclenche pas).
- */
-add_action( 'woocommerce_after_account_orders', 'pf_account_downloads_in_orders' );
-function pf_account_downloads_in_orders( $has_orders ) {
-	if ( ! function_exists( 'wc_get_customer_available_downloads' ) ) {
-		return;
-	}
-	if ( ! wc_get_customer_available_downloads( get_current_user_id() ) ) {
-		return;
-	}
-	echo '<h2 class="pf-titre-2 pf-account-section-title">Téléchargements</h2>';
-	do_action( 'woocommerce_account_downloads_endpoint' );
 }
 
 /**

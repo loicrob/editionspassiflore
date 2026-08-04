@@ -109,14 +109,58 @@ if ( ! is_wp_error( $fg_terms ) && ! empty( $fg_terms ) ) {
 			'current' => ( $vid === $id ),
 		];
 	}
-	if ( count( $format_variants ) === 0 ) $format_variants = [];
+} else {
+	// Produit autonome (pas de format_groupe) mais portant un format
+	// particulier : même traitement que dans un groupe, avec un seul membre
+	// non cliquable (ex. livre qui n'existe qu'en numérique).
+	$own_format = wp_get_object_terms( $id, 'pa_format_particulier', [ 'fields' => 'names' ] );
+	if ( ! is_wp_error( $own_format ) && ! empty( $own_format ) ) {
+		$format_variants[] = [
+			'id'      => $id,
+			'url'     => get_permalink( $id ),
+			'label'   => $own_format[0],
+			'current' => true,
+		];
+	}
 }
 
 $group_title = '';
 if ( ! empty( $format_variants ) ) {
-	$fg_term = get_term( $fg_terms[0], 'format_groupe' );
-	if ( $fg_term && ! is_wp_error( $fg_term ) ) {
-		$group_title = $fg_term->name;
+	if ( ! empty( $fg_terms ) && ! is_wp_error( $fg_terms ) ) {
+		$fg_term = get_term( $fg_terms[0], 'format_groupe' );
+		if ( $fg_term && ! is_wp_error( $fg_term ) ) {
+			$group_title = $fg_term->name;
+		}
+	} else {
+		$group_title = pf_format_root( $id );
+	}
+}
+
+/* ─── Message épuisé (remplace bs-price-row) ───────────────────── */
+
+$epuise_message = '';
+if ( ! $product->is_in_stock() ) {
+	$other_labels = [];
+	if ( ! empty( $format_variants ) ) {
+		$epuise_map = pf_format_epuise_map( wp_list_pluck( $format_variants, 'id' ) );
+		foreach ( $format_variants as $v ) {
+			if ( ! $v['current'] && ! isset( $epuise_map[ $v['id'] ] ) ) {
+				$other_labels[] = mb_strtolower( $v['label'] );
+			}
+		}
+	}
+	if ( empty( $other_labels ) ) {
+		$epuise_message = 'Ce livre est désormais épuisé.';
+	} else {
+		$plural = count( $other_labels ) > 1;
+		$epuise_message = sprintf(
+			'Ce format est désormais épuisé, mais %s %s %s %s toujours %s.',
+			$plural ? 'les' : 'la',
+			$plural ? 'versions' : 'version',
+			passiflore_join_with_et( $other_labels ),
+			$plural ? 'sont' : 'est',
+			$plural ? 'disponibles' : 'disponible'
+		);
 	}
 }
 
@@ -194,7 +238,7 @@ $description     = $product->get_description(); // même source que la section �
 				<div class="bs-hero__purchase">
 					<?php if ( ! empty( $format_variants ) ) : ?>
 					<div class="bs-formats">
-						<span class="bs-formats__label">Formats :</span>
+						<span class="bs-formats__label">Format<?= count( $format_variants ) > 1 ? 's' : '' ?> :</span>
 						<?php foreach ( $format_variants as $v ) :
 							$cls = 'bs-format-btn pf-btn pf-btn--xs ' . ( $v['current'] ? 'pf-btn--outline bs-format-btn--active' : 'pf-btn--neutral' );
 							if ( $v['current'] ) : ?>
@@ -205,6 +249,7 @@ $description     = $product->get_description(); // même source que la section �
 						endforeach; ?>
 					</div>
 					<?php endif; ?>
+					<?php if ( $product->is_in_stock() ) : ?>
 					<div class="bs-price-row">
 						<?php woocommerce_template_single_price(); ?>
 						<?php
@@ -216,6 +261,9 @@ $description     = $product->get_description(); // même source que la section �
 						}
 						?>
 					</div>
+					<?php else : ?>
+					<p class="bs-epuise-msg"><?= esc_html( $epuise_message ) ?></p>
+					<?php endif; ?>
 					<?php if ( $product->is_purchasable() && $product->is_in_stock() ) : ?>
 					<a href="<?= esc_url( $product->add_to_cart_url() ) ?>"
 					   class="button bs-hero__cart add_to_cart_button ajax_add_to_cart"

@@ -178,8 +178,18 @@
 		// Sans effet sur desktop (nav verticale, ne recouvre pas les sections) —
 		// la variable n'y est simplement pas utilisée.
 		if (sectionNav) {
+			// Rail desktop (.pf-sectionnav::before) : son bas doit s'arrêter dans le
+			// dernier point, centré sur la 1re ligne du dernier lien (cf. style.css). Le
+			// nombre de lignes de ce lien dépend du texte/de la largeur, non calculable
+			// en CSS pur — mesuré ici et posé dans --pf-sectionnav-rail-bottom.
+			var lastNavLink = navLinks[navLinks.length - 1];
 			function updateSectionNavHeight() {
 				document.documentElement.style.setProperty('--pf-sectionnav-h', sectionNav.offsetHeight + 'px');
+				if (lastNavLink) {
+					var fontSize = parseFloat(getComputedStyle(lastNavLink).fontSize) || 0;
+					var railBottom = Math.max(0, lastNavLink.offsetHeight - fontSize * 1.2);
+					document.documentElement.style.setProperty('--pf-sectionnav-rail-bottom', railBottom + 'px');
+				}
 			}
 			window.addEventListener('resize', updateSectionNavHeight, { passive: true });
 			updateSectionNavHeight();

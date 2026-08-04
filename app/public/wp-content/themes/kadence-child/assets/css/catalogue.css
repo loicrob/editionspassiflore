@@ -93,8 +93,12 @@ body.tax-product_cat .entry-hero.product-hero-section {
    seul cas qui scrolle lui-même et dont l'état vient d'ici (catalogue.js, classes
    .has-fade-*) et non de scroll-fade.js. Ne reste que la longueur de la rampe ;
    32px et non 60 : la rangée est courte et les puces de filtre sont étroites, un
-   fondu long en effacerait une entière. La transition de 0,25s vient avec. */
-.pf-cat-row-scroll { --pf-fade-size: 32px; }
+   fondu long en effacerait une entière. La transition de 0,25s vient avec.
+   En clamp plutôt que fixe : sur un téléphone étroit la rangée elle-même est
+   proportionnellement plus courte, un fondu 32px y mord donc sur une puce entière —
+   même coefficient de mise à l'échelle que le défaut de style.css (32/60), plancher
+   à 20px pour rester lisible comme un fondu. */
+.pf-cat-row-scroll { --pf-fade-size: clamp(20px, 2.3vw, 32px); }
 
 
 /* ─── Mobile / tablet (< 1024px) ─────────────────────────────────── */
@@ -346,6 +350,11 @@ body.tax-product_cat .entry-hero.product-hero-section {
 
 .pf-cat-opt-count { color: var(--pf-text-dim); font-size: 12px; margin-left: auto; padding-left: 8px; }
 .pf-cat-option:hover:not(.is-disabled) .pf-cat-opt-count { color: var(--pf-accent); }
+
+/* Option « Par défaut » du tri : toujours rendue (SSR correct dès le premier
+   paint), masquée sauf quand Distinctions est actif — la grille se recharge en
+   AJAX, où un re-rendu PHP de la barre n'a pas lieu, cf. catalogue.js. */
+.pf-cat-option.is-hidden { display: none; }
 
 .pf-cat-multi .pf-cat-option input[type="checkbox"] {
 	margin: 0;

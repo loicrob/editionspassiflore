@@ -202,6 +202,31 @@ function pf_auth_post_auth_redirect( $redirect ) {
 }
 
 /**
+ * Déconnexion sans confirmation, même nonce périmé (onglet resté ouvert,
+ * retour arrière depuis le bfcache…).
+ *
+ * Le lien « Se déconnecter » (hub ET sectionnav — tous deux passent par
+ * wc_get_account_endpoint_url('customer-logout')) est noncé par WooCommerce ;
+ * si ce nonce ne valide plus au clic, wc_template_redirect() n'appelle pas
+ * wp_logout(), affiche « Êtes-vous sûr de vouloir vous déconnecter ? » (notice
+ * → toast sur ce thème) et renvoie sur la page compte, TOUJOURS CONNECTÉ. Se
+ * déconnecter est une action anodine et réversible (se reconnecter est
+ * trivial) : cette confirmation ne protège de rien qui vaille la friction.
+ *
+ * Priorité 5, avant wc_template_redirect() (10) qui fait sinon cette
+ * vérification lui-même.
+ */
+add_action( 'template_redirect', 'pf_auth_logout_without_confirm', 5 );
+function pf_auth_logout_without_confirm() {
+	if ( ! isset( $GLOBALS['wp']->query_vars['customer-logout'] ) || ! is_user_logged_in() ) {
+		return;
+	}
+	wp_logout();
+	wp_safe_redirect( wc_get_logout_redirect_url() );
+	exit;
+}
+
+/**
  * Après déconnexion : atterrir sur /connexion, pas sur la page compte.
  *
  * WooCommerce renvoie par défaut sur « Mon compte » — où le visiteur, désormais
@@ -209,7 +234,7 @@ function pf_auth_post_auth_redirect( $redirect ) {
  * espace client. On corrige la **destination** à la source, via le filtre
  * officiel, plutôt que d'ajouter une redirection conditionnelle sur /mon-compte :
  * celle-ci porterait sur le chemin qui sert aussi la récupération de mot de
- * passe (endpoint `mot-de-passe-perdu`, cible du lien envoyé par e-mail), pour
+ * passe (endpoint `mot-de-passe-oublie`, cible du lien envoyé par e-mail), pour
  * un bénéfice purement cosmétique. Ici, un seul filtre, aucun cas limite.
  *
  * Couvre tous les chemins de déconnexion du front (entrée « Déconnexion » du

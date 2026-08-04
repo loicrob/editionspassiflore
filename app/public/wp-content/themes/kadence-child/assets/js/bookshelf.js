@@ -626,7 +626,6 @@
 		var hoverStart  = 0;       // ms timestamp of the latest enter
 		var loadTimer   = null;    // pending fetch-start setTimeout id
 		var revealTimer = null;    // pending reveal setTimeout id
-		var overReco    = false;   // pointer currently on the reco badge/explanation
 
 		function clearLoad() {
 			if (loadTimer !== null) {
@@ -648,7 +647,7 @@
 		// the user leaves before the timer fires) nothing happens.
 		function attemptReveal() {
 			clearReveal();
-			if (!hoverActive || !coverReady || overReco) return;
+			if (!hoverActive || !coverReady) return;
 
 			// PRÉCHAUFFAGE (cf. .pf-book--arming dans bookshelf.css). La
 			// couverture n'a encore jamais été peinte : sa 1re rastérisation
@@ -739,7 +738,6 @@
 
 		function onLeave() {
 			hoverActive = false;
-			overReco    = false;
 			// Cancel any pending fetch that hasn't fired yet — the user
 			// moved off before committing. Once `startCoverLoad` has
 			// actually set `img.src`, browsers can't reliably abort the
@@ -761,26 +759,6 @@
 		book.addEventListener('focusin',    onEnter);
 		book.addEventListener('mouseleave', onLeave);
 		book.addEventListener('focusout',   onLeave);
-
-		// Le badge de recommandation (« ? ») flotte au-dessus du dos mais reste un
-		// descendant du livre → sans ça, s'en approcher révélerait la couverture
-		// (et le fondu du badge le rendrait alors incliquable). On suspend la
-		// révélation tant que le pointeur est sur le badge/l'explication, et on la
-		// reprend dès qu'il revient sur le dos. `mouseover` bubble et précède
-		// `mouseenter`, donc overReco est posé avant qu'onEnter ne tente de révéler.
-		book.addEventListener('mouseover', function (e) {
-			var onReco = !! (e.target.closest && e.target.closest('.pf-book-reco'));
-			if (onReco === overReco) return;
-			overReco = onReco;
-			if (overReco) {
-				clearReveal();
-				book.classList.remove('pf-book--cover-revealed');
-			} else if (hoverActive) {
-				hoverStart = Date.now();
-				scheduleCoverLoad();
-				attemptReveal();
-			}
-		});
 
 		// Tactile : le 1er tap saisit le livre (et annule la navigation),
 		// le 2e tap — livre déjà ouvert — suit le lien.

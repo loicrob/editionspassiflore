@@ -130,82 +130,13 @@ window.pfBookPicker = function ( $, opts ) {
 
 	if ( Array.isArray( opts.books ) ) {
 		// Mode local : liste préchargée → combobox flottant insensible à la casse
-		// et aux accents, affichée dès le focus (filtrée à la frappe).
+		// et aux accents, affichée dès le focus (filtrée à la frappe). Le filtre
+		// flou est partagé (assets/js/book-filter.js), sans plafond de résultats.
 		var BOOKS = opts.books;
 
-		// Miroir JS de pf_search_normalize() (inc/search.php) : minuscules, sans
-		// accents NI ligatures (\u0153\u2192oe, \u00e6\u2192ae), ponctuation \u2192 s\u00e9parateurs.
-		var normalize = function ( s ) {
-			return ( s == null ? '' : '' + s ).toLowerCase()
-				.replace( /\u0153/g, 'oe' ).replace( /\u00e6/g, 'ae' )
-				.normalize( 'NFD' ).replace( /[\u0300-\u036f]/g, '' )
-				.replace( /[^a-z0-9]+/g, ' ' ).trim();
-		};
-		BOOKS.forEach( function ( b ) { if ( b._n === undefined ) b._n = normalize( b.title ); } );
-
-		// Distance de Levenshtein (DP sur une ligne).
-		var lev = function ( a, b ) {
-			var al = a.length, bl = b.length;
-			if ( ! al ) return bl;
-			if ( ! bl ) return al;
-			var prev = [], i, j;
-			for ( j = 0; j <= bl; j++ ) prev[ j ] = j;
-			for ( i = 1; i <= al; i++ ) {
-				var cur = [ i ];
-				for ( j = 1; j <= bl; j++ ) {
-					var cost = a.charAt( i - 1 ) === b.charAt( j - 1 ) ? 0 : 1;
-					cur[ j ] = Math.min( prev[ j ] + 1, cur[ j - 1 ] + 1, prev[ j - 1 ] + cost );
-				}
-				prev = cur;
-			}
-			return prev[ bl ];
-		};
-
-		var threshold = function ( tok ) {
-			var n = tok.length;
-			if ( n < 4 ) return 0;
-			if ( n < 7 ) return 1;
-			return 2;
-		};
-
-		// Un token de requ\u00eate matche si sous-cha\u00eene d'un token du texte, ou
-		// Levenshtein <= seuil (tol\u00e9rance aux fautes de frappe).
-		var tokenMatches = function ( qt, ttoks ) {
-			var t, thr = threshold( qt );
-			for ( t = 0; t < ttoks.length; t++ ) {
-				if ( ttoks[ t ].indexOf( qt ) !== -1 ) return true;
-			}
-			if ( thr === 0 ) return false;
-			for ( t = 0; t < ttoks.length; t++ ) {
-				if ( Math.abs( ttoks[ t ].length - qt.length ) > thr ) continue;
-				if ( lev( qt, ttoks[ t ] ) <= thr ) return true;
-			}
-			return false;
-		};
-
-		var localFilter = function ( q ) {
-			var qn     = normalize( q );
-			var tokens = qn ? qn.split( ' ' ) : [];
-			var qjoin  = qn.replace( / /g, '' );
-			var out = [];
-			for ( var i = 0; i < BOOKS.length; i++ ) {
-				var n = BOOKS[ i ]._n, ok = true;
-				// Sous-cha\u00eene \u00ab coll\u00e9e \u00bb (g\u00e8re les caract\u00e8res sp\u00e9ciaux), sinon tous
-				// les tokens doivent matcher (pr\u00e9fixe / sous-cha\u00eene / faute de frappe).
-				if ( qjoin && n.replace( / /g, '' ).indexOf( qjoin ) !== -1 ) {
-					out.push( BOOKS[ i ] );
-					continue;
-				}
-				var ttoks = n ? n.split( ' ' ) : [];
-				for ( var t = 0; t < tokens.length; t++ ) {
-					if ( ! tokenMatches( tokens[ t ], ttoks ) ) { ok = false; break; }
-				}
-				if ( ok ) out.push( BOOKS[ i ] );
-			}
-			return out;
-		};
-
-		$search.on( 'focus input', function () { renderResults( localFilter( $( this ).val() ) ); } );
+		$search.on( 'focus input', function () {
+			renderResults( window.pfBookFilter( BOOKS, $( this ).val() ) );
+		} );
 		$search.on( 'blur', function () { setTimeout( function () { $results.hide(); }, 200 ); } );
 		// Garde le focus dans le champ pendant l'interaction avec la liste
 		// (permet d'ajouter plusieurs livres sans refermer le menu).

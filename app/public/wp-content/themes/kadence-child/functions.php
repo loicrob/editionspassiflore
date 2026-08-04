@@ -28,7 +28,7 @@ function passiflore_enqueue_auteurs_styles() {
     // au-dessus du composant toast global pf-toast (enregistré site-wide par
     // Passiflore_Bookshelf). Enregistré ici, tiré à la demande par les scripts
     // des endpoints à nonce qui le déclarent en dépendance (newsletter, panier,
-    // mes-avis).
+    // suppression d'un avis sur la fiche livre).
     wp_register_script(
         'pf-session-toast',
         get_stylesheet_directory_uri() . '/assets/js/pf-session-toast.js',
@@ -60,6 +60,15 @@ function passiflore_enqueue_auteurs_styles() {
         true
     );
 
+    // Séparateurs « · » du footer (site-wide, cf. [pf_footer_legal]).
+    wp_enqueue_script(
+        'pf-footer-legal',
+        get_stylesheet_directory_uri() . '/assets/js/footer-legal.js',
+        [],
+        filemtime( get_stylesheet_directory() . '/assets/js/footer-legal.js' ),
+        true
+    );
+
     // Toasts d'ajout / de retrait du panier. Site-wide : le mini-panier du header
     // est sur toutes les pages, et son bouton × doit donner le même retour qu'un
     // ajout. jquery en dépendance — `added_to_cart` / `removed_from_cart` sont des
@@ -81,6 +90,10 @@ function passiflore_enqueue_auteurs_styles() {
             // cf. inc/class-reading-list.php). Le message est injecté en innerHTML
             // par pf-toast.js → l'entité est bien interprétée.
             'added'    => '%s a bien été ajouté au panier&nbsp;!',
+            // Offre « version numérique » retenue : deux produits partent au
+            // panier, le toast doit les annoncer tous les deux — sans quoi le
+            // client ne voit confirmé que le livre papier.
+            'added_num' => '%s et sa version numérique ont bien été ajoutés au panier&nbsp;!',
             'removed'  => '%s a bien été retiré du panier.',
             'cart_cta' => 'Voir le panier',
             'cart_url' => wc_get_cart_url(),
@@ -221,22 +234,6 @@ function passiflore_enqueue_auteurs_styles() {
             [],
             filemtime( get_stylesheet_directory() . '/assets/css/account.css' )
         );
-        // Infobulle partagée (titre « Suggestions de Passiflore ») — dépendance
-        // de account-reco.js, qui la câble (window.pfTooltip.wire).
-        wp_enqueue_script(
-            'pf-tooltip',
-            get_stylesheet_directory_uri() . '/assets/js/pf-tooltip.js',
-            [],
-            filemtime( get_stylesheet_directory() . '/assets/js/pf-tooltip.js' ),
-            true
-        );
-        wp_enqueue_script(
-            'pf-account-reco',
-            get_stylesheet_directory_uri() . '/assets/js/account-reco.js',
-            [ 'pf-tooltip' ],
-            filemtime( get_stylesheet_directory() . '/assets/js/account-reco.js' ),
-            true
-        );
         // Nav du compte = composant .pf-sectionnav--static : ombres de bord du
         // défilement horizontal (mobile) + recentrage de la pilule active.
         wp_enqueue_script(
@@ -266,6 +263,24 @@ function passiflore_enqueue_auteurs_styles() {
             'ajax_url' => admin_url( 'admin-ajax.php' ),
             'nonce'    => wp_create_nonce( 'pf_shelf_display' ),
         ] );
+        // Mesure --pf-account-hub-top pour .pf-account-dashboard (account.css).
+        // No-op sur les pages de compte autres que le hub (élément absent du DOM).
+        wp_enqueue_script(
+            'pf-account-hub',
+            get_stylesheet_directory_uri() . '/assets/js/account-hub.js',
+            [],
+            filemtime( get_stylesheet_directory() . '/assets/js/account-hub.js' ),
+            true
+        );
+        // Ouverture/fermeture animée du bloc mot de passe (form-edit-account.php).
+        // No-op ailleurs sur le compte (élément absent du DOM).
+        wp_enqueue_script(
+            'pf-account-password-toggle',
+            get_stylesheet_directory_uri() . '/assets/js/account-password-toggle.js',
+            [],
+            filemtime( get_stylesheet_directory() . '/assets/js/account-password-toggle.js' ),
+            true
+        );
     }
     if ( function_exists( 'is_cart' ) && is_cart() ) {
         wp_enqueue_style(
@@ -370,9 +385,13 @@ function passiflore_redirect_empty_cart() {
 }
 
 require_once get_stylesheet_directory() . '/inc/a11y.php';
+require_once get_stylesheet_directory() . '/inc/format-groupe.php';
+require_once get_stylesheet_directory() . '/inc/product-format-admin.php';
 require_once get_stylesheet_directory() . '/inc/author-books-grouping.php';
 require_once get_stylesheet_directory() . '/inc/search.php';
 require_once get_stylesheet_directory() . '/inc/modifier-produit.php';
+require_once get_stylesheet_directory() . '/inc/book-field-validation.php';
+require_once get_stylesheet_directory() . '/inc/stock-sync.php';
 require_once get_stylesheet_directory() . '/inc/catalogues.php';
 require_once get_stylesheet_directory() . '/inc/header-hooks.php';
 require_once get_stylesheet_directory() . '/inc/header-sticky.php';
@@ -388,7 +407,7 @@ require_once get_stylesheet_directory() . '/inc/class-events-search.php';
 require_once get_stylesheet_directory() . '/inc/class-events-map.php';
 require_once get_stylesheet_directory() . '/inc/event-admin.php';
 require_once get_stylesheet_directory() . '/inc/event-duplicate.php';
-require_once get_stylesheet_directory() . '/inc/event-slug-sync.php';
+require_once get_stylesheet_directory() . '/inc/post-slug-sync.php';
 require_once get_stylesheet_directory() . '/inc/venue-admin.php';
 require_once get_stylesheet_directory() . '/inc/book-groups-admin.php';
 require_once get_stylesheet_directory() . '/inc/event-hours.php';
@@ -402,13 +421,16 @@ require_once get_stylesheet_directory() . '/inc/class-recherche-auteurs.php';
 require_once get_stylesheet_directory() . '/inc/class-recherche-globale.php';
 require_once get_stylesheet_directory() . '/inc/accueil.php';
 require_once get_stylesheet_directory() . '/inc/class-reading-list.php';
-require_once get_stylesheet_directory() . '/inc/class-mes-avis.php';
 require_once get_stylesheet_directory() . '/inc/account-auth.php';
 require_once get_stylesheet_directory() . '/inc/recommendations.php';
+require_once get_stylesheet_directory() . '/inc/account-hub.php';
 require_once get_stylesheet_directory() . '/inc/shipping.php';
 require_once get_stylesheet_directory() . '/inc/boxtal-perf.php';
 require_once get_stylesheet_directory() . '/inc/numerique-offer.php';
+require_once get_stylesheet_directory() . '/inc/epub-storage.php';
+require_once get_stylesheet_directory() . '/inc/class-ebooks.php';
 require_once get_stylesheet_directory() . '/inc/checkout.php';
+require_once get_stylesheet_directory() . '/inc/checkout-consent.php';
 require_once get_stylesheet_directory() . '/inc/wc-notices-toast.php';
 require_once get_stylesheet_directory() . '/inc/mini-cart.php';
 require_once get_stylesheet_directory() . '/inc/shortcodes.php';

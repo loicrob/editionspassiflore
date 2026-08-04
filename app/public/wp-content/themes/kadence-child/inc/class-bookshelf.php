@@ -85,22 +85,18 @@ class Passiflore_Bookshelf {
 	const BOOKMARK_STAR_PATH = 'm389-400 91-55 91 55-24-104 80-69-105-9-42-98-42 98-105 9 80 69-24 104Z';
 
 	/**
-	 * Annotations de recommandation, posées par pf_reco_render() le temps d'un
-	 * rendu : [ product_id => [ 'score' => int, 'why' => string ] ]. À vide
-	 * (cas général), aucun badge n'est émis et le comportement est inchangé.
-	 */
-	protected static $reco_annotations = [];
-
-	public static function set_reco_annotations( array $map ) {
-		self::$reco_annotations = $map;
-	}
-
-	/**
 	 * Nombre de livres (dédupliqués) du dernier rendu de [passiflore_etagere].
 	 * Sous-produit du rendu (count des $books, avant lazy-load d'affichage) : lu
 	 * par Passiflore_Catalogue pour le compteur « N résultats » du panneau.
 	 */
 	public static $last_total = 0;
+
+	/**
+	 * Étagère en cours rendue avec `epub-reader="true"` : ses liseuses portent
+	 * alors `data-pf-epub` et ouvrent le lecteur au lieu de naviguer.
+	 * Réaffectée à chaque render_shortcode(), donc jamais rémanente.
+	 */
+	protected $epub_reader = false;
 
 	public function __construct() {
 		add_shortcode( 'passiflore_etagere', [ $this, 'render_shortcode' ] );
@@ -219,6 +215,16 @@ class Passiflore_Bookshelf {
 			filemtime( $theme_dir . '/assets/js/shelf-bookmarks.js' ),
 			true
 		);
+
+		// Infobulle « Distinctions » : enqueué par render_shortcode()
+		// sur les seules étagères filtrées par distinctions.
+		wp_register_script(
+			'pf-shelf-distinctions',
+			$theme_uri . '/assets/js/shelf-distinctions.js',
+			[],
+			filemtime( $theme_dir . '/assets/js/shelf-distinctions.js' ),
+			true
+		);
 	}
 
 	/**
@@ -315,6 +321,26 @@ class Passiflore_Bookshelf {
 			} );
 		}
 
+		// Tri "Par défaut" (Distinctions) : rang lu dans l'ordre curé admin,
+		// résolu par représentant de format_groupe — l'ordre stocke des IDs de
+		// représentants, alors que $books peut contenir une autre édition du
+		// même format_groupe (format=numerique/grands-caracteres). Sans cette
+		// résolution le tri dégénère en ordre DB arbitraire dès qu'on quitte le
+		// format par défaut. Entrées non classées (hors liste curée) en fin.
+		if ( sanitize_key( $atts['orderby'] ) === 'defaut' ) {
+			$order_pos = array_flip( pf_bg_distinctions_order() );
+			$dir       = ( strtoupper( $atts['order'] ) === 'ASC' ) ? -1 : 1;
+			foreach ( $books as &$b ) {
+				$b['_defaut_rank'] = $order_pos[ pf_bg_representative( $b['id'] ) ] ?? PHP_INT_MAX;
+			}
+			unset( $b );
+			usort( $books, static function ( $a, $b ) use ( $dir ) {
+				return $dir * ( $a['_defaut_rank'] <=> $b['_defaut_rank'] );
+			} );
+			foreach ( $books as &$b ) unset( $b['_defaut_rank'] );
+			unset( $b );
+		}
+
 		$show_price   = filter_var( $atts['show_price'], FILTER_VALIDATE_BOOLEAN );
 		$mode         = sanitize_key( $atts['mode'] );
 		$per_shelf    = absint( $atts['per_shelf'] );
@@ -332,6 +358,20 @@ class Passiflore_Bookshelf {
 			self::enqueue_bookmark_assets();
 		}
 
+		// Étagère des ePub achetés : le clic ouvre le lecteur dans la page.
+		//
+		// Propriété d'instance plutôt qu'un 9e paramètre positionnel de
+		// render_book() (qui en a déjà 8, à threader par render_scroll() ET
+		// render_shelves()) : la classe est un singleton, render_shortcode() est son
+		// point d'entrée unique, et l'affectation INCONDITIONNELLE ici garantit la
+		// remise à zéro d'un rendu au suivant — pas de fuite d'état entre étagères.
+		//
+		// Le drapeau est de portée ÉTAGÈRE (comportement uniforme) : c'est ce qui
+		// justifie un attribut de shortcode plutôt qu'un canal statique posé par
+		// l'appelant autour du do_shortcode(). Un tel canal ne se justifie que pour
+		// une charge HÉTÉROGÈNE par livre.
+		$this->epub_reader = filter_var( $atts['epub-reader'], FILTER_VALIDATE_BOOLEAN ) && ! $is_hero;
+
 		// Étiquettes « À paraître » / « Nouveauté » : actives par défaut.
 		// Si l'une ou l'autre est désactivée, on neutralise le drapeau correspondant.
 		$show_ap  = filter_var( $atts['display-aparaitre'],  FILTER_VALIDATE_BOOLEAN );
@@ -342,6 +382,25 @@ class Passiflore_Bookshelf {
 				if ( ! $show_nv ) $b['is_nouveaute'] = false;
 			}
 			unset( $b );
+		}
+
+		// Étagère filtrée par distinctions : chaque livre porte, SUR LE MÊME
+		// EMPLACEMENT que l'étiquette de chant, un bouton rond qui ouvre
+		// l'infobulle listant ses distinctions. Le partage du slot est sans
+		// arbitrage à écrire : un tel filtre ne peut croiser ni « À paraître »
+		// ni une étagère de formats. Covers seulement — en dos, le chant de
+		// planche ne porte aucune étiquette (cf. render_book).
+		if ( 'covers' === $display && ! $is_hero
+			&& 'distinctions' === sanitize_title( $atts['decouvrir'] ) ) {
+			$any = false;
+			foreach ( $books as &$b ) {
+				$b['distinctions'] = self::book_distinctions( $b['id'] );
+				$any = $any || ! empty( $b['distinctions'] );
+			}
+			unset( $b );
+			if ( $any ) {
+				wp_enqueue_script( 'pf-shelf-distinctions' );
+			}
 		}
 
 		$cat_theme = $this->resolve_category_theme( $atts );
@@ -368,7 +427,7 @@ class Passiflore_Bookshelf {
 			'ids'                      => '',
 			'format'                   => '',          // '' (dédup) | tous | classique | <slug pa_format_particulier>
 			'search'                   => '',
-			'decouvrir'                => '',          // '' | nouveautes | prix-litteraires | a-paraitre
+			'decouvrir'                => '',          // '' | nouveautes | distinctions | a-paraitre
 			'disponibilite'            => '',          // slug SCF
 			'public'                   => '',          // slug SCF
 			'type'                     => '',          // slug SCF
@@ -380,6 +439,7 @@ class Passiflore_Bookshelf {
 			'hero'                     => 'false',    // true = mode héros fiche livre (non cliquable, sans hover)
 			'display_formats'          => 'false',    // true — affiche le format (pa_format_particulier) dans le chevalet
 			'show-bookmarks'           => 'false',    // true — icône signet « liste de lecture » sur chaque couverture (utilisateur connecté)
+			'epub-reader'              => 'false',    // true — une liseuse ouvre le lecteur ePub au lieu de naviguer (page /mon-compte/livres-numeriques)
 			'libraires_url'            => '',          // mode hero uniquement : lien « Voir sur Place des libraires », rendu dans .pf-shelf sous la planche. rawurlencode() côté appelant (l'URL traverse le parseur de shortcode en tant que chaîne).
 		];
 	}
@@ -503,6 +563,14 @@ class Passiflore_Bookshelf {
 				// prepare_books in render_shortcode(). Keep a neutral query
 				// order here and, crucially, set NO meta_key (which would drop
 				// books lacking that meta).
+				$args['orderby'] = 'date';
+				break;
+			case 'defaut':
+				// Ordre curé (Produits → Groupes de livres → Tri distinctions),
+				// appliqué après coup comme 'hauteur' ci-dessus : le rang vit dans
+				// une option PHP, pas en SQL, et doit en plus se résoudre par
+				// représentant de format_groupe pour survivre à un swap de format
+				// (cf. render_shortcode). Même raison de ne PAS poser de meta_key.
 				$args['orderby'] = 'date';
 				break;
 			default:
@@ -654,14 +722,12 @@ class Passiflore_Bookshelf {
 					'value' => '1',
 				];
 				break;
-			case 'prix-litteraires':
-				// SCF repeater meta stores the row count as the field value.
-				$args['meta_query'][] = [
-					'key'     => 'distinctions',
-					'value'   => 0,
-					'compare' => '>',
-					'type'    => 'NUMERIC',
-				];
+			case 'distinctions':
+				// pf_distinction_book_ids() (book-single-tabs.php) filtre sur le
+				// CONTENU réel des lignes, pas seulement leur nombre (une ligne
+				// créée puis vidée ne compte plus) — post__in plutôt qu'un
+				// meta_query, cf. son docblock.
+				$this->intersect_post_in( $args, function_exists( 'pf_distinction_book_ids' ) ? pf_distinction_book_ids() : [] );
 				break;
 			case 'a-paraitre':
 				$args['meta_query'][] = [ 'key' => 'disponibilite', 'value' => 'a-paraitre' ];
@@ -775,103 +841,22 @@ class Passiflore_Bookshelf {
 	}
 
 	/**
-	 * Représentant de CHAQUE terme format_groupe, calculé en une seule requête,
-	 * en remplacement d'un appel get_group_representative() par terme. Réplique
-	 * exactement sa règle : édition classique (aucun terme pa_format_particulier)
-	 * d'abord, sinon par priorité grands-caracteres → poche → numerique → audio ;
-	 * à égalité, l'édition la plus récente (post_date DESC, comme le get_posts par
-	 * défaut). Un groupe sans représentant publié éligible est ignoré (identique
-	 * à l'ancien `if ( $rep )`).
+	 * Représentant de CHAQUE terme format_groupe, en lot.
+	 * Façade sur pf_group_representatives_all() (inc/format-groupe.php).
 	 */
 	private static function get_group_representatives_batch() {
-		global $wpdb;
-
-		// Toutes les appartenances format_groupe des produits publiés, avec le
-		// slug pa_format_particulier de chaque édition (NULL = classique).
-		$rows = $wpdb->get_results(
-			"SELECT gtt.term_id AS group_id, p.ID AS product_id, ft.slug AS format_slug
-			 FROM {$wpdb->term_relationships} gtr
-			 INNER JOIN {$wpdb->term_taxonomy} gtt
-				 ON gtt.term_taxonomy_id = gtr.term_taxonomy_id AND gtt.taxonomy = 'format_groupe'
-			 INNER JOIN {$wpdb->posts} p
-				 ON p.ID = gtr.object_id AND p.post_type = 'product' AND p.post_status = 'publish'
-			 LEFT JOIN {$wpdb->term_relationships} ftr
-				 ON ftr.object_id = p.ID
-			 LEFT JOIN {$wpdb->term_taxonomy} ftt
-				 ON ftt.term_taxonomy_id = ftr.term_taxonomy_id AND ftt.taxonomy = 'pa_format_particulier'
-			 LEFT JOIN {$wpdb->terms} ft
-				 ON ft.term_id = ftt.term_id
-			 ORDER BY p.post_date DESC, p.ID DESC"
-		);
-
-		// group_id => [ product_id => format_slug|'' ], ordre = post_date DESC.
-		$groups = [];
-		foreach ( $rows as $r ) {
-			$gid  = (int) $r->group_id;
-			$pid  = (int) $r->product_id;
-			$slug = (string) ( $r->format_slug ?? '' );
-			if ( ! isset( $groups[ $gid ][ $pid ] ) || ( $groups[ $gid ][ $pid ] === '' && $slug !== '' ) ) {
-				$groups[ $gid ][ $pid ] = $slug;
-			}
-		}
-
-		$priority = [ 'grands-caracteres', 'poche', 'numerique', 'audio' ];
-		$reps     = [];
-		foreach ( $groups as $members ) {
-			$rep = 0;
-			// 1. Édition classique : aucun terme pa_format_particulier (slug vide).
-			foreach ( $members as $pid => $slug ) {
-				if ( $slug === '' ) { $rep = $pid; break; }
-			}
-			// 2. Sinon, par ordre de priorité de format.
-			if ( ! $rep ) {
-				foreach ( $priority as $want ) {
-					foreach ( $members as $pid => $slug ) {
-						if ( $slug === $want ) { $rep = $pid; break 2; }
-					}
-				}
-			}
-			if ( $rep ) $reps[] = (int) $rep;
-		}
-
-		return $reps;
+		return pf_group_representatives_all();
 	}
 
 	/**
-	 * Pick the representative book of a format_groupe term:
-	 *  1. the classique edition (no pa_format_particulier term)
-	 *  2. fallback by priority: grands-caracteres → poche → numerique → audio
+	 * Représentant d'un terme format_groupe.
+	 * Façade sur pf_group_representative() (inc/format-groupe.php), qui porte la
+	 * règle unique — ordre canonique des formats, formats épuisés écartés,
+	 * représentant choisi à la main. Conservée publique : appelée depuis
+	 * book-single-tabs.php et book-groups-admin.php.
 	 */
 	public static function get_group_representative( $term_id ) {
-		$classique = get_posts( [
-			'post_type'      => 'product',
-			'post_status'    => 'publish',
-			'posts_per_page' => 1,
-			'fields'         => 'ids',
-			'tax_query'      => [
-				'relation' => 'AND',
-				[ 'taxonomy' => 'format_groupe', 'terms' => $term_id ],
-				[ 'taxonomy' => 'pa_format_particulier', 'operator' => 'NOT EXISTS' ],
-			],
-		] );
-		if ( $classique ) return (int) $classique[0];
-
-		foreach ( [ 'grands-caracteres', 'poche', 'numerique', 'audio' ] as $slug ) {
-			$fallback = get_posts( [
-				'post_type'      => 'product',
-				'post_status'    => 'publish',
-				'posts_per_page' => 1,
-				'fields'         => 'ids',
-				'tax_query'      => [
-					'relation' => 'AND',
-					[ 'taxonomy' => 'format_groupe', 'terms' => $term_id ],
-					[ 'taxonomy' => 'pa_format_particulier', 'field' => 'slug', 'terms' => $slug ],
-				],
-			] );
-			if ( $fallback ) return (int) $fallback[0];
-		}
-
-		return null;
+		return pf_group_representative( (int) $term_id );
 	}
 
 	private function intersect_post_in( &$args, $ids ) {
@@ -935,7 +920,7 @@ class Passiflore_Bookshelf {
 			'public'    => $this->count_options( $atts, 'public',    $this->get_scf_choice_slugs( 'public' ) ),
 			'type'      => $this->count_options( $atts, 'type',      $this->get_scf_choice_slugs( 'type' ) ),
 			'langues'   => $this->count_options( $atts, 'langues',   $this->get_scf_choice_slugs( 'langues' ) ),
-			'decouvrir' => $this->count_options( $atts, 'decouvrir', [ '', 'nouveautes', 'prix-litteraires', 'a-paraitre' ] ),
+			'decouvrir' => $this->count_options( $atts, 'decouvrir', [ '', 'nouveautes', 'distinctions', 'a-paraitre' ] ),
 		];
 
 		if ( $use_cache ) {
@@ -1764,10 +1749,12 @@ class Passiflore_Bookshelf {
 			$has_extract = ! empty( get_field( 'extrait', $b['id'] ) );
 		}
 
+		$with_distinctions = ( $display === 'covers' && ! empty( $b['distinctions'] ) );
+
 		$classes = 'pf-book';
 		if ( $with_price ) {
 			$classes .= ' pf-book--has-price';
-		} elseif ( $display === 'covers' && ( ! empty( $b['is_aparaitre'] ) || ! empty( $b['is_nouveaute'] ) || $with_formats ) ) {
+		} elseif ( $display === 'covers' && ( ! empty( $b['is_aparaitre'] ) || ! empty( $b['is_nouveaute'] ) || $with_formats || $with_distinctions ) ) {
 			$classes .= ' pf-book--has-shelf-label';
 		}
 		if ( $is_ereader ) {
@@ -1808,7 +1795,16 @@ class Passiflore_Bookshelf {
 			$html .= ' style="' . esc_attr( $style ) . '"';
 			$html .= ' aria-label="' . $aria . '">';
 		} else {
-			$html = '<a href="' . esc_url( $b['url'] ) . '" class="' . esc_attr( $classes ) . '" style="' . esc_attr( $style ) . '" aria-label="' . esc_attr( $sr_label ) . '">';
+			// Liseuse d'un ePub acheté : `data-pf-epub` fait ouvrir le lecteur par
+			// epub-reader.js, qui intercepte le clic. Le href reste le permalien du
+			// livre — c'est le repli sans JavaScript, et la cible d'un ctrl-clic.
+			// L'applicabilité est décidée PAR LIVRE via `is_ereader`, déjà résolu par
+			// prepare_books() : un futur téléchargeable qui ne serait pas une liseuse
+			// garde donc un lien normal vers sa fiche.
+			$epub  = ( ! empty( $this->epub_reader ) && ! empty( $b['is_ereader'] ) )
+				? ' data-pf-epub="' . (int) $b['id'] . '"'
+				: '';
+			$html = '<a href="' . esc_url( $b['url'] ) . '"' . $epub . ' class="' . esc_attr( $classes ) . '" style="' . esc_attr( $style ) . '" aria-label="' . esc_attr( $sr_label ) . '">';
 		}
 		$html .= '<div class="pf-book-inner">';
 
@@ -1902,9 +1898,14 @@ class Passiflore_Bookshelf {
 		}
 
 		// Étiquette sur le chant de la planche, uniquement en covers.
-		// Priorité : À paraître > Nouveauté > Format.
+		// Priorité : Distinctions > À paraître > Nouveauté > Format.
+		// Les distinctions passent devant, mais l'ordre est théorique : elles ne
+		// sont résolues que sur une étagère filtrée par distinctions, qui ne peut
+		// afficher ni « À paraître » ni un format (cf. render_shortcode).
 		if ( $display === 'covers' ) {
-			if ( ! empty( $b['is_aparaitre'] ) ) {
+			if ( $with_distinctions ) {
+				$html .= $this->distinctions_html( $b );
+			} elseif ( ! empty( $b['is_aparaitre'] ) ) {
 				$html .= '<span class="pf-book-shelf-label">' . esc_html__( 'À paraître', 'kadence-child' ) . '</span>';
 			} elseif ( ! empty( $b['is_nouveaute'] ) ) {
 				$html .= '<span class="pf-book-shelf-label">' . esc_html__( 'Nouveauté', 'kadence-child' ) . '</span>';
@@ -1913,34 +1914,54 @@ class Passiflore_Bookshelf {
 			}
 		}
 
-		// Badge + explication de recommandation (espace compte). Enfant de .pf-book
-		// (hors couverture) : le badge flotte AU-DESSUS du livre — il ne suit ni le
-		// scale ni la rotation. En dos, il est simplement plus petit et centré sur
-		// le dos (bookshelf.css), et l'explication s'affiche en carte flottante.
-		// L'explication s'ouvre au clic (le « ? » devient une croix) et se referme
-		// au clic (croix / explication / extérieur) — assets/js/account-reco.js.
-		if ( isset( self::$reco_annotations[ $b['id'] ] ) ) {
-			$ann    = self::$reco_annotations[ $b['id'] ];
-			$why    = isset( $ann['why'] ) ? (string) $ann['why'] : '';
-			$tip_id = 'pf-reco-tip-' . (int) $b['id'];
-			$html  .= '<div class="pf-book-reco" data-score="' . esc_attr( $ann['score'] ?? '' ) . '">';
-			$html  .= '<span class="pf-book-reco-badge pf-roundbtn pf-roundbtn--secondary" tabindex="0"'
-				. ( $why ? ' aria-describedby="' . esc_attr( $tip_id ) . '"' : '' )
-				. ' aria-label="' . esc_attr__( 'Pourquoi cette suggestion ?', 'kadence-child' ) . '">'
-				. '<span class="pf-book-reco-badge__q" aria-hidden="true">?</span>'
-				. '<svg class="pf-book-reco-badge__close" viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>'
-				. '</span>';
-			if ( $why ) {
-				// $why (pf_reco_explanation) contient <strong>/<em> avec titres déjà esc_html'és.
-				// Enveloppé dans un seul enfant : la bulle est en flex (centrage vertical) et
-				// aurait sinon fait de chaque <strong>/nœud texte un item flex distinct.
-				$html .= '<span class="pf-book-reco-tip" id="' . esc_attr( $tip_id ) . '" role="tooltip"><span class="pf-book-reco-tip__text">' . wp_kses( $why, [ 'strong' => [], 'em' => [] ] ) . '</span></span>';
-			}
-			$html .= '</div>';
-		}
-
 		$html .= $is_hero ? '</div>' : '</a>';
 		return $html;
+	}
+
+	/**
+	 * Distinctions d'un livre, aplaties en une liste de libellés — délègue à
+	 * pf_distinction_labels() (book-single-tabs.php), source unique de ce qui
+	 * compte comme une distinction "réelle" (cf. son docblock). Un livre sans
+	 * ligne réelle retombe donc de lui-même sur l'étiquette de chant ordinaire,
+	 * sans bouton qui ouvrirait une infobulle vide.
+	 */
+	private static function book_distinctions( $id ) {
+		// Partagé (pf_distinction_labels_shared) et non pf_distinction_labels() seul :
+		// le livre affiché ici peut être le REPRÉSENTANT du format_groupe (classique),
+		// alors que la distinction a été saisie sur une autre édition (grands
+		// caractères…) — cf. son docblock, book-single-tabs.php.
+		return function_exists( 'pf_distinction_labels_shared' ) ? pf_distinction_labels_shared( (int) $id ) : [];
+	}
+
+	/**
+	 * Bouton rond « Distinctions », posé sur le chant de la planche à la
+	 * place de l'étiquette. Ouvre l'infobulle flottante (shelf-distinctions.js).
+	 *
+	 * `role="button"` et non `<button>` : le livre est un `<a>`, on n'y imbrique
+	 * pas de contrôle — même idiome que le signet « liste de lecture ». La
+	 * navigation est retenue en JS.
+	 *
+	 * Le contenu voyage dans un `<template>` INERTE plutôt qu'en JSON dans un
+	 * attribut : c'est du HTML échappé une seule fois ici, que le JS n'a plus
+	 * qu'à cloner. Classes `.pf-*` propres (et non les `.bs-*` de la fiche
+	 * livre, legacy gelé) — seule l'icône est partagée.
+	 */
+	private function distinctions_html( $b ) {
+		$items = '';
+		foreach ( $b['distinctions'] as $d ) {
+			$items .= '<li>' . pf_distinction_icon( 'pf-distinctions-list__icon' )
+				. '<span>' . esc_html( $d ) . '</span></li>';
+		}
+		/* translators: %s = titre du livre. */
+		$label = sprintf( 'Distinctions de « %s »', $b['title'] );
+
+		return '<span class="pf-book-distinctions" role="button" tabindex="0"'
+			. ' aria-expanded="false" aria-label="' . esc_attr( $label ) . '">'
+			. pf_distinction_icon( 'pf-book-distinctions__icon' )
+			. '<template class="pf-book-distinctions__data">'
+			. '<ul class="pf-distinctions-list">' . $items . '</ul>'
+			. '</template>'
+			. '</span>';
 	}
 
 	/**

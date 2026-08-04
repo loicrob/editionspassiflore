@@ -13,23 +13,77 @@ add_filter( 'preprocess_comment', 'passiflore_avis_spam_check' );
 
 // Tous les avis produit sont systématiquement mis en attente de modération,
 // quel que soit le statut de l'auteur (contourne l'auto-approbation des comptes ayant déjà des avis approuvés).
+// Exception : les réponses de l'éditeur (comment_parent != 0 — le formulaire public
+// n'offre pas de « répondre », donc une réponse ne peut venir que de l'admin). Sans
+// cette exception, « Approuver et répondre » depuis wp-admin approuve l'avis mais la
+// réponse elle-même naît en attente (jamais visible en front, cf.
+// passiflore_avis_public_reply qui exige status=approve) et l'email de notification
+// (wp_insert_comment, qui ne se redéclenche pas à une approbation manuelle ultérieure)
+// ne part jamais.
 add_filter( 'pre_comment_approved', function ( $approved, $commentdata ) {
-	if ( 'spam' !== $approved
-		&& ! empty( $commentdata['comment_post_ID'] )
-		&& get_post_type( (int) $commentdata['comment_post_ID'] ) === 'product' ) {
-		return '0';
+	if ( 'spam' === $approved
+		|| empty( $commentdata['comment_post_ID'] )
+		|| get_post_type( (int) $commentdata['comment_post_ID'] ) !== 'product' ) {
+		return $approved;
 	}
-	return $approved;
+	$is_reply_by_moderator = ! empty( $commentdata['comment_parent'] )
+		&& ! empty( $commentdata['user_id'] )
+		&& user_can( (int) $commentdata['user_id'], 'moderate_comments' );
+	return $is_reply_by_moderator ? $approved : '0';
 }, 10, 2 );
+
+// Bug WooCommerce (Reviews::handle_reply_to_review(), src/Internal/Admin/ProductReviews/Reviews.php) :
+// cette méthode intercepte wp_ajax_replyto-comment en priorité -1 pour tout avis produit
+// (avant le cœur WP, qui ne s'exécute alors jamais) et compare `$parent->comment_post_ID`
+// (string brute issue de WP_Comment) à `$comment_post_ID` (int) avec `===` strict — donc
+// toujours faux. Résultat : le bouton « Approuver et répondre » de l'écran Boutique →
+// Avis publie la réponse mais n'approuve JAMAIS l'avis d'origine. Plugin tiers non modifiable
+// ici (voir CLAUDE.md) → on approuve nous-mêmes le parent, en priorité AVANT ce hook (-2),
+// pour que sa propre vérification défaillante n'ait plus rien à faire (déjà approuvé =
+// no-op silencieux de son côté, aucun conflit).
+add_action( 'wp_ajax_replyto-comment', 'passiflore_avis_fix_approve_parent', -2 );
+
+function passiflore_avis_fix_approve_parent() {
+	if ( empty( $_POST['approve_parent'] ) || empty( $_POST['comment_ID'] ) ) {
+		return;
+	}
+	if ( ! check_ajax_referer( 'replyto-comment', '_ajax_nonce-replyto-comment', false ) ) {
+		return;
+	}
+	$parent = get_comment( absint( $_POST['comment_ID'] ) );
+	if ( ! $parent
+		|| '0' !== (string) $parent->comment_approved
+		|| get_post_type( (int) $parent->comment_post_ID ) !== 'product'
+		|| (int) $parent->comment_post_ID !== (int) ( $_POST['comment_post_ID'] ?? 0 )
+		|| ! current_user_can( 'edit_comment', $parent->comment_ID ) ) {
+		return;
+	}
+	wp_set_comment_status( $parent, 'approve' );
+}
 
 // Après soumission, renvoyer vers la section avis (l'ancre #comment-XX par défaut n'existe pas dans notre rendu)
 add_filter( 'comment_post_redirect', 'passiflore_avis_redirect', 10, 2 );
 
 function passiflore_avis_redirect( $location, $comment ) {
 	if ( $comment && get_post_type( $comment->comment_post_ID ) === 'product' ) {
+		// `unapproved` / `moderation-hash` : args que le cœur ajoute juste AVANT ce
+		// filtre (wp-comments-post.php) pour l'ancien bloc « en attente » à usage
+		// unique. L'auteur connecté voit désormais son avis dans la liste à chaque
+		// visite (cf. include_unapproved plus bas) — plus rien ne les lit.
+		$location = remove_query_arg( [ 'unapproved', 'moderation-hash' ], $location );
 		$location = preg_replace( '/#.*$/', '', $location ) . '#avis-des-lecteurs';
 	}
 	return $location;
+}
+
+// Dépôt en AJAX (passiflore_ajax_avis_submit, plus bas) : le chemin classique
+// ci-dessous (redirection via wp_die_handler + wp_die() anti-spam) ne doit pas
+// s'y déclencher, sous peine de renvoyer un 302/HTML là où le client attend du
+// JSON. wp_handle_comment_submission() appelé avec $wp_error=true fait déjà
+// remonter les échecs du cœur (flood, doublon, commentaire vide…) en WP_Error
+// plutôt qu'en wp_die() — seuls nos propres contrôles doivent donc s'effacer.
+function passiflore_avis_is_ajax_submit(): bool {
+	return wp_doing_ajax() && isset( $_POST['action'] ) && 'pf_avis_submit' === $_POST['action'];
 }
 
 // En cas d'échec de soumission d'un avis, renvoyer vers la section avis avec le motif
@@ -37,7 +91,7 @@ function passiflore_avis_redirect( $location, $comment ) {
 add_action( 'pre_comment_on_post', 'passiflore_avis_catch_errors' );
 
 function passiflore_avis_catch_errors( $post_id ) {
-	if ( get_post_type( $post_id ) !== 'product' ) {
+	if ( get_post_type( $post_id ) !== 'product' || passiflore_avis_is_ajax_submit() ) {
 		return;
 	}
 	add_filter( 'wp_die_handler', function () use ( $post_id ) {
@@ -69,6 +123,14 @@ function passiflore_avis_spam_check( $commentdata ) {
 
 	// Les modérateurs (réponses depuis l'admin, etc.) ne passent pas par les pièges
 	if ( current_user_can( 'moderate_comments' ) ) {
+		return $commentdata;
+	}
+
+	// Le dépôt AJAX (passiflore_ajax_avis_submit) a déjà rejoué ces mêmes pièges
+	// en amont, avant d'appeler wp_handle_comment_submission() — avec une erreur
+	// JSON propre en cas d'échec. Les rejouer ici finirait en wp_die(), que le
+	// client ne sait pas interpréter.
+	if ( passiflore_avis_is_ajax_submit() ) {
 		return $commentdata;
 	}
 
@@ -163,6 +225,235 @@ function passiflore_avis_notify_reply( $comment_id, $comment ) {
 }
 
 
+/* ─── Corbeille en cascade (avis + réponse, quelle que soit l'origine) ── */
+
+/**
+ * Quand un avis produit part à la corbeille — action « Corbeille » de l'admin
+ * Commentaires, de l'écran Boutique → Avis (WooCommerce), action groupée, ou
+ * l'auto-suppression ci-dessous — sa réponse doit suivre : wp_trash_comment()
+ * ne cascade nativement que pour les commentaires de type 'note' (notes de
+ * commande), pas 'comment'. Sans ça, la réponse de l'éditeur reste seule en
+ * admin ("Approuvé", répondant à un avis qui n'apparaît plus nulle part côté
+ * public — passiflore_avis_public_reply() n'est appelée que pour les avis
+ * encore listés).
+ *
+ * Hooké sur `trashed_comment` (déclenché par TOUT appel à wp_trash_comment(),
+ * quel que soit le point d'entrée) plutôt que sur une action UI précise.
+ */
+add_action( 'trashed_comment', 'passiflore_avis_cascade_trash_replies', 10, 2 );
+
+function passiflore_avis_cascade_trash_replies( $comment_id, $comment ) {
+	if ( (int) $comment->comment_parent !== 0 || get_post_type( $comment->comment_post_ID ) !== 'product' ) {
+		return;
+	}
+	foreach ( get_comments( [ 'parent' => $comment_id, 'status' => 'all', 'fields' => 'ids' ] ) as $child_id ) {
+		// Ignore une réponse déjà à la corbeille (ex. passiflore_ajax_avis_delete, qui
+		// cascade elle-même avant de trasher l'avis) : rejouer wp_trash_comment() sur
+		// un commentaire déjà en corbeille écrase _wp_trash_meta_status avec 'trash'
+		// et casse la restauration.
+		if ( 'trash' !== wp_get_comment_status( $child_id ) ) {
+			wp_trash_comment( $child_id );
+		}
+	}
+}
+
+
+/* ─── Suppression d'un avis par son auteur (fiche livre) ────── */
+
+/**
+ * L'auteur connecté supprime son propre avis depuis la fiche livre où il l'a
+ * déposé (il n'y a pas d'espace de suivi dans « Mon compte » : l'avis se gère là
+ * où il se lit). Mise en corbeille, donc restaurable depuis wp-admin.
+ */
+add_action( 'wp_enqueue_scripts', 'passiflore_avis_delete_assets' );
+
+function passiflore_avis_delete_assets() {
+	// Le bouton n'est rendu que sur son propre avis : rien à charger pour un visiteur
+	// déconnecté. Priorité par défaut : le src est fourni, donc `pf-session-toast`
+	// (enregistré dans functions.php) est résolu à l'impression, pas ici.
+	if ( ! is_product() || ! is_user_logged_in() ) {
+		return;
+	}
+
+	wp_enqueue_script(
+		'pf-avis-delete',
+		get_stylesheet_directory_uri() . '/assets/js/avis-delete.js',
+		[ 'pf-session-toast' ],
+		filemtime( get_stylesheet_directory() . '/assets/js/avis-delete.js' ),
+		true
+	);
+	wp_localize_script( 'pf-avis-delete', 'pfAvisDelete', [
+		'ajax_url' => admin_url( 'admin-ajax.php' ),
+		'nonce'    => wp_create_nonce( 'pf_avis_delete' ),
+		'strings'  => [
+			'confirm'     => 'Voulez-vous vraiment supprimer votre avis ?',
+			'cancel_btn'  => 'Annuler',
+			'confirm_btn' => 'Confirmer',
+			'deleted'     => 'Votre avis a bien été supprimé.',
+			'error'       => 'Votre avis n’a pas pu être supprimé.',
+		],
+	] );
+}
+
+add_action( 'wp_ajax_pf_avis_delete', 'passiflore_ajax_avis_delete' );
+// `nopriv` alors que l'action exige une session : sans lui, un clic dont la session a
+// expiré entre-temps reçoit d'admin-ajax un « 0 » brut en HTTP 400 — que le client ne
+// peut pas distinguer d'une réponse JSON et avale en silence (le visiteur clique, rien
+// ne se passe). Ici la requête atteint le gestionnaire, qui répond 403 → toast de session.
+add_action( 'wp_ajax_nopriv_pf_avis_delete', 'passiflore_ajax_avis_delete' );
+
+function passiflore_ajax_avis_delete() {
+	// 403 ⇒ « votre session a expiré » côté client (pf-session-toast.js) : réservé au
+	// nonce (que check_ajax_referer refuse lui-même en 403) et à l'absence de session.
+	// Tout autre refus part en 404, sinon un rejet légitime (double-clic, avis déjà
+	// supprimé) s'annoncerait à tort comme une session périmée.
+	check_ajax_referer( 'pf_avis_delete', 'nonce' );
+
+	$uid = get_current_user_id();
+	if ( ! $uid ) {
+		wp_send_json_error( [ 'reason' => 'auth' ], 403 );
+	}
+
+	$comment = get_comment( absint( $_POST['comment_id'] ?? 0 ) );
+	if ( ! $comment
+		|| (int) $comment->user_id !== $uid
+		|| (int) $comment->comment_parent !== 0
+		|| get_post_type( $comment->comment_post_ID ) !== 'product'
+		// Publié ('1') ou en attente ('0') SEULEMENT. Un avis écarté par l'éditeur
+		// ('trash'/'spam') n'est plus le sien à reprendre — et surtout wp_trash_comment()
+		// rejoué écraserait _wp_trash_meta_status avec 'trash', ce qui casserait
+		// définitivement la restauration depuis la corbeille.
+		|| ! in_array( (string) $comment->comment_approved, [ '1', '0' ], true ) ) {
+		wp_send_json_error( [ 'reason' => 'gone' ], 404 );
+	}
+
+	// Les réponses suivent leur avis : wp_trash_comment() ne cascade que sur les
+	// commentaires de type 'note', donc sans ça une réponse de l'éditeur survivrait
+	// à l'avis auquel elle répond (invisible en front, orpheline en admin).
+	foreach ( get_comments( [ 'parent' => $comment->comment_ID, 'status' => 'all', 'fields' => 'ids' ] ) as $child ) {
+		wp_trash_comment( $child );
+	}
+
+	if ( ! wp_trash_comment( $comment->comment_ID ) ) {
+		wp_send_json_error( [ 'reason' => 'failed' ], 500 );
+	}
+
+	wp_send_json_success();
+}
+
+
+/* ─── Dépôt d'un avis en AJAX (fiche livre) ──────────────────── */
+
+/**
+ * Le formulaire se poste en AJAX pour éviter le rechargement de page : le nouvel
+ * avis (en attente de validation) est renvoyé en HTML et ajouté à la liste par
+ * le JS. Amélioration progressive : sans JS, le formulaire poste normalement
+ * (comment_form() → wp-comments-post.php, chemin classique inchangé).
+ */
+add_action( 'wp_enqueue_scripts', 'passiflore_avis_submit_assets' );
+
+function passiflore_avis_submit_assets() {
+	if ( ! is_product() ) {
+		return;
+	}
+
+	wp_enqueue_script(
+		'pf-avis-submit',
+		get_stylesheet_directory_uri() . '/assets/js/avis-submit.js',
+		[ 'pf-session-toast' ],
+		filemtime( get_stylesheet_directory() . '/assets/js/avis-submit.js' ),
+		true
+	);
+	wp_localize_script( 'pf-avis-submit', 'pfAvisSubmit', [
+		'ajax_url' => admin_url( 'admin-ajax.php' ),
+		'nonce'    => wp_create_nonce( 'pf_avis_submit' ),
+		'strings'  => [
+			'success' => 'Merci d’avoir partagé votre avis ! Il est désormais en attente de validation par l’équipe de Passiflore.',
+			'error'   => 'Votre avis n’a pas pu être envoyé.',
+		],
+	] );
+}
+
+add_action( 'wp_ajax_pf_avis_submit', 'passiflore_ajax_avis_submit' );
+// nopriv : le dépôt d'avis est ouvert aux visiteurs non connectés (nom requis, email retiré).
+add_action( 'wp_ajax_nopriv_pf_avis_submit', 'passiflore_ajax_avis_submit' );
+
+function passiflore_ajax_avis_submit() {
+	check_ajax_referer( 'pf_avis_submit', 'nonce' );
+
+	$post_id = isset( $_POST['comment_post_ID'] ) ? absint( $_POST['comment_post_ID'] ) : 0;
+	if ( ! $post_id || get_post_type( $post_id ) !== 'product' ) {
+		wp_send_json_error( [ 'message' => 'Votre avis n’a pas pu être envoyé.' ] );
+	}
+
+	// Mêmes pièges anti-spam que le chemin classique (passiflore_avis_spam_check,
+	// qui s'efface pendant ce dépôt AJAX — cf. passiflore_avis_is_ajax_submit) :
+	// honeypot, piège temporel, nom obligatoire. Rejoués ici pour renvoyer une
+	// erreur JSON propre plutôt que le wp_die() du chemin sans JS.
+	if ( ! current_user_can( 'moderate_comments' ) ) {
+		if ( ! empty( $_POST['pf_hp'] ) ) {
+			wp_send_json_error( [ 'message' => 'Votre avis n’a pas pu être envoyé.' ] );
+		}
+		$min_seconds  = 4;
+		$raw          = isset( $_POST['pf_ts'] ) ? (string) wp_unslash( $_POST['pf_ts'] ) : '';
+		[ $ts, $sig ] = array_pad( explode( ':', $raw, 2 ), 2, '' );
+		$signature_ok = $ts !== '' && hash_equals( hash_hmac( 'sha256', $ts, wp_salt( 'auth' ) ), $sig );
+		if ( ! $signature_ok || ( time() - (int) $ts ) < $min_seconds ) {
+			wp_send_json_error( [ 'message' => 'Votre avis n\'a pas pu être envoyé.' ] );
+		}
+		// Le nom n'est exigé que pour un invité : connecté, le champ est disabled
+		// (rempli par le compte) donc absent du POST — comme dans le chemin
+		// classique, où c'est comment_author déjà résolu par
+		// wp_handle_comment_submission() qu'on vérifierait, pas le POST brut.
+		if ( ! is_user_logged_in() && '' === trim( (string) wp_unslash( $_POST['author'] ?? '' ) ) ) {
+			wp_send_json_error( [ 'message' => 'Veuillez indiquer votre nom pour publier un avis.' ] );
+		}
+	}
+
+	// Même fonction cœur que le chemin classique (wp-comments-post.php),
+	// appelée ici directement : mêmes hooks (preprocess_comment,
+	// pre_comment_approved…), mais $wp_error=true fait remonter les échecs du
+	// cœur (flood, doublon, commentaire vide…) en WP_Error plutôt qu'en wp_die().
+	$result = wp_handle_comment_submission( wp_unslash( $_POST ) );
+
+	if ( is_wp_error( $result ) ) {
+		// Le statut HTTP de la WP_Error n'est délibérément PAS transmis : certains
+		// (comment_closed, not_logged_in…) valent 403, et le client réserve ce
+		// statut à « session expirée » (check_ajax_referer) — cf. politique de
+		// nonce du projet. Un rejet légitime partirait sinon à tort pour ça.
+		$msg = wp_strip_all_tags( $result->get_error_message() );
+		wp_send_json_error( [ 'message' => '' !== $msg ? $msg : 'Votre avis n\'a pas pu être envoyé.' ] );
+	}
+
+	do_action( 'set_comment_cookies', $result, wp_get_current_user(), isset( $_POST['wp-comment-cookies-consent'] ) );
+
+	ob_start();
+	passiflore_render_avis_item( passiflore_avis_entry_from_comment( $result ), false );
+	$html = ob_get_clean();
+
+	wp_send_json_success( [ 'html' => $html ] );
+}
+
+/**
+ * Nettoyage unique par environnement après le retrait de l'espace « Avis laissés »
+ * (endpoint /mon-compte/avis-laisses). Idiome maison (cf. maybe_purge_cover_colors) :
+ * la règle de réécriture de l'endpoint survit dans l'option `rewrite_rules` en cache,
+ * et les deux métas n'ont plus aucun lecteur. Rien à lancer en WP-CLI.
+ * À retirer une fois déployé sur tous les environnements.
+ */
+add_action( 'admin_init', 'passiflore_avis_cleanup_endpoint' );
+
+function passiflore_avis_cleanup_endpoint() {
+	if ( ! get_option( 'pf_avis_endpoint_v' ) ) {
+		return;
+	}
+	delete_option( 'pf_avis_endpoint_v' );
+	delete_metadata( 'comment', 0, '_pf_reply_public', '', true ); // case « Réponse publique ? » supprimée
+	delete_metadata( 'comment', 0, '_pf_user_deleted', '', true ); // marqueur sans lecteur
+	flush_rewrite_rules( false );
+}
+
+
 /* ─── Événements liés à un produit ──────────────────────────── */
 
 // Événements partagés entre tous les formats d'un même format_groupe : un
@@ -218,6 +509,119 @@ function passiflore_get_product_events( int $product_id ): array {
 }
 
 
+/**
+ * Libellés « réels » du repeater SCF `distinctions` d'un livre — SOURCE UNIQUE.
+ * Une ligne du repeater compte comme vide dès que son texte ne contient AUCUN
+ * caractère alphanumérique (pas seulement une chaîne strictement vide) : le
+ * champ `distinctions` de SCF stocke le NOMBRE de lignes, pas leur contenu, et
+ * un éditeur peut créer une ligne puis la laisser blanche (ou n'y taper que de
+ * la ponctuation) sans que ça se voie dans ce compteur. Utilisée par la
+ * section « Distinctions » ci-dessous, par le filtre catalogue/étagère
+ * "decouvrir=distinctions" (Passiflore_Bookshelf::apply_decouvrir_filter) et
+ * par l'onglet admin « Tri des livres avec distinction »
+ * (pf_bg_distinctions_eligible_reps) — les trois doivent s'accorder sur ce
+ * qu'est un livre "avec distinction", sous peine de lister/afficher un livre
+ * dans l'un sans qu'il apparaisse dans l'autre.
+ */
+function pf_distinction_labels( int $id ): array {
+	if ( ! function_exists( 'get_field' ) ) return [];
+	$rows = get_field( 'distinctions', $id );
+	if ( ! is_array( $rows ) ) return [];
+	$out = [];
+	foreach ( $rows as $row ) {
+		$d = isset( $row['distinction'] ) ? trim( (string) $row['distinction'] ) : '';
+		if ( $d !== '' && preg_match( '/[\p{L}\p{N}]/u', $d ) ) {
+			$out[] = $d;
+		}
+	}
+	return $out;
+}
+
+/**
+ * Distinctions "de l'œuvre" — agrège pf_distinction_labels() sur toutes les
+ * éditions du format_groupe, même logique que passiflore_collect_group_repeater()
+ * pour avis/presse/vidéos/podcasts (author-books-grouping.php) : une
+ * distinction saisie sur UNE SEULE édition (ex. grands caractères) doit
+ * s'afficher sur toutes, y compris le représentant classique affiché par
+ * défaut dans le catalogue/l'étagère — sans quoi le médaillon de l'étagère
+ * pointerait vers une œuvre "distinguée" dont la fiche n'affiche pourtant
+ * aucune distinction (le représentant, lui, n'en porte peut-être aucune en
+ * propre).
+ */
+function pf_distinction_labels_shared( int $id ): array {
+	$group_ids = function_exists( 'passiflore_get_format_groupe_product_ids' )
+		? passiflore_get_format_groupe_product_ids( $id )
+		: [ $id ];
+	$seen = [];
+	$out  = [];
+	foreach ( $group_ids as $gid ) {
+		foreach ( pf_distinction_labels( $gid ) as $label ) {
+			$norm = mb_strtolower( preg_replace( '/[\s\x{00A0}]+/u', ' ', trim( $label ) ) );
+			if ( isset( $seen[ $norm ] ) ) continue;
+			$seen[ $norm ] = true;
+			$out[] = $label;
+		}
+	}
+	return $out;
+}
+
+/**
+ * IDs de TOUTES LES ÉDITIONS des œuvres ayant au moins une distinction réelle
+ * sur N'IMPORTE LAQUELLE de leurs éditions — source unique pour le filtre
+ * catalogue/étagère "decouvrir=distinctions"
+ * (Passiflore_Bookshelf::apply_decouvrir_filter) ET pour l'éligibilité de
+ * l'onglet admin « Tri des livres avec distinction »
+ * (pf_bg_distinctions_eligible_reps, qui déduplique ensuite par représentant).
+ *
+ * ⚠️ Étendu à TOUTES les éditions de l'œuvre, pas seulement son représentant :
+ * apply_format_filter() applique ensuite DEUX mécanismes différents selon le
+ * format demandé — intersection avec les représentants en format par défaut,
+ * mais tax_query sur pa_format_particulier pour un format précis (numérique,
+ * grands caractères…), qui ne connaît PAS la notion de représentant. Si
+ * post__in ne contenait que le représentant, une distinction saisie sur une
+ * édition non représentante ferait disparaître l'œuvre du format par défaut
+ * (le représentant n'a lui-même aucune distinction) ET l'édition qui la porte
+ * du filtre par format (pas dans post__in). pf_distinction_labels_shared()
+ * ci-dessus assure la réciproque à l'affichage.
+ *
+ * Pré-filtre SQL bon marché (compteur de lignes SCF, rapide) puis vérification
+ * du contenu réel via pf_distinction_labels() (le compteur ne baisse pas
+ * quand une ligne est vidée sans être supprimée).
+ */
+function pf_distinction_book_ids(): array {
+	$ids = get_posts( [
+		'post_type'      => 'product',
+		'post_status'    => 'publish',
+		'posts_per_page' => -1,
+		'fields'         => 'ids',
+		'meta_query'     => [ [ 'key' => 'distinctions', 'value' => 0, 'compare' => '>', 'type' => 'NUMERIC' ] ],
+	] );
+	$real = array_filter(
+		array_map( 'intval', $ids ),
+		fn( $id ) => ! empty( pf_distinction_labels( $id ) )
+	);
+	if ( ! function_exists( 'passiflore_get_format_groupe_product_ids' ) ) return array_values( $real );
+
+	$expanded = [];
+	foreach ( $real as $id ) {
+		foreach ( passiflore_get_format_groupe_product_ids( $id ) as $eid ) {
+			$expanded[ $eid ] = true;
+		}
+	}
+	return array_keys( $expanded );
+}
+
+/**
+ * Icône « distinction » (médaille) — SOURCE UNIQUE. Utilisée par la section
+ * « Distinctions » ci-dessous ET par le bouton d'infobulle des étagères
+ * filtrées par distinctions (`Passiflore_Bookshelf::distinctions_html()`), qui
+ * doit porter exactement la même icône.
+ */
+function pf_distinction_icon( $class = 'bs-distinctions-icon' ) {
+	return '<svg class="' . esc_attr( $class ) . '" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 -960 960 960" fill="currentColor" aria-hidden="true"><path d="m438-452-58-57q-11-11-27.5-11T324-508q-11 11-11 28t11 28l86 86q12 12 28 12t28-12l170-170q12-12 11.5-28T636-592q-12-12-28.5-12.5T579-593L438-452ZM326-90l-58-98-110-24q-15-3-24-15.5t-7-27.5l11-113-75-86q-10-11-10-26t10-26l75-86-11-113q-2-15 7-27.5t24-15.5l110-24 58-98q8-13 22-17.5t28 1.5l104 44 104-44q14-6 28-1.5t22 17.5l58 98 110 24q15 3 24 15.5t7 27.5l-11 113 75 86q10 11 10 26t-10 26l-75 86 11 113q2 15-7 27.5T802-212l-110 24-58 98q-8 13-22 17.5T584-74l-104-44-104 44q-14 6-28 1.5T326-90Zm52-72 102-44 104 44 56-96 110-26-10-112 74-84-74-86 10-112-110-24-58-96-102 44-104-44-56 96-110 24 10 112-74 86 74 84-10 114 110 24 58 96Zm102-318Z"/></svg>';
+}
+
+
 /* ─── Layout principal ───────────────────────────────────────── */
 
 function passiflore_render_sections_layout() {
@@ -228,18 +632,21 @@ function passiflore_render_sections_layout() {
 
 	$sections = [];
 
-	// ── Prix et distinctions ─────────────────────────────────────
-	$distinctions = get_field( 'distinctions', $id ) ?: [];
+	// ── Distinctions ─────────────────────────────────────
+	// Partagées entre toutes les éditions du format_groupe (comme presse/vidéos/
+	// podcasts/avis ci-dessous) : consulter n'importe quelle édition doit montrer
+	// les mêmes distinctions, même si elles ont été saisies sur une autre.
+	$distinctions = pf_distinction_labels_shared( $id );
 	if ( $distinctions ) {
-		$icon  = '<svg class="bs-distinctions-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 -960 960 960" fill="currentColor" aria-hidden="true"><path d="m438-452-58-57q-11-11-27.5-11T324-508q-11 11-11 28t11 28l86 86q12 12 28 12t28-12l170-170q12-12 11.5-28T636-592q-12-12-28.5-12.5T579-593L438-452ZM326-90l-58-98-110-24q-15-3-24-15.5t-7-27.5l11-113-75-86q-10-11-10-26t10-26l75-86-11-113q-2-15 7-27.5t24-15.5l110-24 58-98q8-13 22-17.5t28 1.5l104 44 104-44q14-6 28-1.5t22 17.5l58 98 110 24q15 3 24 15.5t7 27.5l-11 113 75 86q10 11 10 26t-10 26l-75 86 11 113q2 15-7 27.5T802-212l-110 24-58 98q-8 13-22 17.5T584-74l-104-44-104 44q-14 6-28 1.5T326-90Zm52-72 102-44 104 44 56-96 110-26-10-112 74-84-74-86 10-112-110-24-58-96-102 44-104-44-56 96-110 24 10 112-74 86 74 84-10 114 110 24 58 96Zm102-318Z"/></svg>';
+		$icon  = pf_distinction_icon();
 		$html  = '<ul class="bs-distinctions">';
 		foreach ( $distinctions as $d ) {
-			$html .= '<li>' . $icon . esc_html( $d['distinction'] ) . '</li>';
+			$html .= '<li>' . $icon . esc_html( $d ) . '</li>';
 		}
 		$html .= '</ul>';
 		// L'id reste `bs-distinctions` : c'est l'ancre de la nav de section, donc
 		// une URL partageable — seul le libellé change.
-		$sections[] = [ 'id' => 'bs-distinctions', 'label' => 'Prix et distinctions', 'html' => $html ];
+		$sections[] = [ 'id' => 'bs-distinctions', 'label' => 'Distinctions', 'html' => $html ];
 	}
 
 	// ── Résumé ──────────────────────────────────────────────────
@@ -320,12 +727,22 @@ function passiflore_render_sections_layout() {
 	}
 
 	// ── Avis des lecteurs (sélection éditeur SCF + avis du site, fusionnés) ──
+	// `include_unapproved` (cœur WP) ajoute à la liste des avis publiés le ou les
+	// avis EN ATTENTE de l'utilisateur courant : la clause devient
+	// `( comment_approved = '1' ) OR ( user_id = N AND comment_approved = '0' )`
+	// → un avis écarté par l'éditeur (`trash`/`spam`) reste invisible pour tous,
+	// y compris son auteur, sans contrôle supplémentaire.
+	// ⚠️ JAMAIS `[ 0 ]` : `user_id = 0` désigne TOUS les invités, ce qui publierait
+	// chaque avis d'invité en attente de modération (wp_parse_list() ne filtre pas
+	// le 0 et is_numeric( 0 ) est vrai). D'où le tableau vide si personne n'est connecté.
+	$avis_uid     = get_current_user_id();
 	$avis_l       = passiflore_collect_avis_scf( $group_ids, 'avis_des_lecteurs' );
 	$site_reviews = get_comments( [
-		'post__in'     => $group_ids,
-		'status'       => 'approve',
-		'parent'       => 0, // exclut les réponses de l'éditeur (rattachées à leur avis)
-		'type__not_in' => [ 'pingback', 'trackback' ],
+		'post__in'           => $group_ids,
+		'status'             => 'approve',
+		'parent'             => 0, // exclut les réponses de l'éditeur (rattachées à leur avis)
+		'type__not_in'       => [ 'pingback', 'trackback' ],
+		'include_unapproved' => $avis_uid ? [ $avis_uid ] : [],
 	] );
 
 	$avis_lecteurs = passiflore_merge_avis( $avis_l, $site_reviews );
@@ -780,40 +1197,21 @@ function passiflore_ids_in_format( array $ids, string $format_slug ): array {
 }
 
 /**
- * Returns all format siblings of $id (same format_groupe, excluding $id itself)
- * in the canonical fallback order: classique → grands-caracteres → poche → numerique → audio.
- * Mirrors the priority used by Passiflore_Bookshelf::get_group_representative.
+ * Toutes les éditions sœurs de $id (même format_groupe) dans l'ordre canonique
+ * des formats — classique en tête, puis l'ordre des termes de l'attribut.
+ *
+ * Une seule requête (pf_group_members) au lieu d'un get_posts par format, et
+ * l'ordre vient de pf_format_order() : plus de liste en dur à resynchroniser
+ * avec le résolveur de représentant.
  */
 function passiflore_get_format_siblings_ordered( int $id, bool $include_self = false ): array {
-	$fg = wp_get_object_terms( $id, 'format_groupe', [ 'fields' => 'ids' ] );
-	if ( is_wp_error( $fg ) || empty( $fg ) ) return [];
+	$group = pf_format_group_of( $id );
+	if ( ! $group ) return [];
 
-	$base = [
-		'post_type'      => 'product',
-		'post_status'    => 'publish',
-		'posts_per_page' => -1,
-		'fields'         => 'ids',
-	];
-	if ( ! $include_self ) {
-		$base['post__not_in'] = [ $id ];
-	}
+	$members = pf_group_members( $group );
+	if ( ! $include_self ) unset( $members[ $id ] );
 
-	$classique = get_posts( $base + [ 'tax_query' => [
-		'relation' => 'AND',
-		[ 'taxonomy' => 'format_groupe',         'terms'    => $fg ],
-		[ 'taxonomy' => 'pa_format_particulier', 'operator' => 'NOT EXISTS' ],
-	] ] );
-
-	$result = array_map( 'intval', $classique );
-	foreach ( [ 'grands-caracteres', 'poche', 'numerique', 'audio' ] as $slug ) {
-		$others = get_posts( $base + [ 'tax_query' => [
-			'relation' => 'AND',
-			[ 'taxonomy' => 'format_groupe',         'terms' => $fg ],
-			[ 'taxonomy' => 'pa_format_particulier', 'field' => 'slug', 'terms' => $slug ],
-		] ] );
-		$result = array_merge( $result, array_map( 'intval', $others ) );
-	}
-	return $result;
+	return pf_group_sort_members( $members );
 }
 
 function passiflore_get_livres_lies_sections( int $id ): array {
@@ -835,7 +1233,7 @@ function passiflore_get_livres_lies_sections( int $id ): array {
 	if ( ! is_wp_error( $serie_terms ) && ! empty( $serie_terms ) ) {
 		$serie_reps = pf_bg_group_member_reps( 'pf_serie', '_pf_serie_order', (int) $serie_terms[0] );
 		if ( count( $serie_reps ) > 1 ) {
-			$internal[] = [ 'title' => 'De la même série', 'ids' => $serie_reps, 'sort_by_date' => false ];
+			$internal[] = [ 'title' => 'Ensemble de la série', 'ids' => $serie_reps, 'sort_by_date' => false ];
 		}
 	}
 
@@ -854,6 +1252,10 @@ function passiflore_get_livres_lies_sections( int $id ): array {
 		$internal[] = [ 'title' => 'Vous aimerez aussi', 'ids' => $aimerez_ids, 'sort_by_date' => false ];
 	}
 
+	// Livres du/des même(s) auteur(s) : plusieurs groupes, mais UNE SEULE section
+	// (cf. plus bas) — le libellé relationnel est porté par son titre, chaque
+	// groupe n'a plus qu'un <h3> de noms.
+	$auteur_groups   = [];
 	$auteur_term_ids = passiflore_get_product_author_ids( $id );
 	if ( $auteur_term_ids ) {
 		$exclude  = [ $id ];
@@ -873,36 +1275,93 @@ function passiflore_get_livres_lies_sections( int $id ): array {
 			passiflore_product_ids_by_auteur_terms( $auteur_term_ids ),
 			$exclude
 		) ) );
-		foreach ( passiflore_group_books_by_author_set( $auteur_term_ids, $candidates ) as $group ) {
-			$internal[] = [
-				'title'        => passiflore_author_group_title( $group, $auteur_term_ids, 'book' ),
-				'ids'          => $group['product_ids'],
-				'sort_by_date' => true,
-			];
-		}
+		$auteur_groups = passiflore_group_books_by_author_set( $auteur_term_ids, $candidates );
 	}
+
+	$sort_by_parution = function ( array $ids ): array {
+		usort( $ids, function ( $a, $b ) {
+			$da = (string) get_post_meta( $a, 'date_de_parution', true );
+			$db = (string) get_post_meta( $b, 'date_de_parution', true );
+			return strcmp( $db, $da );
+		} );
+		return $ids;
+	};
+	$etagere = function ( array $ids, string $extra = '' ) use ( $current_format ): string {
+		$ids_str = implode( ',', array_map( 'absint', $ids ) );
+		return do_shortcode( '[passiflore_etagere ids="' . $ids_str . '" mode="scroll" display="covers" nb_books_first_displayed="20"' . $extra . ']' );
+	};
 
 	$result = [];
 	foreach ( $internal as $section ) {
 		$ids = $section['ids'];
 		if ( ! empty( $section['sort_by_date'] ) ) {
-			usort( $ids, function ( $a, $b ) {
-				$da = (string) get_post_meta( $a, 'date_de_parution', true );
-				$db = (string) get_post_meta( $b, 'date_de_parution', true );
-				return strcmp( $db, $da );
-			} );
+			$ids = $sort_by_parution( $ids );
 		}
 		if ( empty( $section['raw_ids'] ) ) {
 			$ids = passiflore_ids_in_format( $ids, $current_format );
 		}
-		$ids_str         = implode( ',', array_map( 'absint', $ids ) );
-		$display_formats = ! empty( $section['display_formats'] ) ? ' display_formats="true"' : '';
 		$result[]   = [
 			'id'    => 'bs-lies-' . sanitize_title( $section['title'] ),
 			'label' => $section['title'],
-			'html'  => do_shortcode( '[passiflore_etagere ids="' . $ids_str . '" mode="scroll" display="covers" nb_books_first_displayed="20"' . $display_formats . ']' ),
+			'html'  => $etagere( $ids, ! empty( $section['display_formats'] ) ? ' display_formats="true"' : '' ),
 		];
 	}
+
+	// Une section unique, donc une seule entrée dans la nav de section : son
+	// titre porte la relation (« Du même auteur », « Des mêmes autrices »…),
+	// accordé sur TOUS les auteurs du livre. À l'intérieur, une étagère par
+	// ensemble d'auteurs, chacune coiffée d'un <h3> nommant ses auteurs — sauf
+	// celle qui reprend strictement les auteurs du livre, que le titre de
+	// section annonce déjà.
+	if ( $auteur_groups ) {
+		$html = '';
+		foreach ( $auteur_groups as $group ) {
+			$titre = passiflore_author_group_title( $group, $auteur_term_ids, 'book' );
+			if ( '' !== $titre ) {
+				$html .= '<h3>' . esc_html( $titre ) . '</h3>';
+			}
+			$html .= $etagere( passiflore_ids_in_format( $sort_by_parution( $group['product_ids'] ), $current_format ) );
+		}
+		$result[] = [
+			'id'    => 'bs-lies-meme-auteur',
+			'label' => passiflore_meme_auteur_label( $auteur_term_ids ),
+			'html'  => $html,
+		];
+	}
+
+	// Aussi en {thématique} : autres livres partageant la même sous-catégorie
+	// product_cat (le rayon racine, lui, est trop large pour être pertinent).
+	// Une section par thématique portée par le livre — la quasi-totalité n'en
+	// ont qu'une, mais quelques-uns en ont deux.
+	$theme_terms = wp_get_object_terms( $id, 'product_cat', [ 'fields' => 'all', 'orderby' => 'name' ] );
+	if ( ! is_wp_error( $theme_terms ) ) {
+		$self_and_siblings = passiflore_get_format_groupe_product_ids( $id );
+		foreach ( $theme_terms as $term ) {
+			if ( ! $term->parent ) continue; // rayon, pas une thématique
+
+			$candidates = get_posts( [
+				'post_type'      => 'product',
+				'post_status'    => 'publish',
+				'posts_per_page' => -1,
+				'fields'         => 'ids',
+				'post__not_in'   => $self_and_siblings,
+				'tax_query'      => [ [ 'taxonomy' => 'product_cat', 'terms' => $term->term_id ] ],
+			] );
+			$candidates = passiflore_dedup_by_format_groupe( array_map( 'intval', $candidates ) );
+			if ( empty( $candidates ) ) continue;
+
+			// Minuscule initiale : le nom du terme est capitalisé (titre de
+			// catégorie), mais se lit mieux en minuscule après « Aussi en ».
+			$theme_label = mb_strtolower( mb_substr( $term->name, 0, 1, 'UTF-8' ), 'UTF-8' ) . mb_substr( $term->name, 1, null, 'UTF-8' );
+
+			$result[] = [
+				'id'    => 'bs-lies-' . sanitize_title( 'aussi-en-' . $term->name ),
+				'label' => 'Aussi en ' . $theme_label,
+				'html'  => $etagere( passiflore_ids_in_format( $sort_by_parution( $candidates ), $current_format ) ),
+			];
+		}
+	}
+
 	return $result;
 }
 
@@ -918,85 +1377,155 @@ function passiflore_avis_parse_ts( string $dmy ): int {
 }
 
 // Normalise un repeater d'avis SCF en entrées [ titre, text, auteur, date, ts ], triées du + récent au + ancien.
+// Les clés `comment_id` / `own` / `pending` sont neutres ici (un avis SCF n'est pas un
+// commentaire) mais doivent exister : passiflore_render_avis_items() appelle cette
+// fonction en direct pour les avis des libraires, sans passer par merge_avis().
 function passiflore_normalize_avis_scf( array $items ): array {
 	$entries = [];
 	foreach ( $items as $a ) {
 		$raw = (string) ( $a['date_de_publication'] ?? '' );
 		$ts  = passiflore_avis_parse_ts( $raw );
 		$entries[] = [
-			'titre'  => (string) ( $a['titre']  ?? '' ),
-			'text'   => (string) ( $a['avis']   ?? '' ),
-			'auteur' => (string) ( $a['auteur'] ?? '' ),
-			'date'   => $ts ? date_i18n( 'j F Y', $ts ) : $raw,
-			'ts'     => $ts,
-			'reply'  => null,
+			'titre'      => (string) ( $a['titre']  ?? '' ),
+			'text'       => (string) ( $a['avis']   ?? '' ),
+			'auteur'     => (string) ( $a['auteur'] ?? '' ),
+			'date'       => $ts ? date_i18n( 'j F Y', $ts ) : $raw,
+			'ts'         => $ts,
+			'reply'      => null,
+			'comment_id' => 0,
+			'own'        => false,
+			'pending'    => false,
 		];
 	}
 	usort( $entries, fn( $a, $b ) => $b['ts'] <=> $a['ts'] );
 	return $entries;
+}
+
+// Construit l'entrée normalisée d'UN commentaire WooCommerce — partagée par la
+// fusion d'affichage (merge_avis) et par le dépôt AJAX (passiflore_ajax_avis_submit,
+// qui rend l'avis fraîchement créé isolément, sans reload).
+function passiflore_avis_entry_from_comment( WP_Comment $c ): array {
+	$uid = get_current_user_id();
+	return [
+		'titre'      => '',
+		'text'       => (string) $c->comment_content,
+		'auteur'     => (string) $c->comment_author,
+		'date'       => get_comment_date( 'j F Y', $c ),
+		'ts'         => (int) strtotime( $c->comment_date_gmt . ' GMT' ),
+		'reply'      => passiflore_avis_public_reply( (int) $c->comment_ID ),
+		'comment_id' => (int) $c->comment_ID,
+		// `own` : seul l'auteur connecté peut supprimer son avis. Un avis déposé
+		// sans être connecté n'a pas de user_id → non rattachable à un compte.
+		'own'        => $uid && (int) $c->user_id === $uid,
+		'pending'    => '1' !== (string) $c->comment_approved,
+	];
 }
 
 // Fusionne avis SCF (sélection éditeur) + commentaires WooCommerce en une liste unique triée du + récent au + ancien.
 function passiflore_merge_avis( array $scf_items, array $comments ): array {
 	$entries = passiflore_normalize_avis_scf( $scf_items );
 	foreach ( $comments as $c ) {
-		$entries[] = [
-			'titre'  => '',
-			'text'   => (string) $c->comment_content,
-			'auteur' => (string) $c->comment_author,
-			'date'   => get_comment_date( 'j F Y', $c ),
-			'ts'     => (int) strtotime( $c->comment_date_gmt . ' GMT' ),
-			'reply'  => passiflore_avis_public_reply( (int) $c->comment_ID ),
-		];
+		$entries[] = passiflore_avis_entry_from_comment( $c );
 	}
 	usort( $entries, fn( $a, $b ) => $b['ts'] <=> $a['ts'] );
 	return $entries;
 }
 
-// Réponse de l'éditeur à un avis, uniquement si marquée « publique » (meta _pf_reply_public). Sinon null.
+// Première réponse de l'éditeur à un avis (texte + date), ou null.
+// Une réponse APPROUVÉE s'affiche ; pour la retenir, l'éditeur la laisse en attente.
 function passiflore_avis_public_reply( int $comment_id ): ?array {
 	$replies = get_comments( [
-		'parent'     => $comment_id,
-		'status'     => 'approve',
-		'number'     => 1,
-		'orderby'    => 'comment_date_gmt',
-		'order'      => 'ASC',
-		'meta_key'   => '_pf_reply_public',
-		'meta_value' => '1',
+		'parent'  => $comment_id,
+		'status'  => 'approve',
+		'orderby' => 'comment_date_gmt',
+		'order'   => 'ASC',
 	] );
-	if ( empty( $replies ) ) {
-		return null;
+	foreach ( $replies as $r ) {
+		// Seules les réponses écrites par un modérateur sont signées « Réponse de
+		// l'éditeur » : le formulaire public n'offre pas de « répondre », mais
+		// `comment_parent` est un champ caché falsifiable et le cœur autorise la
+		// réponse à un avis approuvé — sans ce contrôle, une approbation par erreur
+		// ferait passer un visiteur pour l'éditeur.
+		if ( (int) $r->user_id && user_can( (int) $r->user_id, 'moderate_comments' ) ) {
+			return [
+				'text' => (string) $r->comment_content,
+				'date' => get_comment_date( 'j F Y', $r ),
+			];
+		}
 	}
-	return [
-		'text' => (string) $replies[0]->comment_content,
-		'date' => get_comment_date( 'j F Y', $replies[0] ),
-	];
+	return null;
+}
+
+// Un seul avis (blockquote) — factorisé pour être appelable isolément par le
+// dépôt AJAX (nouvel avis à insérer sans reload, cf. passiflore_ajax_avis_submit)
+// autant que par la boucle de la liste complète ci-dessous.
+function passiflore_render_avis_item( array $avis, bool $hidden = false ) {
+	$own     = ! empty( $avis['own'] );
+	$pending = ! empty( $avis['pending'] );
+
+	echo '<blockquote class="pf-quote bs-avis-item' . ( $pending ? ' bs-avis-item--pending' : '' ) . ( $hidden ? ' bs-item--hidden' : '' ) . '"'
+		. ( $own ? ' data-comment-id="' . (int) $avis['comment_id'] . '"' : '' ) . '>';
+	if ( $avis['titre'] !== '' ) {
+		echo '<h4 class="bs-avis-titre">' . esc_html( $avis['titre'] ) . '</h4>';
+	}
+	if ( $avis['text'] !== '' ) {
+		echo '<p class="bs-avis-text">' . nl2br( esc_html( $avis['text'] ) ) . '</p>';
+	}
+	echo '<footer class="bs-avis-footer">';
+	if ( $avis['auteur'] !== '' ) {
+		echo '<span class="bs-avis-auteur">' . esc_html( $avis['auteur'] ) . '</span>';
+	}
+	if ( $own ) {
+		// aria-label daté : plusieurs avis d'un même auteur peuvent cohabiter dans
+		// la liste (un par format du format_groupe), « Supprimer » seul serait ambigu.
+		printf(
+			'<button type="button" class="bs-avis-supprimer pf-btn pf-btn--neutral pf-btn--sm" aria-label="%s">Supprimer</button>',
+			esc_attr( 'Supprimer mon avis' . ( $avis['date'] !== '' ? ' du ' . $avis['date'] : '' ) )
+		);
+	}
+	echo '</footer>';
+	if ( $pending ) {
+		echo '<p class="bs-avis-pending-notice">En attente de validation par l’équipe de Passiflore.</p>';
+	}
+	if ( ! empty( $avis['reply'] ) ) {
+		echo '<div class="pf-avis-reponse">';
+		echo '<div class="pf-avis-reponse__head">';
+		$logo_url = (string) get_site_icon_url( 48 );
+		if ( $logo_url !== '' ) {
+			echo '<img class="pf-avis-reponse__logo" src="' . esc_url( $logo_url ) . '" alt="" loading="lazy" width="20" height="20" />';
+		}
+		echo '<strong>Réponse de Passiflore</strong>';
+		echo '</div>';
+		echo '<p class="pf-avis-reponse__text">' . nl2br( esc_html( $avis['reply']['text'] ) ) . '</p>';
+		echo '</div>';
+	}
+	echo '</blockquote>';
 }
 
 // Boucle de rendu des blockquotes + bouton « Voir tout » (sans wrapper de section).
 function passiflore_render_avis_list( array $entries ) {
-	$seuil = 3;
-	foreach ( $entries as $i => $avis ) {
-		$hidden = $i >= $seuil ? ' bs-item--hidden' : '';
-		echo '<blockquote class="pf-quote bs-avis-item' . $hidden . '">';
-		if ( $avis['titre'] !== '' ) {
-			echo '<h4 class="bs-avis-titre">' . esc_html( $avis['titre'] ) . '</h4>';
+	$seuil   = 3;
+	$visible = 0;
+	$masques = 0;
+
+	foreach ( $entries as $avis ) {
+		$own = ! empty( $avis['own'] );
+
+		// Son propre avis est TOUJOURS déplié : la fiche livre est le seul endroit
+		// d'où l'auteur peut le relire et le supprimer, y compris au-delà du seuil.
+		$hidden = false;
+		if ( $own || $visible < $seuil ) {
+			$visible++;
+		} else {
+			$hidden = true;
+			$masques++;
 		}
-		if ( $avis['text'] !== '' ) {
-			echo '<p class="bs-avis-text">' . nl2br( esc_html( $avis['text'] ) ) . '</p>';
-		}
-		echo '<footer class="bs-avis-footer">';
-		if ( $avis['auteur'] !== '' ) echo esc_html( $avis['auteur'] );
-		echo '</footer>';
-		if ( ! empty( $avis['reply'] ) ) {
-			echo '<div class="pf-avis-reponse"><strong>Réponse de l\'éditeur</strong>';
-			echo '<p class="pf-avis-reponse__text">' . nl2br( esc_html( $avis['reply']['text'] ) ) . '</p>';
-			echo '</div>';
-		}
-		echo '</blockquote>';
+
+		passiflore_render_avis_item( $avis, $hidden );
 	}
-	if ( count( $entries ) > $seuil ) {
-		echo '<button class="bs-voir-tout pf-btn pf-btn--neutral pf-btn--sm" type="button">Voir tout (' . ( count( $entries ) - $seuil ) . ')</button>';
+
+	if ( $masques ) {
+		echo '<button class="bs-voir-tout pf-btn pf-btn--neutral pf-btn--sm" type="button">Voir tout (' . $masques . ')</button>';
 	}
 }
 
@@ -1014,29 +1543,13 @@ function passiflore_render_avis_items( array $entries, string $section ) {
 function passiflore_render_avis_lecteurs( int $product_id, array $entries ) {
 	$error = passiflore_avis_error_data();
 
-	$pending = passiflore_get_pending_avis( $product_id );
-
 	if ( ! empty( $error['msg'] ) ) {
 		echo '<p class="pf-notice pf-notice--error bs-avis-erreur" role="alert">' . esc_html( $error['msg'] ) . '</p>';
 	}
 
-	if ( $pending || $entries ) {
+	if ( $entries ) {
 		echo '<div class="bs-tab-avis"><div class="bs-avis-section" data-section="lecteurs">';
-
-		if ( $pending ) {
-			echo '<blockquote class="bs-avis-item bs-avis-item--pending" role="status">';
-			if ( $pending->comment_content !== '' ) {
-				echo '<p class="bs-avis-text">' . nl2br( esc_html( $pending->comment_content ) ) . '</p>';
-			}
-			echo '<footer class="bs-avis-footer">' . esc_html( $pending->comment_author ) . '</footer>';
-			echo '<p class="bs-avis-pending-notice">En attente de validation par l\'éditeur.</p>';
-			echo '</blockquote>';
-		}
-
-		if ( $entries ) {
-			passiflore_render_avis_list( $entries );
-		}
-
+		passiflore_render_avis_list( $entries );
 		echo '</div></div>';
 	}
 
@@ -1059,7 +1572,15 @@ function passiflore_render_avis_lecteurs( int $product_id, array $entries ) {
 		. '<input type="text" id="pf_hp" name="pf_hp" value="" tabindex="-1" autocomplete="off"></p>'
 		. '<input type="hidden" name="pf_ts" value="' . esc_attr( $ts . ':' . hash_hmac( 'sha256', (string) $ts, wp_salt( 'auth' ) ) ) . '">';
 
-	$disabled = is_user_logged_in() ? ' disabled' : '';
+	$is_logged_in = is_user_logged_in();
+	$disabled     = $is_logged_in ? ' disabled' : '';
+
+	$author_note = '';
+	if ( $is_logged_in ) {
+		$edit_account_url = wc_get_endpoint_url( 'edit-account', '', wc_get_page_permalink( 'myaccount' ) );
+		$author_note = '<p class="comment-form-author-note">Pour modifier le nom, rendez-vous dans les '
+			. '<a href="' . esc_url( $edit_account_url ) . '" target="_blank" rel="noopener">détails du compte' . pf_new_window_note() . '</a>.</p>';
+	}
 
 	// Ordre fixe : textarea → Nom (disabled si connecté) → note → bouton.
 	// fields/logged_in_as vidés : tout passe par comment_field, rendu quel que soit l'état de connexion.
@@ -1072,7 +1593,8 @@ function passiflore_render_avis_lecteurs( int $product_id, array $entries ) {
 			. $traps
 			. '<p class="comment-form-author"><label for="author">Nom <span class="required">*</span></label>'
 			. '<input id="author" name="author" type="text" value="' . esc_attr( $prefill_author ) . '" maxlength="245" required aria-required="true"' . $disabled . '></p>'
-			. '<p class="comment-notes-after">Votre avis sera publié après validation par l\'éditeur.</p>',
+			. $author_note
+			. '<p class="comment-notes-after">Votre avis sera publié après validation par l’équipe de Passiflore.</p>',
 		'title_reply'          => '',
 		'title_reply_to'       => '',
 		'label_submit'         => 'Publier mon avis',
@@ -1091,20 +1613,6 @@ function passiflore_render_avis_lecteurs( int $product_id, array $entries ) {
 function passiflore_avis_remove_cookies( $fields ) {
 	unset( $fields['cookies'] );
 	return $fields;
-}
-
-// Retourne le commentaire en attente si les query params de modération du core sont valides, sinon null.
-function passiflore_get_pending_avis( int $product_id ): ?WP_Comment {
-	if ( empty( $_GET['unapproved'] ) || empty( $_GET['moderation-hash'] ) ) {
-		return null;
-	}
-	$pending = get_comment( (int) $_GET['unapproved'] );
-	if ( ! $pending
-		|| (int) $pending->comment_post_ID !== $product_id
-		|| ! hash_equals( wp_hash( $pending->comment_date_gmt ), (string) wp_unslash( $_GET['moderation-hash'] ) ) ) {
-		return null;
-	}
-	return $pending;
 }
 
 // Données d'un échec de soumission (motif + saisie conservée), à usage unique via transient

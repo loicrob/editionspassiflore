@@ -17,6 +17,12 @@
  * Granularité « œuvre » : on travaille sur le représentant du `format_groupe`
  * (édition classique). Le terme est posé sur TOUTES les éditions d'une œuvre
  * (S1) → lookup inverse direct depuis n'importe quelle édition, sans fallback.
+ *
+ * Un 4e onglet (« Tri des livres avec distinction ») ordonne l'étagère
+ * `decouvrir="distinctions"` / tri « Par défaut » du catalogue. Composition
+ * automatique (repeater SCF `distinctions` non vide), pas de picker : ordre
+ * stocké en option (`pf_distinctions_order`), les nouveaux livres distingués
+ * tombent en tête (triés par date de parution entre eux) à chaque lecture.
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -60,10 +66,7 @@ function pf_bg_group_taxonomies(): array {
  * pour le swap de format côté front, pour que les IDs stockés concordent.
  */
 function pf_bg_representative( int $id ): int {
-	$fg = wp_get_object_terms( $id, 'format_groupe', [ 'fields' => 'ids' ] );
-	if ( is_wp_error( $fg ) || empty( $fg ) ) return $id;
-	$rep = Passiflore_Bookshelf::get_group_representative( (int) $fg[0] );
-	return $rep ? (int) $rep : $id;
+	return pf_format_representative_of( $id );
 }
 
 /**
@@ -80,6 +83,51 @@ function pf_bg_dedup( array $ids ): array {
 		$out[] = $rep;
 	}
 	return $out;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Tri des livres avec distinction (ordre global, pas de picker)
+   ═══════════════════════════════════════════════════════════════ */
+
+/**
+ * Représentants (œuvres) ayant au moins une distinction — toute édition dont
+ * le repeater SCF `distinctions` a au moins une ligne réelle (contenu non
+ * vide, cf. pf_distinction_labels() dans book-single-tabs.php — source unique
+ * partagée avec le filtre front decouvrir=distinctions) fait remonter le
+ * représentant de son `format_groupe`, même si ce n'est pas lui qui porte la
+ * donnée (plus indulgent que le filtre front, qui lui filtre APRÈS
+ * déduplication et perdrait le livre).
+ */
+function pf_bg_distinctions_eligible_reps(): array {
+	$ids = function_exists( 'pf_distinction_book_ids' ) ? pf_distinction_book_ids() : [];
+	return pf_bg_dedup( $ids );
+}
+
+/**
+ * Ordre effectif des livres distingués : ordre enregistré (option), duquel les
+ * entrées périmées (distinction retirée) sont écartées, précédé des livres
+ * nouvellement distingués (absents de l'ordre enregistré) triés entre eux par
+ * date de parution décroissante. Rien n'est persisté ici — seul un
+ * enregistrement explicite (onglet admin) fige ce calcul.
+ */
+function pf_bg_distinctions_order(): array {
+	$eligible = pf_bg_distinctions_eligible_reps();
+	$eligible_pos = array_flip( $eligible );
+
+	$stored = get_option( 'pf_distinctions_order', [] );
+	$stored = is_array( $stored ) ? array_map( 'intval', $stored ) : [];
+	$kept   = array_values( array_filter( $stored, fn( $id ) => isset( $eligible_pos[ $id ] ) ) );
+
+	$kept_pos = array_flip( $kept );
+	$new = array_values( array_filter( $eligible, fn( $id ) => ! isset( $kept_pos[ $id ] ) ) );
+	usort( $new, function ( $a, $b ) {
+		return strcmp(
+			(string) get_post_meta( $b, 'date_de_parution', true ),
+			(string) get_post_meta( $a, 'date_de_parution', true )
+		);
+	} );
+
+	return array_merge( $new, $kept );
 }
 
 /**
@@ -260,6 +308,15 @@ function pf_bg_handle_post() {
 		pf_bg_redirect( [ 'tab' => 'aimerez', 'msg' => 'error' ] );
 	}
 
+	// Ordre du tri « distinctions » (liste globale, pas de composition à part).
+	if ( $tab === 'distinctions' && $action === 'save_distinctions_order' ) {
+		$eligible = array_flip( pf_bg_distinctions_eligible_reps() );
+		$ids = array_map( 'intval', (array) ( $_POST['pf_bg_books'] ?? [] ) );
+		$ids = array_values( array_filter( array_unique( $ids ), fn( $id ) => isset( $eligible[ $id ] ) ) );
+		update_option( 'pf_distinctions_order', $ids );
+		pf_bg_redirect( [ 'tab' => 'distinctions', 'msg' => 'saved' ] );
+	}
+
 	pf_bg_redirect( [ 'tab' => $tab ] );
 }
 
@@ -268,10 +325,11 @@ function pf_bg_handle_post() {
    ═══════════════════════════════════════════════════════════════ */
 
 function pf_bg_enqueue() {
+	pf_enqueue_book_filter();
 	wp_enqueue_script(
 		'pf-book-picker',
 		get_stylesheet_directory_uri() . '/assets/js/book-picker.js',
-		[ 'jquery', 'jquery-ui-sortable' ],
+		[ 'jquery', 'jquery-ui-sortable', 'pf-book-filter' ],
 		filemtime( get_stylesheet_directory() . '/assets/js/book-picker.js' ),
 		true
 	);
@@ -349,7 +407,12 @@ function pf_bg_notice() {
 function pf_bg_render_page() {
 	if ( ! current_user_can( 'edit_products' ) ) return;
 
-	$tabs = [ 'series' => 'Séries', 'traductions' => 'Traductions', 'aimerez' => 'Vous aimerez aussi' ];
+	$tabs = [
+		'series'       => 'Séries',
+		'traductions'  => 'Traductions',
+		'aimerez'      => 'Vous aimerez aussi',
+		'distinctions' => 'Tri des livres avec distinction',
+	];
 	$tab  = sanitize_key( $_GET['tab'] ?? 'series' );
 	if ( ! isset( $tabs[ $tab ] ) ) $tab = 'series';
 
@@ -368,6 +431,8 @@ function pf_bg_render_page() {
 	echo '<div style="margin-top:16px">';
 	if ( $tab === 'aimerez' ) {
 		pf_bg_render_aimerez_tab();
+	} elseif ( $tab === 'distinctions' ) {
+		pf_bg_render_distinctions_tab();
 	} else {
 		pf_bg_render_group_tab( $tab );
 	}
@@ -573,6 +638,45 @@ function pf_bg_render_aimerez_tab() {
 	echo '</div>';
 
 	echo '</div>';
+}
+
+/**
+ * Onglet « Tri des livres avec distinction » : composition automatique (pas de
+ * picker), seul le drag-reorder est éditable. Réutilise le marquage #pf-bg-list
+ * du picker partagé pour hériter de son sortable (jQuery UI déjà initialisé
+ * dessus par book-groups-admin.js) sans ajouter de JS dédié — pas de bouton
+ * « Retirer » ni de recherche/ajout rendus, donc ces liaisons du picker restent
+ * inertes ici.
+ */
+function pf_bg_render_distinctions_tab() {
+	$reps = pf_bg_distinctions_order();
+
+	echo '<p>Ordre de l\'étagère filtrée par <strong>Distinctions</strong> (tri « Par défaut » du catalogue). Un nouveau livre distingué apparaît en tête, les livres déjà classés gardent leur position.</p>';
+
+	if ( ! $reps ) {
+		echo '<p>Aucun livre avec une distinction pour l\'instant.</p>';
+		return;
+	}
+
+	echo '<form method="post" action="' . esc_url( pf_bg_base_url() ) . '" style="max-width:520px">';
+	wp_nonce_field( 'pf_bg_save', 'pf_bg_nonce' );
+	echo '<input type="hidden" name="pf_bg_action" value="save_distinctions_order">';
+	echo '<input type="hidden" name="tab" value="distinctions">';
+
+	echo '<ul id="pf-bg-list">';
+	foreach ( $reps as $pid ) {
+		$title = get_the_title( $pid );
+		if ( ! $title ) continue;
+		echo '<li data-id="' . (int) $pid . '">';
+		echo '<span class="pf-bg-handle dashicons dashicons-menu" aria-hidden="true"></span>';
+		echo '<span>' . esc_html( $title ) . '</span>';
+		echo '<input type="hidden" name="pf_bg_books[]" value="' . (int) $pid . '">';
+		echo '</li>';
+	}
+	echo '</ul>';
+
+	echo '<div class="pf-bg-save-row"><button type="submit" class="button button-primary">Enregistrer l\'ordre</button></div>';
+	echo '</form>';
 }
 
 /* ═══════════════════════════════════════════════════════════════

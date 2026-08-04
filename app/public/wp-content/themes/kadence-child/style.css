@@ -266,7 +266,7 @@ a.pf-value:hover, .pf-value-container a:hover, a.pf-value-highlight:hover, .pf-v
 .pf-btn--neutral {
     background: var(--pf-surface);
     border-color: var(--pf-border);
-    color: var(--pf-text);
+    color: var(--pf-muted);
 }
 .pf-btn--neutral:hover,
 .pf-btn--neutral:focus,
@@ -275,6 +275,28 @@ a.pf-value:hover, .pf-value-container a:hover, a.pf-value-highlight:hover, .pf-v
     border-color: var(--pf-accent);
     color: var(--pf-accent) !important;
     box-shadow: none;
+}
+/* Bouton DÉSACTIVÉ (ex. « Supprimer » un avis pendant l'appel, « Ajouter » l'offre
+   numérique du panier) : le survol/focus ne doit rien changer, sous peine de laisser
+   croire qu'il reste actionnable. On réaffirme le token de repos de chaque variante ;
+   spécificité supérieure au survol (:disabled s'y ajoute) → gagne sans !important,
+   SAUF sur --neutral dont la couleur de survol porte déjà un !important ci-dessus. */
+.pf-btn--primary:disabled:hover, .pf-btn--primary:disabled:focus, .pf-btn--primary:disabled:active,
+.pf-btn--primary.disabled:hover, .pf-btn--primary.disabled:focus, .pf-btn--primary.disabled:active {
+    background: var(--pf-accent);
+    border-color: var(--pf-accent);
+    color: var(--pf-surface);
+}
+.pf-btn--outline:disabled:hover, .pf-btn--outline:disabled:focus, .pf-btn--outline:disabled:active,
+.pf-btn--outline.disabled:hover, .pf-btn--outline.disabled:focus, .pf-btn--outline.disabled:active {
+    background: transparent;
+    color: var(--pf-accent);
+}
+.pf-btn--neutral:disabled:hover, .pf-btn--neutral:disabled:focus, .pf-btn--neutral:disabled:active,
+.pf-btn--neutral.disabled:hover, .pf-btn--neutral.disabled:focus, .pf-btn--neutral.disabled:active {
+    background: var(--pf-surface);
+    border-color: var(--pf-border);
+    color: var(--pf-muted) !important;
 }
 /* Boutons « small » calqués sur les triggers de la barre principale du catalogue
    (.pf-cat-trigger) : mêmes padding / taille de texte / radius / interligne.
@@ -343,6 +365,30 @@ a.pf-value:hover, .pf-value-container a:hover, a.pf-value-highlight:hover, .pf-v
 .wp-block-button__link:hover, .wp-block-button__link:focus, .wp-block-button__link:active,
 .wp-element-button:hover,     .wp-element-button:focus,     .wp-element-button:active,
 .button:hover,                .button:focus,                .button:active {
+    box-shadow: none;
+}
+
+/* Bouton natif DÉSACTIVÉ (ex. « S'abonner » de la newsletter pendant l'envoi) : Kadence
+   applique quand même son changement de couleur/fond au survol/focus d'un <button disabled>
+   (global.min.css), laissant croire à tort qu'il reste actionnable. On réaffirme les mêmes
+   tokens que le repos (--global-palette-btn/-bg) ; :disabled/.disabled ajoute une pseudo-
+   classe au survol → spécificité supérieure, gagne sans !important. */
+button:disabled:hover,                 button:disabled:focus,                 button:disabled:active,
+button.disabled:hover,                 button.disabled:focus,                 button.disabled:active,
+.button:disabled:hover,                .button:disabled:focus,                .button:disabled:active,
+.button.disabled:hover,                .button.disabled:focus,                .button.disabled:active,
+.wp-block-button__link:disabled:hover, .wp-block-button__link:disabled:focus, .wp-block-button__link:disabled:active,
+.wp-block-button__link.disabled:hover, .wp-block-button__link.disabled:focus, .wp-block-button__link.disabled:active,
+.wp-element-button:disabled:hover,     .wp-element-button:disabled:focus,     .wp-element-button:disabled:active,
+.wp-element-button.disabled:hover,     .wp-element-button.disabled:focus,     .wp-element-button.disabled:active,
+input[type=button]:disabled:hover,     input[type=button]:disabled:focus,     input[type=button]:disabled:active,
+input[type=button].disabled:hover,     input[type=button].disabled:focus,     input[type=button].disabled:active,
+input[type=reset]:disabled:hover,      input[type=reset]:disabled:focus,      input[type=reset]:disabled:active,
+input[type=reset].disabled:hover,      input[type=reset].disabled:focus,      input[type=reset].disabled:active,
+input[type=submit]:disabled:hover,     input[type=submit]:disabled:focus,     input[type=submit]:disabled:active,
+input[type=submit].disabled:hover,     input[type=submit].disabled:focus,     input[type=submit].disabled:active {
+    color: var(--global-palette-btn);
+    background: var(--global-palette-btn-bg);
     box-shadow: none;
 }
 
@@ -552,9 +598,9 @@ h6 { font-family: var(--pf-font-body);    font-weight: var(--pf-weight-normal); 
     line-height: var(--pf-leading-normal);
 }
 
-p a:not(.button):not(.wp-block-button__link):not(.wp-element-button):not(.pf-value):not(.leaflet-control *),
-span a:not(.button):not(.wp-block-button__link):not(.wp-element-button):not(.leaflet-control *),
-.entry-content a:not(.button):not(.wp-block-button__link):not(.wp-element-button):not(.pf-card):not(.menu-item-link):not(.tribe-events-c-subscribe-dropdown__list-item-link):not(.leaflet-control *):not(.leaflet-popup-close-button):not(.tribe-events-calendar-month__day-date-link):not(.tribe-events-calendar-month__calendar-event-title-link):not(.tooltipstered) {
+p a:not(.button):not(.pf-btn):not(.wp-block-button__link):not(.wp-element-button):not(.pf-value):not(.leaflet-control *),
+span a:not(.button):not(.pf-btn):not(.wp-block-button__link):not(.wp-element-button):not(.leaflet-control *),
+.entry-content a:not(.button):not(.pf-btn):not(.wp-block-button__link):not(.wp-element-button):not(.pf-card):not(.menu-item-link):not(.tribe-events-c-subscribe-dropdown__list-item-link):not(.leaflet-control *):not(.leaflet-popup-close-button):not(.tribe-events-calendar-month__day-date-link):not(.tribe-events-calendar-month__calendar-event-title-link):not(.tooltipstered) {
     color: var(--pf-accent) !important;
     text-decoration: underline !important;
     text-underline-offset: .15em !important;
@@ -564,9 +610,9 @@ span a:not(.button):not(.wp-block-button__link):not(.wp-element-button):not(.lea
     text-decoration: underline !important;
     text-underline-offset: .15em !important;
 }
-p a:not(.button):not(.wp-block-button__link):not(.wp-element-button):not(.pf-value):not(.leaflet-control *):hover,
-span a:not(.button):not(.wp-block-button__link):not(.wp-element-button):not(.leaflet-control *):hover,
-.entry-content a:not(.button):not(.wp-block-button__link):not(.wp-element-button):not(.pf-card):not(.menu-item-link):not(.tribe-events-c-subscribe-dropdown__list-item-link):not(.leaflet-control *):not(.leaflet-popup-close-button):not(.tribe-events-calendar-month__day-date-link):not(.tribe-events-calendar-month__calendar-event-title-link):not(.tooltipstered):hover,
+p a:not(.button):not(.pf-btn):not(.wp-block-button__link):not(.wp-element-button):not(.pf-value):not(.leaflet-control *):hover,
+span a:not(.button):not(.pf-btn):not(.wp-block-button__link):not(.wp-element-button):not(.leaflet-control *):hover,
+.entry-content a:not(.button):not(.pf-btn):not(.wp-block-button__link):not(.wp-element-button):not(.pf-card):not(.menu-item-link):not(.tribe-events-c-subscribe-dropdown__list-item-link):not(.leaflet-control *):not(.leaflet-popup-close-button):not(.tribe-events-calendar-month__day-date-link):not(.tribe-events-calendar-month__calendar-event-title-link):not(.tooltipstered):hover,
 .contact-info-footer:hover {
     color: var(--global-palette-highlight-alt) !important;
     text-decoration: underline !important;
@@ -1404,6 +1450,34 @@ body.admin-bar { --pf-adminbar: 32px; }
     visibility: visible;
 }
 
+/* Croix de fermeture — seulement épinglée (clic/tap/clavier, `.is-open`) : un
+   survol/focus simple se referme tout seul, la croix n'aurait pas de sens.
+   Injectée par pf-tooltip.js (composant partagé, cf. commentaire du fichier).
+   Idiome .pf-roundbtn en petit (même construction que .pf-toast__close et
+   .pf-distinctions-tip__close). Sélecteurs en (0,2,0)/(0,3,0) pour battre
+   `.pf-roundbtn { display: flex; position: relative }` (même spécificité
+   sinon en (0,1,0), et .pf-roundbtn est déclaré plus loin dans le fichier) —
+   jamais !important entre fichiers du thème enfant (règle CSS du projet). */
+.pf-numerique-tip .pf-numerique-tip__close {
+    display: none;
+}
+.pf-numerique-tip.is-open .pf-numerique-tip__close {
+    display: flex;
+    position: absolute;
+    top: var(--pf-space-2);
+    right: var(--pf-space-2);
+    pointer-events: auto; /* la bulle elle-même est pointer-events:none */
+    --pf-roundbtn-size: 18px;
+}
+.pf-numerique-tip.is-open .pf-numerique-tip__close svg {
+    width: 10px;
+    height: 10px;
+}
+/* Dégagement pour ne pas passer sous la croix : réservé seulement épinglée. */
+.pf-numerique-tip.is-open .pf-numerique-tip__bubble {
+    padding-right: var(--pf-space-5);
+}
+
 /* =========================================================
    Infobulle flottante des signets « liste de lecture » (.pf-book-bookmark-tip)
    Élément global unique posé en <body>, positionné en JS depuis le rect écran du
@@ -1434,6 +1508,109 @@ body.admin-bar { --pf-adminbar: 32px; }
 .pf-book-bookmark-tip.is-visible {
     opacity: 1;
     visibility: visible;
+}
+
+/* =========================================================
+   Infobulle « Distinctions » (.pf-distinctions-tip)
+   Étagères filtrées par distinctions : liste des distinctions du livre, ouverte
+   par le bouton rond posé sur le chant de la planche (.pf-book-distinctions,
+   bookshelf.css). Même construction que l'infobulle des signets ci-dessus —
+   élément global unique en <body>, positionné en JS depuis le rect écran du
+   bouton (assets/js/shelf-distinctions.js) — mais INTERACTIVE : elle défile
+   quand la liste est longue. D'où l'écart avec elle : pas de
+   `pointer-events: none` (le pointeur doit pouvoir y entrer, y compris venant
+   du survol qui l'ouvre — la fermeture différée en JS laisse le temps de
+   traverser le GAP). Le scroll est isolé sur .pf-distinctions-tip__content
+   (et non sur la bulle elle-même) pour que la croix de fermeture, épinglée en
+   position absolue au coin, ne défile pas avec la liste. */
+.pf-distinctions-tip {
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: calc(var(--pf-z-toast) - 1);
+    width: max-content;
+    max-width: min(280px, calc(100vw - 2 * var(--pf-space-4)));
+    padding: var(--pf-space-2) var(--pf-space-3);
+    background: color-mix(in srgb, var(--pf-cream) 96%, transparent);
+    backdrop-filter: blur(var(--pf-aero-blur));
+    -webkit-backdrop-filter: blur(var(--pf-aero-blur));
+    color: var(--pf-text);
+    border-radius: var(--pf-radius);
+    box-shadow: var(--pf-shadow-float), inset 0 0 0 1px var(--pf-border-light);
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.18s ease, visibility 0.18s ease;
+}
+.pf-distinctions-tip.is-visible {
+    opacity: 1;
+    visibility: visible;
+}
+/* Focalisée à l'ouverture pour être lue (cf. shelf-distinctions.js) : conteneur,
+   donc pas d'anneau — la bulle qui apparaît EST l'indicateur. */
+.pf-distinctions-tip:focus {
+    outline: none;
+}
+.pf-distinctions-tip__content {
+    max-height: min(240px, 45vh);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+}
+
+/* Croix de fermeture — seulement épinglée (clic/clavier) : un aperçu au
+   survol se referme tout seul, la croix n'aurait pas de sens. Idiome
+   .pf-roundbtn en petit (même construction que .pf-toast__close). Sélecteurs
+   en (0,2,0)/(0,3,0) pour battre `.pf-roundbtn { display: flex; position:
+   relative }` (même spécificité sinon en (0,1,0), et .pf-roundbtn est
+   déclaré plus loin dans le fichier) — jamais !important entre fichiers du
+   thème enfant (règle CSS du projet, cf. .pf-numerique-tip__close). */
+.pf-distinctions-tip .pf-distinctions-tip__close {
+    display: none;
+}
+.pf-distinctions-tip.is-pinned .pf-distinctions-tip__close {
+    display: flex;
+    position: absolute;
+    top: var(--pf-space-2);
+    right: var(--pf-space-2);
+    --pf-roundbtn-size: 18px;
+}
+.pf-distinctions-tip.is-pinned .pf-distinctions-tip__close svg {
+    width: 10px;
+    height: 10px;
+}
+/* Dégagement pour ne pas passer sous la croix : réservé seulement épinglée,
+   l'aperçu au survol (sans croix) garde toute la largeur. */
+.pf-distinctions-tip.is-pinned .pf-distinctions-tip__content {
+    padding-right: var(--pf-space-5);
+}
+
+/* Liste des distinctions — reprend la voix de la section « Prix et
+   distinctions » de la fiche livre (icône médaille + filet de séparation). */
+.pf-distinctions-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    font-family: var(--pf-font-body);
+    font-size: var(--pf-text-sm);
+    line-height: 1.35;
+}
+.pf-distinctions-list li {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.4em;
+    padding: 0.4em 0;
+    border-bottom: 1px solid var(--pf-border);
+}
+.pf-distinctions-list li:last-child {
+    border-bottom: none;
+}
+.pf-distinctions-list__icon {
+    flex: none;
+    color: var(--pf-accent);
+    /* Recalée sur la première ligne de texte (l'icône est alignée en haut pour
+       que les libellés sur deux lignes restent lisibles). */
+    margin-top: 0.1em;
 }
 
 /* =========================================================
@@ -1507,14 +1684,10 @@ body.admin-bar { --pf-adminbar: 32px; }
     color: var(--pf-accent);
 }
 /* Variantes de statut (opts.status) — nées du déport des notices WooCommerce
-   (assets/js/wc-notices-toast.js) : la sévérité, portée jusque-là par la couleur
-   du bandeau de notice, passe dans la couleur de l'icône. Le toast garde son fond
-   crème : un aplat rouge en bas d'écran serait plus agressif que la notice
-   d'origine, et le contraste du texte est déjà celui du composant. */
-.pf-toast--success .pf-toast__icon { color: var(--pf-success); }
-.pf-toast--error   .pf-toast__icon { color: var(--pf-danger); }
-.pf-toast--warning .pf-toast__icon { color: var(--pf-warning); }
-.pf-toast--info    .pf-toast__icon { color: var(--pf-info); }
+   (assets/js/wc-notices-toast.js) : la sévérité ne teinte plus l'icône (toujours
+   --pf-accent, quel que soit le statut) — seul role="alert" sur .pf-toast--error
+   porte encore la distinction. Le toast garde son fond crème : un aplat rouge en
+   bas d'écran serait plus agressif que la notice d'origine. */
 .pf-toast__icon svg {
     display: block;
     width: 100%;
@@ -1711,7 +1884,9 @@ html.pf-notices-js .wc-block-components-notices__snackbar {
    site, à la place d'un spinner qui ferait un point de fixation isolé loin du
    champ de saisie.
    Deux hôtes aujourd'hui, qui ne posent QUE le bord auquel le filet se colle :
-     - recherche globale du header  → bord HAUT du panneau de résultats ;
+     - recherche globale du header  → bord HAUT du panneau de résultats (aussi
+       utilisé pour le lot suivant d'un « + de résultats », cf.
+       recherche-globale.js : même classe .is-loading sur le même panneau) ;
      - sous-header de /evenements   → bord BAS de la barre (liste + carte).
    Le pseudo-élément se cale sur la boîte de padding de l'ancêtre positionné le
    plus proche : c'est ce qui le rend pleine largeur d'écran sur /evenements
@@ -1744,19 +1919,30 @@ html.pf-notices-js .wc-block-components-notices__snackbar {
    Bloc « réponse de l'éditeur » sous un avis (compte client + fiche livre).
    Base visuelle : .pf-quote (ci-dessus) avec filet accent. ========================================================= */
 .pf-avis-reponse {
-    --pf-quote-rule: var(--pf-accent);
+    --pf-quote-rule: var(--pf-text-dim);
     margin: var(--pf-space-3) 0 0;
     padding: var(--pf-space-3) var(--pf-space-4);
 }
-.pf-avis-reponse > strong {
-    display: block;
+.pf-avis-reponse__head {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin: 0 0 0.3rem;
+}
+.pf-avis-reponse__logo {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    margin-bottom: 1px;
+}
+.pf-avis-reponse__head > strong {
     font-size: 0.78rem;
     text-transform: uppercase;
     letter-spacing: 0.04em;
-    color: var(--pf-accent);
-    margin: 0 0 0.3rem;
+    color: var(--pf-text-dim);
 }
-.pf-avis-reponse__text { margin: 0; font-size: 0.92rem; line-height: 1.55; color: var(--pf-text); }
+.pf-avis-reponse__text { margin: 0; font-size: 0.9rem; }
 .pf-avis-reponse__date { display: block; margin: 0.4rem 0 0; font-size: 0.75rem; color: var(--pf-text-dim); }
 
 /* =========================================================
@@ -1814,7 +2000,7 @@ html.pf-notices-js .wc-block-components-notices__snackbar {
 .pf-scroll-fade,
 .pf-cat-row-scroll {
     position: relative;
-    --pf-fade-size: 60px;
+    --pf-fade-size: clamp(28px, 4.3vw, 60px);
     --pf-fade-l: 0px;
     --pf-fade-r: 0px;
     -webkit-mask-image: linear-gradient(to right, transparent 0, #000 var(--pf-fade-l), #000 calc(100% - var(--pf-fade-r)), transparent 100%);
@@ -1827,6 +2013,12 @@ html.pf-notices-js .wc-block-components-notices__snackbar {
 
 .pf-scroll-fade.is-scroll-right,
 .pf-cat-row-scroll.has-fade-right  { --pf-fade-r: var(--pf-fade-size); }
+
+/* Tuiles auteur (fiche livre + fiche événement) : cartes 200px, plus étroites que
+   les 250px des tuiles événement qui calibrent le défaut ci-dessus — même forme de
+   clamp, réduite au prorata (200/250) pour rester dans la même proportion visuelle
+   au lieu de partager tel quel le fondu taillé pour des cartes plus larges. */
+.pf-scroll-fade:has(.pf-event-auteurs-scroll) { --pf-fade-size: clamp(24px, 3.4vw, 48px); }
 
 /* =========================================================
    Popup d'événement flottant (.pf-map-pop) — COMPOSANT PARTAGÉ.
@@ -2003,7 +2195,11 @@ html.pf-notices-js .wc-block-components-notices__snackbar {
 	left: 0.38rem;
 	/* Demi-hauteur d'un lien (padding 0.6em + moitié de line-height 1.2) : aligne les extrémités sur le centre du 1er/dernier point plutôt que sur leur bord. */
 	top: calc(var(--pf-text-sm) * 1.2);
-	bottom: calc(var(--pf-text-sm) * 1.2);
+	/* Repli = formule ci-dessus (dernier lien sur 1 ligne). Si le dernier lien passe sur
+	   plusieurs lignes, sa hauteur réelle n'est pas calculable en CSS pur (dépend du texte/de
+	   la largeur) → mesurée en JS (section-nav.js) et posée dans cette variable, pour que le
+	   trait s'arrête pile dans le point (centré sur la 1re ligne, cf. a::before ci-dessous). */
+	bottom: var(--pf-sectionnav-rail-bottom, calc(var(--pf-text-sm) * 1.2));
 	width: 1px;
 	background: var(--pf-border);
 }
@@ -2027,7 +2223,10 @@ html.pf-notices-js .wc-block-components-notices__snackbar {
 	content: '';
 	position: absolute;
 	left: -1.0625rem;
-	top: 50%;
+	/* Centré sur la 1re ligne (padding-top 0.6em + moitié de line-height), pas sur le
+	   milieu de toute la boîte : un lien passant sur plusieurs lignes décalerait sinon
+	   le point vers le bas. Même formule que .pf-sectionnav::before ci-dessus. */
+	top: calc(var(--pf-text-sm) * 1.2);
 	transform: translateY(-50%);
 	width: 7px;
 	height: 7px;
@@ -2185,8 +2384,14 @@ html.pf-notices-js .wc-block-components-notices__snackbar {
 	   dégradé peint qu'il a remplacé commençait 24px plus loin (le padding latéral
 	   du site, porté par le track). Sa portée utile valait donc 24px de barre nue
 	   + ~30px de rampe = 54px depuis le bord ; 56px la rétablit. Plus long (5rem
-	   testé) et le fondu mord sur le libellé actif au lieu du seul voisin. */
-	.pf-sectionnav .pf-scroll-fade { --pf-fade-size: 3.5rem; }
+	   testé) et le fondu mord sur le libellé actif au lieu du seul voisin.
+	   Repris en clamp : 56px vaut pour un rail tablette encombré de libellés larges,
+	   disproportionné sur un téléphone étroit où 2-3 libellés suffisent à remplir
+	   l'écran. Plancher 40px et non moins : sous les 24px de padding + rampe minimale
+	   ci-dessus, le fondu s'épuiserait dans le padding vide et laisserait une coupure
+	   nette au premier libellé. Coefficient calé pour atteindre 56px pile à 1023px
+	   (bord de ce point de rupture), pas au-delà. */
+	.pf-sectionnav .pf-scroll-fade { --pf-fade-size: clamp(40px, 5.5vw, 56px); }
 
 	.pf-sectionnav::before { display: none; }
 
@@ -2304,7 +2509,9 @@ html.pf-notices-js .wc-block-components-notices__snackbar {
 	   de base ciblerait TOUS les liens (aplatissement + pastille décalée vers le
 	   haut). On rétablit la géométrie normale (padding + pastille centrée) partout. */
 	.pf-sectionnav--static .pf-sectionnav__track a:first-child { padding-top: 0.6em; }
-	.pf-sectionnav--static .pf-sectionnav__track a:first-child::before { top: 50%; }
+	/* Même formule que .pf-sectionnav a::before (centrée 1re ligne) — pas 50%, sinon
+	   un libellé de menu qui passe sur 2 lignes décale la pastille vers le bas. */
+	.pf-sectionnav--static .pf-sectionnav__track a:first-child::before { top: calc(var(--pf-text-sm) * 1.2); }
 
 	/* Écart de détachement au-dessus de « Déconnexion ». */
 	.pf-sectionnav--static .woocommerce-MyAccount-navigation-link--customer-logout { margin-top: var(--pf-space-4); }
@@ -2348,12 +2555,15 @@ html.pf-notices-js .wc-block-components-notices__snackbar {
 .pf-switch__btn:not(:last-child) { border-right: 1px solid var(--pf-border-light); }
 .pf-switch__btn.is-active,
 .pf-cat-univers-btn.is-active { background: var(--pf-red-soft); color: var(--pf-accent); box-shadow: none; }
-.pf-switch__btn:not(.is-active):hover,
-.pf-cat-univers-btn:not(.is-active):hover { background: var(--pf-red-soft-strong); color: var(--pf-accent); box-shadow: none; }
+/* :not(:disabled) — même idiome que .pf-dropdown__option:hover:not(.is-disabled) :
+   un segment désactivé (ex. « Dos » quand le format ne le permet pas) ne doit pas
+   réagir au survol, sous peine de laisser croire qu'il reste cliquable. */
+.pf-switch__btn:not(.is-active):not(:disabled):hover,
+.pf-cat-univers-btn:not(.is-active):not(:disabled):hover { background: var(--pf-red-soft-strong); color: var(--pf-accent); box-shadow: none; }
 .pf-switch__btn:disabled { opacity: 0.35; cursor: not-allowed; }
 /* Variante --solid : segment actif en aplat rouge (sélecteur de vue Liste/Mois TEC). */
 .pf-switch--solid .pf-switch__btn.is-active { background: var(--pf-accent); color: var(--pf-surface); }
-.pf-switch--solid .pf-switch__btn:not(.is-active):hover { background: var(--pf-cream-dark); color: var(--pf-accent); }
+.pf-switch--solid .pf-switch__btn:not(.is-active):not(:disabled):hover { background: var(--pf-cream-dark); color: var(--pf-accent); }
 
 /* =========================================================
    Bouton scindé — libellé principal (action directe) + kebab accolé
@@ -2408,7 +2618,8 @@ html.pf-notices-js .wc-block-components-notices__snackbar {
 
 /* =========================================================
    Menu déroulant — trigger bordé + menu flottant (position:fixed, placé en JS).
-   Markup : catalogue (tri/filtres/PDF), recherche globale (type). ========================================================= */
+   Markup : catalogue (tri/filtres/PDF), datepicker de la vue mois des événements
+   (override TEC month/top-bar/datepicker.php). ========================================================= */
 .pf-dropdown { position: relative; }
 .pf-dropdown__trigger {
     display: flex;
@@ -2712,4 +2923,22 @@ html.pf-notices-js .wc-block-components-notices__snackbar {
     .pf-newsletter__btn {
         width: 100%;
     }
+}
+
+/* =========================================================
+   .pf-footer-legal — liens légaux, bandeau copyright du footer.
+   ========================================================= */
+.pf-footer-legal {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    /* Le séparateur est un item flex à part entière (pas du texte inline) : ce gap
+       espace donc À LA FOIS lien↔séparateur et séparateur↔lien, d'où une valeur
+       plus resserrée qu'un simple espacement lien↔lien. */
+    gap: var(--pf-space-2) var(--pf-space-3);
+    margin-top: var(--pf-space-2);
+    font-size: var(--pf-text-sm);
+}
+.pf-footer-legal__sep {
+    color: var(--pf-text-dim);
 }

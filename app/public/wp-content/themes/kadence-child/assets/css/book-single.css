@@ -122,6 +122,14 @@
 	min-width: 0;
 }
 
+.bs-epuise-msg {
+	margin: 0;
+	color: var(--pf-text);
+	font-size: 0.95rem;
+	line-height: 1.3rem;
+	font-style: italic;
+}
+
 .bs-hero__price {
 	font-size: 1.3rem;
 	font-weight: 600;
@@ -312,6 +320,19 @@
 }
 
 /* Boutons de format : .pf-btn .pf-btn--sm + .pf-btn--neutral (inactif) / .pf-btn--primary (actif) — voir style.css. */
+
+/* Format actif = span non cliquable (simple indicateur, pas un lien) : le survol/focus ne doit
+   rien changer, sous peine de suggérer une action possible. Sélecteur avec le type d'élément
+   pour battre .pf-btn--outline:hover (style.css) sans dépendre de l'ordre de chargement. */
+span.bs-format-btn--active,
+span.bs-format-btn--active:hover,
+span.bs-format-btn--active:focus,
+span.bs-format-btn--active:active {
+	cursor: default;
+	background: transparent;
+	color: var(--pf-accent);
+	box-shadow: none;
+}
 
 /* ─── Hero visual — étagère ──────────────────────────────────── */
 
@@ -615,6 +636,18 @@
 	margin-bottom: 0;
 }
 
+/* Section « Des mêmes auteurs » : un <h3> par groupe d'auteurs suivi de son
+   étagère (passiflore_get_livres_lies_sections()). Espacement volontairement
+   asymétrique : titre → étagère resserré (lus comme un seul bloc), étagère →
+   titre du groupe suivant plus large (sépare les groupes entre eux). */
+#du-meme-auteur h3, #de-la-meme-autrice h3, #des-memes-auteurs h3, #des-memes-autrices h3 {
+	margin: 0 0 var(--pf-space-3);
+}
+
+#du-meme-auteur .pf-bookshelf + h3, #de-la-meme-autrice .pf-bookshelf + h3, #des-memes-auteurs .pf-bookshelf + h3, #des-memes-autrices .pf-bookshelf + h3 {
+	margin-top: var(--pf-space-10);
+}
+
 /* ─── Onglet Presse & Médias ─────────────────────────────────── */
 
 .bs-tab-media {
@@ -737,22 +770,28 @@
 }
 
 .bs-avis-text {
-	font-size: 0.95rem;
-	color: var(--pf-heading);
+	font-size: 0.9rem;
 	margin: 0 0 0.6rem;
-	line-height: 1.6;
-	font-family: var(--pf-font-heading);
 }
 
+/* Le pied porte l'attribution et, sur son propre avis, le bouton « Supprimer » :
+   rangée souple (le bouton passe sous le nom si la place manque). Inerte quand le
+   pied n'a qu'un nom. */
 .bs-avis-footer {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--pf-space-2) var(--pf-space-4);
 	font-size: 0.8rem;
 	color: var(--pf-text);
 }
 
 .bs-avis-titre {
-	font-size: 1rem;
-	font-weight: 600;
+	font-size: 1.05rem !important;
 	margin: 0 0 0.4rem;
+	color: var(--pf-text);
+	font-family: var(--pf-font-heading);
 }
 
 .bs-avis-date {
@@ -766,7 +805,12 @@
 	margin: 0 0 var(--pf-space-4);
 }
 
-.bs-avis-item--pending {
+/* Avis en attente (visible par son seul auteur) : l'atténuation porte sur le CONTENU
+   cité, jamais sur la boîte. Une `opacity` sur l'ancêtre crée un groupe de composition
+   dont un enfant ne peut pas être plus opaque — le bouton « Supprimer » et la mention
+   « en attente » tomberaient sous le contraste minimal, sans recours possible. */
+.bs-avis-item--pending > .bs-avis-text,
+.bs-avis-item--pending .bs-avis-auteur {
 	opacity: 0.55;
 }
 
@@ -775,12 +819,6 @@
 	font-style: italic;
 	color: var(--pf-muted);
 	margin: var(--pf-space-2) 0 0;
-}
-
-/* Réponse de l'éditeur sous un avis (fiche livre) : .pf-avis-reponse (style.css).
-   L'avis hôte (.bs-avis-item) est sur fond --pf-surface-alt → on repasse la réponse en blanc pour garder le contraste. */
-.bs-avis-item .pf-avis-reponse {
-	background: var(--pf-surface);
 }
 
 /* Fond/couleur/filet/padding : .pf-notice--error (style.css). */
@@ -830,6 +868,17 @@
 .bs-avis-form .comment-notes-after {
 	font-size: 0.8rem;
 	color: var(--pf-muted);
+}
+
+.bs-avis-form .comment-form-author-note {
+	font-size: 0.8rem;
+	font-style: italic;
+	color: var(--pf-muted);
+}
+
+.bs-avis-form .comment-form-author-note a {
+	color: inherit;
+	font-style: normal;
 }
 
 .bs-avis-form .form-submit {

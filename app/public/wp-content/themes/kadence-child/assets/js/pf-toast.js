@@ -15,7 +15,10 @@
  *                    `role="alert"` : un message bloquant ne doit pas attendre
  *                    la fin de la lecture en cours pour être annoncé.
  *   opts.duration  : ms avant fermeture auto (défaut 5000 ; 0 = illimité).
- *   opts.actions   : [ { label, onClick } | { label, href } ] → .pf-btn--primary.--sm.
+ *   opts.actions   : [ { label, onClick, outline } | { label, href, outline } ] →
+ *                    .pf-btn--primary.--sm (ou .pf-btn--outline.--sm si `outline: true`,
+ *                    pour une action secondaire — ex. « Annuler » à côté d'une action
+ *                    primaire dans le même toast).
  *                    `href` produit un vrai lien (clic milieu / nouvel onglet
  *                    possibles) et ne ferme pas le toast : la navigation s'en charge,
  *                    et un ctrl-clic doit laisser le toast en place.
@@ -151,11 +154,11 @@
 			actions.className = 'pf-toast__actions';
 			opts.actions.forEach( function ( a ) {
 				var btn = document.createElement( a.href ? 'a' : 'button' );
-				// --primary explicite : `.pf-btn` seul ne porte AUCUNE apparence
+				// --primary/--outline explicite : `.pf-btn` seul ne porte AUCUNE apparence
 				// (fond/couleur viennent du modificateur). Un <button> nu héritait
 				// du bouton Kadence — de mêmes fond et couleur, par coïncidence —
 				// mais un <a> nu retombait en simple lien rouge sans fond.
-				btn.className = 'pf-btn pf-btn--primary pf-btn--sm';
+				btn.className = 'pf-btn pf-btn--' + ( a.outline ? 'outline' : 'primary' ) + ' pf-btn--sm';
 				btn.textContent = a.label || '';
 				if ( a.href ) {
 					btn.href = a.href;

@@ -612,6 +612,157 @@ function pf_search_products_ranked( $query ) {
 }
 
 /**
+ * IDs de livres pour la RECHERCHE GLOBALE du header : le classement partagé
+ * ci-dessus, puis trois règles d'éligibilité propres à cette recherche-là.
+ *
+ * ⚠️ RÉSERVÉE À LA RECHERCHE GLOBALE. Ne PAS la substituer à
+ * pf_search_products_ranked() dans le catalogue
+ * (Passiflore_Bookshelf::get_search_ranked_ids()) ni dans le sélecteur de
+ * livres de l'admin événements (inc/event-admin.php) : les deux doivent
+ * continuer à trouver les livres épuisés et masqués — le catalogue parce
+ * qu'un livre épuisé garde une fiche à consulter, l'admin parce qu'on
+ * rattache des livres épuisés à des événements passés.
+ *
+ * Les trois règles :
+ *
+ *   1. ÉPUISÉ exclu — union de la SCF `disponibilite` et du stock WooCommerce.
+ *      L'union ne change rien à ce jour (`outofstock` est un sous-ensemble
+ *      strict de `epuise`, 18 sur 19, vérifié en base) : elle est là comme
+ *      ceinture contre la dérive INVERSE, un livre passé hors stock avant
+ *      d'être marqué épuisé en SCF. Rien ne synchronise les deux sources
+ *      (`_manage_stock` vaut 'no' sur tout le catalogue, aucun code de
+ *      synchro) et elles divergent déjà d'un livre. `bientot-epuise` reste
+ *      trouvable : encore en vente.
+ *
+ *   2. VISIBILITÉ WooCommerce respectée — le terme `exclude-from-search` de
+ *      `product_visibility` couvre EXACTEMENT les deux réglages visés :
+ *      « Boutique uniquement » (ce terme seul) et « Masqué » (ce terme +
+ *      `exclude-from-catalog`). « Résultats de recherche uniquement » reste
+ *      donc visible ici, ce qui est bien le sens du réglage.
+ *      ⚠️ On ne lit PAS le terme `outofstock` de cette même taxonomie pour la
+ *      règle 1 : WooCommerce ne l'écrit qu'au passage par le CRUD WC_Product,
+ *      or les statuts de stock de ce site viennent d'un import direct en
+ *      postmeta — il apparaîtrait à la première sauvegarde en admin, livre
+ *      par livre, donnant une règle au comportement inégal selon les fiches.
+ *
+ *   3. MIS EN AVANT en tête — partition stable, faute de mieux :
+ *      pf_search_products_ranked() ne rend que des IDs, sans les scores, et
+ *      son chemin ISBN n'en produit aucun. Sur un panneau qui montre 4
+ *      résultats par section, « en tête » vaut de toute façon un repondérage.
+ *
+ * ORDRE : exclusions PAR ÉDITION, PUIS déduplication par œuvre — pas l'inverse.
+ * pf_bg_dedup() remplace chaque édition trouvée par le représentant de son
+ * `format_groupe` (le classique de préférence) : filtrer après elle testerait
+ * le représentant, et une œuvre dont le classique est épuisé mais le numérique
+ * disponible disparaîtrait entièrement. En filtrant avant, il suffit qu'UNE
+ * édition correspondante soit éligible pour que l'œuvre reste (décision actée).
+ * Conséquence assumée : le livre affiché et lié reste le représentant, donc
+ * possiblement épuisé — ou, en théorie, `exclude-from-search` — parce qu'une
+ * édition sœur portait la correspondance. Le correctif propre serait de rendre
+ * le choix du représentant sensible à l'éligibilité ; à ne pas engager avant
+ * qu'un cas réel n'apparaisse (zéro groupe mixte dans le catalogue à ce jour).
+ *
+ * Sémantique exacte : « au moins une édition éligible PARMI CELLES QUI
+ * CORRESPONDENT à la requête ». Une édition disponible qui ne correspond pas
+ * ne sauve pas son œuvre — la faire remonter afficherait un non-résultat.
+ *
+ * @param  string $query
+ * @return int[]  Représentants d'œuvre prêts à afficher, dans l'ordre final.
+ */
+function pf_search_products_ranked_global( $query ) {
+	$ids = pf_search_products_ranked( $query );
+	if ( empty( $ids ) ) return [];
+
+	// Passe 1 — exclusions, sur les éditions correspondantes.
+	$excluded = pf_search_products_excluded_from_global( $ids );
+	if ( $excluded ) {
+		$ids = array_values( array_diff( $ids, $excluded ) );
+		if ( empty( $ids ) ) return [];
+	}
+
+	// Une œuvre = un représentant de format_groupe.
+	$reps = pf_bg_dedup( $ids );
+
+	// Passe 2 — mise en avant, testée sur le représentant : c'est le produit
+	// affiché, et celui sur lequel un éditeur coche la case. Il n'est pas
+	// forcément dans $ids (il peut être tiré par groupe depuis une édition
+	// sœur), d'où une seconde lecture de termes et non un réemploi de la passe 1.
+	$featured = pf_search_products_with_visibility_term( $reps, 'featured' );
+	if ( empty( $featured ) ) return $reps;
+
+	$first = [];
+	$rest  = [];
+	foreach ( $reps as $id ) {
+		if ( isset( $featured[ $id ] ) ) $first[] = $id;
+		else                             $rest[]  = $id;
+	}
+	return array_merge( $first, $rest );
+}
+
+/**
+ * Sous-ensemble de $ids à retirer de la recherche globale : livres épuisés, ou
+ * réglés « Boutique uniquement » / « Masqué ». Cf. les règles 1 et 2 du
+ * docblock de pf_search_products_ranked_global().
+ *
+ * Deux requêtes GROUPÉES, jamais une par livre : la recherche globale repart à
+ * chaque frappe (débounce 250 ms) et à chaque « + de résultats ».
+ *
+ * @param  int[] $ids
+ * @return int[] IDs à exclure (éventuellement vide).
+ */
+function pf_search_products_excluded_from_global( array $ids ) {
+	$ids = array_values( array_unique( array_map( 'intval', $ids ) ) );
+	if ( empty( $ids ) ) return [];
+
+	global $wpdb;
+	$in = implode( ',', $ids );
+
+	// Épuisé : les deux sources dans un seul WHERE.
+	$out = array_map( 'intval', (array) $wpdb->get_col(
+		"SELECT DISTINCT post_id FROM {$wpdb->postmeta}
+		 WHERE post_id IN ($in)
+		 AND ( ( meta_key = 'disponibilite' AND meta_value = 'epuise' )
+		    OR ( meta_key = '_stock_status'  AND meta_value = 'outofstock' ) )"
+	) );
+
+	$out = array_merge(
+		$out,
+		array_keys( pf_search_products_with_visibility_term( $ids, 'exclude-from-search' ) )
+	);
+
+	return array_values( array_unique( $out ) );
+}
+
+/**
+ * Parmi $ids, ceux qui portent le terme $slug de la taxonomie
+ * `product_visibility`, sous la forme [ id => true ] (test en O(1) côté
+ * appelant). Une seule requête, via le cache de termes du cœur.
+ *
+ * ⚠️ Ne PAS interroger wp_term_relationships avec les term_id de
+ * wc_get_product_visibility_term_ids() : cette table est indexée par
+ * term_taxonomy_id, égal au term_id par coïncidence et non par garantie.
+ *
+ * @param  int[]  $ids
+ * @param  string $slug
+ * @return array<int,bool>
+ */
+function pf_search_products_with_visibility_term( array $ids, $slug ) {
+	$ids = array_values( array_unique( array_map( 'intval', $ids ) ) );
+	if ( empty( $ids ) || ! taxonomy_exists( 'product_visibility' ) ) return [];
+
+	$terms = wp_get_object_terms( $ids, 'product_visibility', [
+		'fields' => 'all_with_object_id',
+	] );
+	if ( is_wp_error( $terms ) ) return [];
+
+	$hits = [];
+	foreach ( $terms as $term ) {
+		if ( $term->slug === $slug ) $hits[ (int) $term->object_id ] = true;
+	}
+	return $hits;
+}
+
+/**
  * IDs d'événements (tribe_events publiés) matchant la requête, rangés à
  * venir d'abord (le plus proche en premier) puis passés (le plus récent en
  * premier) — pas de filtre « marquant » : un événement passé quelconque

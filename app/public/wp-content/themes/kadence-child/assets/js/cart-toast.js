@@ -97,12 +97,14 @@
 			: [ { label: S.cart_cta, href: S.cart_url } ];
 	}
 
-	function toastAdded( title, fallback ) {
+	function toastAdded( title, fallback, withNumerique ) {
 		if ( ! title && ! fallback ) {
 			return;
 		}
+		var tpl = withNumerique ? S.added_num : S.added;
+
 		toast(
-			title ? String( S.added ).replace( '%s', titleHtml( title ) ) : escapeHtml( fallback ),
+			title ? String( tpl ).replace( '%s', titleHtml( title ) ) : escapeHtml( fallback ),
 			ICON_ADD,
 			cartAction()
 		);
@@ -141,6 +143,17 @@
 	}
 
 	$( document.body ).on( 'added_to_cart', function ( e, fragments, hash, $button ) {
+		// L'offre « version numérique » a-t-elle été retenue ? C'est l'attribut que
+		// la case à cocher pose sur le bouton (numerique-offer.js) et que le JS cœur
+		// de WooCommerce a transmis au serveur : le signal le plus fidèle à ce qui a
+		// réellement été demandé.
+		//
+		// ⚠️ Lu SYNCHRONEMENT, jamais dans le `.then()` plus bas : le mini-panier
+		// rafraîchi par cet même événement révèle le numérique, et le
+		// MutationObserver de numerique-offer.js décoche alors la case — donc retire
+		// l'attribut — dès la microtâche suivante, bien avant l'atterrissage du vol.
+		var withNumerique = !! ( $button && $button.attr && $button.attr( 'data-pf_add_numerique' ) );
+
 		// Sur la fiche livre, un exemplaire s'envole vers le panier (add-to-cart-flight.js) :
 		// le toast attend l'atterrissage, sinon il paraîtrait pendant le vol. Ailleurs,
 		// il n'y a pas de vol et la promesse est déjà tenue.
@@ -156,7 +169,7 @@
 		// qu'on anime.
 		landed.then( function () {
 			bumpCartIcon();
-			toastAdded( S.title, fallbackOf( $button ) );
+			toastAdded( S.title, fallbackOf( $button ), withNumerique );
 		} );
 	} );
 

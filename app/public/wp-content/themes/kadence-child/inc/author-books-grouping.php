@@ -7,38 +7,31 @@ if ( ! defined( 'ABSPATH' ) ) exit;
    ═══════════════════════════════════════════════════════════════ */
 
 /**
- * Deduplicate a list of product IDs by format_groupe: for each group, keep
- * the classique edition (no pa_format_particulier term), or the first found.
- * Products with no format_groupe are always kept as-is.
+ * Réduit une liste de produits à un représentant par œuvre, sans doublon, en
+ * préservant l'ordre de première apparition. Les livres autonomes (sans
+ * format_groupe) sont gardés tels quels.
+ *
+ * Le représentant vient de pf_group_representative() (inc/format-groupe.php) —
+ * la même règle que les étagères et le catalogue.
+ *
+ * ⚠️ Cette fonction choisissait auparavant parmi les seuls IDs reçus, avec un
+ * repli sur le premier de la liste et SANS ordre de priorité de format : deux
+ * appelants pouvaient donc renvoyer des représentants différents pour la même
+ * œuvre. Elle renvoie désormais le vrai représentant du groupe, même s'il
+ * n'était pas dans la liste d'entrée.
  */
 function passiflore_dedup_by_format_groupe( array $ids ): array {
-	$standalone = [];
-	$buckets    = [];
+	$seen = [];
+	$out  = [];
 
 	foreach ( $ids as $id ) {
-		$id       = (int) $id;
-		$fg_terms = wp_get_object_terms( $id, 'format_groupe', [ 'fields' => 'ids' ] );
-		if ( is_wp_error( $fg_terms ) || empty( $fg_terms ) ) {
-			$standalone[] = $id;
-		} else {
-			$buckets[ (int) $fg_terms[0] ][] = $id;
-		}
+		$rep = pf_format_representative_of( (int) $id );
+		if ( isset( $seen[ $rep ] ) ) continue;
+		$seen[ $rep ] = true;
+		$out[]        = $rep;
 	}
 
-	$result = $standalone;
-	foreach ( $buckets as $group_ids ) {
-		$rep = null;
-		foreach ( $group_ids as $gid ) {
-			$pa = wp_get_object_terms( $gid, 'pa_format_particulier', [ 'fields' => 'ids' ] );
-			if ( ! is_wp_error( $pa ) && empty( $pa ) ) {
-				$rep = $gid;
-				break;
-			}
-		}
-		$result[] = $rep ?? $group_ids[0];
-	}
-
-	return $result;
+	return $out;
 }
 
 /**
@@ -125,7 +118,14 @@ function passiflore_join_auteur_names( array $names ): string {
  * Author term IDs for a product — any fiche-auteur contribution, regardless of
  * the contribution `type` label (auteur, photographies, traduction, illustrations…).
  * The `type` is a role label; a person credited on a book in ANY role is one of
- * its authors (an auteur term). Returns a sorted array of unique integer term IDs.
+ * its authors (an auteur term).
+ *
+ * Returns unique term IDs in CREDIT ORDER — l'ordre du repeater SCF, tel que
+ * l'éditeur l'a saisi. Tout ce qui s'affiche à partir de cette liste (titres des
+ * sections « livres liés », auteurs imprimés sur les dos générés) suit donc cet
+ * ordre. ⚠️ Le groupement par ensemble d'auteurs, lui, doit rester INDÉPENDANT
+ * de l'ordre : il retrie une copie pour construire son empreinte (cf.
+ * passiflore_group_books_by_author_set()).
  */
 function passiflore_get_product_author_ids( int $post_id ): array {
 	$term_ids      = [];
@@ -138,9 +138,7 @@ function passiflore_get_product_author_ids( int $post_id ): array {
 			if ( $tid ) $term_ids[] = $tid;
 		}
 	}
-	$term_ids = array_values( array_unique( $term_ids ) );
-	sort( $term_ids );
-	return $term_ids;
+	return array_values( array_unique( $term_ids ) );
 }
 
 /**
@@ -149,6 +147,12 @@ function passiflore_get_product_author_ids( int $post_id ): array {
  * traduction…) is not filtered: a person credited on a book in any role is one of
  * its authors. Mirrors Passiflore_Bookshelf::get_product_ids_by_auteur() — handles
  * the three storage shapes SCF uses for multi_select taxonomy fields.
+ *
+ * ⚠️ Jointure sur wp_posts pour ne retenir que les livres PUBLIÉS : la lecture
+ * directe de wp_postmeta ne connaît pas le statut, alors que tout ce qui rend
+ * ces IDs ([passiflore_etagere]) filtre sur `publish`. Sans elle, un brouillon
+ * crédité à l'auteur produisait un titre de section suivi d'une étagère vide
+ * (« Aucun livre ne correspond à votre recherche. »).
  */
 function passiflore_product_ids_by_auteur_terms( array $term_ids ): array {
 	global $wpdb;
@@ -165,6 +169,7 @@ function passiflore_product_ids_by_auteur_terms( array $term_ids ): array {
 	}
 
 	$sql  = "SELECT DISTINCT a.post_id FROM {$wpdb->postmeta} a";
+	$sql .= " INNER JOIN {$wpdb->posts} p ON p.ID = a.post_id AND p.post_status = 'publish'";
 	$sql .= " WHERE a.meta_key LIKE %s AND ( " . implode( ' OR ', $or_clauses ) . " )";
 
 	return array_map( 'intval', $wpdb->get_col( $wpdb->prepare( $sql, $params ) ) );
@@ -205,22 +210,31 @@ function passiflore_meme_auteur_label( array $term_ids ): string {
  *     P4  2+ known subset, with external
  *   Phase 2 — single known author, grouped by author position in reference_ids:
  *     P5  1 known, no external        ("[name]" solo)
- *     P6  1 known, with external      ("[name] avec …")
+ *     P6  1 known, with external      ("[name] (avec …)")
  */
 function passiflore_group_books_by_author_set( array $reference_ids, array $candidate_ids ): array {
 	if ( empty( $candidate_ids ) || empty( $reference_ids ) ) return [];
 
+	// Ordre de crédit conservé (pas de sort) : il porte l'ordre d'affichage des
+	// noms et, en phase 2, l'ordre des sections.
 	$reference_set = array_values( array_unique( array_map( 'intval', $reference_ids ) ) );
-	sort( $reference_set );
 	$ref_count = count( $reference_set );
 
 	$raw = [];
 	foreach ( $candidate_ids as $pid ) {
 		$author_ids = passiflore_get_product_author_ids( (int) $pid );
 		if ( empty( $author_ids ) ) continue;
-		$key = implode( ',', $author_ids );
+		// L'empreinte identifie un ENSEMBLE d'auteurs : elle se calcule sur une
+		// copie triée, sinon deux livres des mêmes auteurs crédités dans un
+		// ordre différent formeraient deux groupes distincts.
+		$key_ids = $author_ids;
+		sort( $key_ids );
+		$key = implode( ',', $key_ids );
 		if ( ! isset( $raw[ $key ] ) ) {
-			$known    = array_values( array_intersect( $author_ids, $reference_set ) );
+			// known : ordre de la RÉFÉRENCE (le livre / la fiche consultée) —
+			// array_intersect conserve l'ordre de son premier argument.
+			// external : ordre de crédit du candidat.
+			$known    = array_values( array_intersect( $reference_set, $author_ids ) );
 			$external = array_values( array_diff( $author_ids, $reference_set ) );
 			$raw[ $key ] = [
 				'fingerprint'  => $author_ids,
@@ -292,26 +306,23 @@ function passiflore_author_group_title( array $group, array $reference_ids, stri
 	if ( $context === 'auteur' ) {
 		return empty( $external )
 			? 'Ouvrages'
-			: 'Ouvrages avec ' . $external_str;
+			: 'Ouvrages (avec ' . $external_str . ')';
 	}
 
-	// Book context
-	$is_full = ( count( $known ) === $ref_count );
-
-	if ( $is_full ) {
-		$base = passiflore_meme_auteur_label( $reference_ids );
-		return empty( $external ) ? $base : $base . ' avec ' . $external_str;
-	}
-
-	if ( count( $known ) === 1 && empty( $external ) ) {
-		return $known_names[0];
-	}
-
-	if ( count( $known ) === 1 ) {
-		return $known_names[0] . ' avec ' . $external_str;
+	// Contexte livre — le libellé relationnel (« Du même auteur », « Des mêmes
+	// autrices »…) est porté par le titre de la SECTION, qui regroupe toutes les
+	// étagères d'auteurs. Chaque groupe se titre donc par ses auteurs, jamais par
+	// la relation :
+	//   « Prénom Nom » / « A et B »                    — aucun co-auteur externe
+	//   « Prénom Nom (avec X) » / « A et B (avec X) »  — avec co-auteur(s)
+	// Chaîne vide pour le groupe qui reprend STRICTEMENT les auteurs du livre :
+	// c'est exactement ce que le titre de section annonce, un <h3> y ferait
+	// doublon. Appelant : passiflore_get_livres_lies_sections().
+	if ( count( $known ) === $ref_count && empty( $external ) ) {
+		return '';
 	}
 
 	return empty( $external )
 		? $known_str
-		: $known_str . ' avec ' . $external_str;
+		: $known_str . ' (avec ' . $external_str . ')';
 }

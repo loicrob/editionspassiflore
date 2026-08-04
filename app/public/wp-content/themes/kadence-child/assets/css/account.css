@@ -35,7 +35,18 @@
    la nav est donc un enfant flex direct de `.woocommerce`, ce qui suffit à
    rendre son `position:sticky` opérant (parent = colonne contenu, haute). */
 
-/* ─── Tableau de bord : salutation ───────────────────────────────── */
+/* ─── Accueil du compte : salutation + grille de tuiles ──────────── */
+/* La navigation latérale est masquée sur cette seule page (les tuiles en
+   tiennent lieu) — cf. pf_account_hub_hide_nav() dans inc/account-hub.php.
+   `.woocommerce-MyAccount-content` étant en `flex: 1 1 320px`, elle occupe
+   alors toute la ligne sans aucune règle supplémentaire. */
+
+/* Occupe au moins tout le viewport sous le header (même calcul que l'écran
+   d'authentification plein écran plus bas). `:has()` scope à cette seule page
+   (le hub est le seul gabarit à rendre .pf-account-dashboard). */
+.woocommerce-account .wrap.kt-clear:has(.pf-account-dashboard) {
+	min-height: calc(100svh - var(--pf-sticky-offset));
+}
 
 .pf-account-hello {
 	margin: 0 0 1.5rem;
@@ -43,6 +54,62 @@
 	font-size: var(--pf-text-xl);
 	line-height: var(--pf-leading-snug);
 	color: var(--pf-heading);
+}
+
+/* .pf-account-dashboard est niché plusieurs niveaux sous le wrap ci-dessus
+   (#primary > .content-container > #main > .entry-content > .woocommerce >
+   .woocommerce-MyAccount-content) — des conteneurs Kadence génériques qui ne
+   stretch pas leurs enfants. Reporter le même calcul viewport - header ici
+   ancrerait la formule depuis SON propre haut, déjà décalé par ces conteneurs
+   : le wrap dépasserait le viewport d'autant (constaté). --pf-account-hub-top
+   (assets/js/account-hub.js) mesure ce décalage réel une fois le DOM prêt ;
+   repli sans JS = --pf-sticky-offset seul (survole légèrement le bas). Permet
+   à `.pf-account-logout` de se plaquer en bas via margin-top:auto.
+
+   `- var(--global-xxl-spacing)` en plus : Kadence pose `margin: 5rem 0` sur
+   `#primary.content-area` (haut ET bas). Le haut est déjà dans la mesure JS
+   (position réelle après ce margin-top) ; le bas, lui, s'ajoute APRÈS le
+   contenu — sans le soustraire ici, ce 5rem passerait sous la ligne de
+   flottaison (un écran plein + 5rem avant le pied de page) au lieu de tenir
+   dans l'écran. */
+.pf-account-dashboard {
+	display: flex;
+	flex-direction: column;
+	min-height: calc(100svh - var(--pf-account-hub-top, var(--pf-sticky-offset)) - var(--global-xxl-spacing, 5rem));
+}
+
+/* Grille fluide : les tuiles se répartissent d'elles-mêmes, sans point de
+   rupture à tenir en phase avec le nombre d'entrées du menu (qui varie selon le
+   client — commandes, livres numériques et liste de lecture sont conditionnels). */
+.pf-account-tiles {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+	gap: var(--pf-space-4);
+}
+
+/* La carte est le composant global .pf-card (style.css) : fond, rayon, ombre au
+   survol et titre qui rougit viennent de là. Ici, seulement la hauteur commune
+   des lignes et la respiration interne. */
+.pf-account-tile .pf-card-content {
+	justify-content: flex-start;
+	align-items: center;
+	gap: var(--pf-space-2);
+}
+
+.pf-account-tile .pf-card-content h2 {
+	margin: 0;
+}
+
+/* Shim de spécificité : Kadence pose `margin-top: 0` sur `.single-content p`
+   (0,1,1), qui battait un sélecteur à classe unique — le lien se collait alors
+   à la dernière tuile (écart mesuré : 0 px). Deux classes → (0,2,0), sans
+   !important. `margin-top: auto` plaque le lien en bas de .pf-account-dashboard
+   (flex column) plutôt qu'un espacement fixe — jamais négatif (colle aux tuiles
+   sans les chevaucher) si le contenu remplit déjà tout le min-height. */
+.pf-account-dashboard .pf-account-logout {
+	margin: auto 0 0;
+	font-size: var(--pf-text-sm);
+	text-align: center;
 }
 
 /* ─── Tableaux (commandes, téléchargements, adresses) ────────────── */
@@ -349,9 +416,65 @@
 	font-weight: var(--pf-weight-semibold);
 }
 
-/* Titres de section greffés (adresses dans le compte, téléchargements dans les commandes). */
-.pf-account-section-title {
-	margin-top: 2.5rem;
+/* ─── Détails du compte : mot de passe replié ────────────────────── */
+/* Remplace le fieldset "Password change" de WooCommerce (form-edit-account.php) :
+   replié par défaut derrière un <summary>, réouvert automatiquement si la
+   soumission a produit une erreur (attribut `open` posé côté PHP).
+   --pf-details-duration gouverne À LA FOIS la rotation de la flèche (ici) et
+   l'animation de hauteur du contenu (account-password-toggle.js, qui lit cette
+   même variable) — une seule source pour que les deux restent synchronisées. */
+.pf-account-password {
+	--pf-details-duration: .25s;
+	margin: var(--pf-space-5) 0 var(--pf-space-6);
+	padding-top: var(--pf-space-4);
+	border-top: 1px solid var(--pf-border);
+}
+
+.pf-account-password > summary {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.4em;
+	cursor: pointer;
+	font-weight: var(--pf-weight-semibold);
+	color: var(--pf-heading);
+	list-style: none;
+}
+
+.pf-account-password > summary::-webkit-details-marker {
+	display: none;
+}
+
+.pf-account-password > summary::before {
+	content: '➜';
+	transition: transform var(--pf-details-duration) ease;
+}
+
+.pf-account-password[open] > summary::before {
+	transform: rotate(90deg);
+}
+
+.pf-account-password > summary:hover {
+	color: var(--pf-accent);
+}
+
+/* Hauteur pilotée en JS (account-password-toggle.js) pendant l'animation ;
+   overflow: hidden en permanence pour que le contenu masqué ne déborde jamais. */
+.pf-account-password__body {
+	overflow: hidden;
+	box-sizing: border-box;
+	padding-top: var(--pf-space-3);
+}
+
+.pf-account-password__hint {
+	margin: 0 0 var(--pf-space-3) !important;
+	font-size: var(--pf-text-sm);
+	color: var(--pf-muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.pf-account-password > summary::before {
+		transition: none;
+	}
 }
 
 /* ─── Page « Adresses » ──────────────────────────────────────────── */

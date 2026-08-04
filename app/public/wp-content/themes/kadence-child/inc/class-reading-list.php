@@ -205,7 +205,7 @@ class Passiflore_Reading_List {
 
 	/**
 	 * Ajoute l'item « Liste de lecture » au menu du compte. Son positionnement
-	 * (juste sous « Accueil ») est fixé par pf_account_menu_reorder().
+	 * (juste après « Livres numériques ») est fixé par pf_account_menu_reorder().
 	 */
 	public function add_menu_item( $items ) {
 		$items[ self::ENDPOINT ] = 'Liste de lecture';
@@ -286,7 +286,7 @@ class Passiflore_Reading_List {
 
 	/** Message d'état vide (à la place de l'étagère). */
 	private static function empty_notice() {
-		return '<p class="pf-liste-lecture-empty">Votre liste de lecture est vide actuellement.<br>Vous pouvez <strong>mettre des marque-pages</strong> aux livres ci-dessous pour <strong>commencer à la remplir</strong>&nbsp;!</p>';
+		return '<p class="pf-liste-lecture-empty">Vous pouvez <strong>mettre des marque-pages</strong> aux livres ci-dessous pour alimenter votre liste de lecture directement.</p>';
 	}
 
 	/* ─── Réécriture ─────────────────────────────────────────────── */

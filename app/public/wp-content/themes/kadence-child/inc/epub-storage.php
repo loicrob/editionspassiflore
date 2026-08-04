@@ -1,0 +1,376 @@
+<?php
+if ( ! defined( 'ABSPATH' ) ) exit;
+
+/**
+ * Stockage protégé des fichiers ePub.
+ *
+ * Les 64 ePub du catalogue avaient été importés DANS LA MÉDIATHÈQUE : c'étaient
+ * donc des attachments publics, rangés dans `uploads/2026/05/` sous leur ISBN nu.
+ * Conséquence mesurée le 2026-07-30 : `GET /wp-json/wp/v2/media?media_type=application`
+ * (sans authentification) renvoyait les 64 fichiers avec leur `source_url`, et
+ * chaque URL répondait 200 avec le fichier complet — tout le catalogue numérique
+ * payant était téléchargeable gratuitement, en deux requêtes. Le `deny from all`
+ * de `woocommerce_uploads/` n'y changeait rien : il est Apache-only (nginx
+ * l'ignore) et 63 des 64 fichiers n'étaient de toute façon pas dans ce dossier.
+ *
+ * Ce fichier tient la partie PERMANENTE du correctif :
+ *  - le répertoire protégé et sa règle serveur (écrite par PHP, cf. plus bas) ;
+ *  - la forme portable des chemins stockés dans `_downloadable_files` ;
+ *  - le routage des FUTURS envois d'ePub vers ce répertoire ;
+ *  - l'enregistrement du répertoire dans la liste approuvée de WooCommerce.
+ *
+ * La migration des 64 fichiers existants est un événement unique par
+ * installation : elle vivait dans `tools/pf-migrate-epubs.php`, script
+ * temporaire supprimé après passage sur chaque environnement.
+ *
+ * ⚠️ La méthode de téléchargement WooCommerce DOIT rester « force »
+ * (`woocommerce_file_download_method`). Elle fait lire le fichier par PHP
+ * (`readfile_chunked()`, un `fopen()` sur un chemin disque), ce que la règle
+ * serveur n'entrave pas — une règle HTTP ne contraint pas le système de
+ * fichiers. La passer à « redirect » publierait l'URL réelle et rouvrirait la
+ * fuite instantanément.
+ */
+
+/* ═══════════════════════════════════════════════════════════════
+   Emplacement et forme des chemins
+   ═══════════════════════════════════════════════════════════════ */
+
+/**
+ * Répertoire protégé, en chemin absolu (sans slash final).
+ * Point de passage UNIQUE : déplacer le stock un jour = changer cette fonction.
+ */
+function pf_epub_dir(): string {
+	return wp_normalize_path( trailingslashit( wp_get_upload_dir()['basedir'] ) . 'pf-epub' );
+}
+
+/**
+ * Même répertoire, en chemin RACINE-RELATIF (`/wp-content/uploads/pf-epub`).
+ *
+ * C'est sous cette forme que les chemins sont stockés dans `_downloadable_files`,
+ * et c'est un choix structurant : contrairement à une URL absolue, elle survit à
+ * un changement de domaine COMME à un changement de chemin disque. Les valeurs
+ * d'origine étaient des URL absolues (`http://editions-passiflore.local/…`), donc
+ * elles ne résolvaient que sur l'hôte qui les avait écrites — ailleurs,
+ * `WC_Download_Handler::parse_file_path()` les classait « remote » et
+ * `readfile_chunked()` allait chercher le fichier par HTTP. C'est précisément ce
+ * qui aurait transformé la règle de blocage en panne totale.
+ *
+ * Forme de première classe pour WooCommerce : `parse_file_path()` et
+ * `WC_Product_Download::file_exists()` ont chacun une branche `/wp-content`
+ * explicite (vérifié dans le source, WC 10.x).
+ *
+ * Repli en chemin absolu si les uploads sortent de l'arborescence WordPress
+ * (constante `UPLOADS` exotique) — là, la portabilité n'est plus exprimable.
+ */
+function pf_epub_rel_dir(): string {
+	$dir     = pf_epub_dir();
+	$abspath = wp_normalize_path( untrailingslashit( ABSPATH ) );
+
+	return str_starts_with( $dir, $abspath . '/' ) ? substr( $dir, strlen( $abspath ) ) : $dir;
+}
+
+/** Valeur à écrire dans `_downloadable_files` pour un fichier donné. */
+function pf_epub_stored_path( string $basename ): string {
+	return pf_epub_rel_dir() . '/' . $basename;
+}
+
+/**
+ * URL du répertoire telle que la liste approuvée de WooCommerce la stocke.
+ *
+ * ⚠️ Valeur NORMALISÉE, à utiliser aussi bien pour enregistrer que pour tester
+ * l'existence : `Register::approved_directory_exists()` compare la chaîne brute
+ * sans la normaliser (vérifié — `exists('/wp-content/…/')` rend false alors que
+ * la ligne existe, `exists('file:///wp-content/…/')` rend true).
+ *
+ * Un chemin racine-relatif se normalise en `file:///wp-content/uploads/pf-epub/`,
+ * chaîne INDÉPENDANTE DE L'HÔTE : une seule ligne suffit donc, et elle reste
+ * juste après un clone de base — contrairement aux lignes que WooCommerce crée
+ * lui-même, qui embarquent le domaine ou le chemin disque.
+ */
+function pf_epub_approved_url(): string {
+	return 'file://' . trailingslashit( pf_epub_rel_dir() );
+}
+
+/**
+ * Nom de fichier à entropie : `9782379460005-a7f3k2.epub`.
+ *
+ * L'entropie est sur le NOM et non sur le répertoire. Les ISBN sont publics et
+ * imprimés sur les livres, donc un répertoire fixe + nom ISBN reste énumérable
+ * partout où la règle serveur ne s'applique pas (nginx). Un répertoire secret,
+ * lui, demanderait une option annexe à persister, fuiterait par les dumps et
+ * l'écran d'édition produit, et surtout MASQUERAIT une règle serveur mal
+ * configurée. Six caractères aléatoires dans le nom, c'est aussi la convention
+ * de WooCommerce (`woocommerce_downloads_add_hash_to_filename`).
+ */
+function pf_epub_unique_basename( string $filename ): string {
+	$name = pathinfo( $filename, PATHINFO_FILENAME );
+	$name = $name ? $name : 'livre';
+
+	return sanitize_file_name( $name . '-' . wp_generate_password( 6, false, false ) . '.epub' );
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Création du répertoire et de sa règle serveur
+   ═══════════════════════════════════════════════════════════════ */
+
+/**
+ * Crée le répertoire protégé s'il manque, avec sa règle de refus et son
+ * index muet. Idempotent : les deux fichiers ne sont écrits que s'ils sont
+ * absents (forme reprise de `WC_Install::create_files()`).
+ *
+ * ⚠️ La règle est écrite PAR PHP et non livrée par git : `uploads/` et
+ * `app/public/.htaccess` sont tous deux gitignorés (.gitignore:51,83), donc
+ * aucun fichier de protection ne peut arriver par git-ftp.
+ *
+ * ⚠️ Le `.htaccess` ne fait rien sous nginx (Local), et le bloc nginx
+ * équivalent ne fait rien sous Apache (Ionos). Sur un hôte nginx, ceci est
+ * OBLIGATOIRE dans le bloc serveur — cf. CLAUDE.md :
+ *     location ~* ^/wp-content/uploads/pf-epub/ { deny all; }
+ */
+function pf_epub_ensure_dir(): bool {
+	$dir = pf_epub_dir();
+
+	if ( ! wp_mkdir_p( $dir ) ) {
+		return false;
+	}
+
+	$files = [
+		'.htaccess'  => "# Fichiers payants : aucun accès HTTP direct.\n"
+			. "# Le téléchargement légitime passe par PHP (WooCommerce, méthode « force »)\n"
+			. "# ou par l'endpoint du lecteur, qui lisent le fichier sur le disque.\n"
+			. "<IfModule mod_authz_core.c>\n\tRequire all denied\n</IfModule>\n"
+			. "<IfModule !mod_authz_core.c>\n\tOrder allow,deny\n\tDeny from all\n</IfModule>\n"
+			. "Options -Indexes\n",
+		'index.html' => '',
+	];
+
+	foreach ( $files as $name => $contents ) {
+		$path = $dir . '/' . $name;
+		if ( ! file_exists( $path ) ) {
+			$fh = @fopen( $path, 'wb' ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
+			if ( $fh ) {
+				fwrite( $fh, $contents );
+				fclose( $fh );
+			}
+		}
+	}
+
+	return true;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Résolution d'un chemin stocké
+   ═══════════════════════════════════════════════════════════════ */
+
+/**
+ * Chemin disque réel d'une valeur de `_downloadable_files`, ou false.
+ *
+ * Délègue à `WC_Download_Handler::parse_file_path()` (donc exactement la même
+ * résolution que le téléchargement lui-même) et refuse tout ce qu'elle classe
+ * « remote » : un fichier qu'on ne sait lire que par HTTP n'est pas un fichier
+ * protégé.
+ */
+function pf_epub_resolve( string $stored ) {
+	if ( '' === $stored || ! class_exists( 'WC_Download_Handler' ) ) {
+		return false;
+	}
+
+	$parsed = WC_Download_Handler::parse_file_path( $stored );
+	if ( ! empty( $parsed['remote_file'] ) || empty( $parsed['file_path'] ) ) {
+		return false;
+	}
+
+	$real = realpath( $parsed['file_path'] );
+
+	return $real ? wp_normalize_path( $real ) : false;
+}
+
+/**
+ * Le fichier est-il DANS le répertoire protégé ?
+ *
+ * Sert de garde de traversée à l'endpoint de service du lecteur, et de test
+ * « déjà migré ? » au script de migration. Comparaison sur les chemins réels,
+ * avec le séparateur final, pour qu'un répertoire voisin dont le nom commence
+ * pareil (`pf-epub-old/`) ne passe pas.
+ */
+function pf_epub_is_protected_path( string $stored ): bool {
+	$real = pf_epub_resolve( $stored );
+	$base = realpath( pf_epub_dir() );
+
+	if ( ! $real || ! $base ) {
+		return false;
+	}
+
+	return str_starts_with( $real, wp_normalize_path( $base ) . '/' )
+		&& 'epub' === strtolower( pathinfo( $real, PATHINFO_EXTENSION ) );
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Liste des répertoires de téléchargement approuvés
+   ═══════════════════════════════════════════════════════════════ */
+
+/**
+ * Déclare le répertoire protégé auprès de WooCommerce.
+ *
+ * Indispensable, et pour un motif dont l'échec est SILENCIEUX :
+ * `wc_downloads_approved_directories_mode` vaut `enabled` sur ce site, et
+ * `WC_Product::set_downloads()` appelle `check_is_valid()` par fichier — quand
+ * la validation lève pour un download EXISTANT, WooCommerce se contente d'un
+ * `set_enabled( false )` sans le dire. Sans cette ligne, un simple clic sur
+ * « Mettre à jour » un produit numérique couperait l'accès des clients qui
+ * l'ont acheté.
+ *
+ * L'auto-ajout de WooCommerce (`approved_directory_checks()`) ne suffit pas :
+ * il n'active la ligne que si l'utilisateur qui enregistre a `manage_options`
+ * — un gestionnaire de boutique déclencherait exactement le cas ci-dessus.
+ *
+ * Pas de garde par option : l'URL étant indépendante de l'hôte, une lecture
+ * suffit, elle n'a lieu que sur les écrans d'admin, et s'en passer rend le
+ * mécanisme auto-cicatrisant (ligne supprimée à la main → re-créée).
+ */
+add_action( 'admin_init', 'pf_epub_register_approved_dir' );
+function pf_epub_register_approved_dir(): void {
+	if ( wp_doing_ajax() || ! function_exists( 'wc_get_container' ) ) {
+		return;
+	}
+
+	$class = '\Automattic\WooCommerce\Internal\ProductDownloads\ApprovedDirectories\Register';
+	if ( ! class_exists( $class ) ) {
+		return;
+	}
+
+	// Classe marquée @internal côté WooCommerce → tout est sous try/catch, et un
+	// échec ne doit jamais casser l'admin.
+	try {
+		$register = wc_get_container()->get( $class );
+
+		// Forme portable (celle que nous stockons) + forme URL, pour les chemins
+		// qui arriveraient en absolu par un import REST. La seconde embarque le
+		// domaine, comme les lignes que WooCommerce crée pour ses propres
+		// répertoires : elle est donc re-créée d'office après un changement d'hôte,
+		// puisqu'on teste chaque forme séparément.
+		$urls = [
+			pf_epub_approved_url(),
+			trailingslashit( wp_get_upload_dir()['baseurl'] ) . 'pf-epub/',
+		];
+
+		foreach ( $urls as $url ) {
+			if ( ! $register->approved_directory_exists( $url ) ) {
+				$register->add_approved_directory( $url, true );
+			}
+		}
+	} catch ( \Throwable $e ) {
+		error_log( 'pf_epub_register_approved_dir: ' . $e->getMessage() );
+	}
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Routage des FUTURS envois d'ePub
+   ═══════════════════════════════════════════════════════════════ */
+
+/**
+ * Un ePub envoyé désormais — médiathèque, panneau « Fichiers téléchargeables »
+ * d'un produit, import — atterrit dans le répertoire protégé sous un nom non
+ * devinable, au lieu de repeupler `uploads/AAAA/MM/` en accès libre.
+ *
+ * C'est ce qui rend le correctif permanent, et c'est la seule protection là où
+ * la règle serveur ne s'applique pas.
+ *
+ * Le drapeau statique porte l'information d'un filtre à l'autre : `upload_dir`
+ * est global et sans contexte, on ne peut pas y savoir quel fichier est en
+ * cours d'envoi.
+ */
+function pf_epub_upload_routing( ?bool $set = null ): bool {
+	static $routing = false;
+
+	if ( null !== $set ) {
+		$routing = $set;
+	}
+
+	return $routing;
+}
+
+add_filter( 'wp_handle_upload_prefilter', 'pf_epub_upload_prefilter' );
+function pf_epub_upload_prefilter( array $file ): array {
+	if ( 'epub' !== strtolower( pathinfo( $file['name'], PATHINFO_EXTENSION ) ) ) {
+		return $file;
+	}
+
+	if ( ! pf_epub_ensure_dir() ) {
+		return $file; // Répertoire impossible à créer : ne pas casser l'envoi.
+	}
+
+	pf_epub_upload_routing( true );
+
+	$file['name'] = pf_epub_unique_basename( $file['name'] );
+
+	return $file;
+}
+
+add_filter( 'upload_dir', 'pf_epub_upload_dir' );
+function pf_epub_upload_dir( array $dirs ): array {
+	if ( ! pf_epub_upload_routing() ) {
+		return $dirs;
+	}
+
+	$dirs['subdir'] = '/pf-epub';
+	$dirs['path']   = $dirs['basedir'] . $dirs['subdir'];
+	$dirs['url']    = $dirs['baseurl'] . $dirs['subdir'];
+
+	return $dirs;
+}
+
+/** Le drapeau ne doit pas survivre à l'envoi : `upload_dir` sert tout le site. */
+add_filter( 'wp_handle_upload', 'pf_epub_upload_done' );
+function pf_epub_upload_done( array $upload ): array {
+	pf_epub_upload_routing( false );
+
+	return $upload;
+}
+
+/**
+ * Ramène à la forme portable les chemins d'ePub soumis par l'écran produit.
+ *
+ * Le panneau « Fichiers téléchargeables » insère l'URL du média, donc une URL
+ * ABSOLUE avec le domaine — même après routage dans le répertoire protégé. Deux
+ * ennuis, tous deux différés :
+ *  1. portabilité : la valeur ne résout que sur l'hôte qui l'a écrite (c'est
+ *     exactement le défaut V1 que la migration a corrigé pour les 64 fichiers) ;
+ *  2. pire, `check_is_valid()` testerait le parent `http://domaine/…/pf-epub/`,
+ *     absent de la liste approuvée → auto-ajout, mais activé UNIQUEMENT si
+ *     l'utilisateur a `manage_options`. Un gestionnaire de boutique verrait donc
+ *     son fichier `set_enabled( false )` en silence.
+ *
+ * On réécrit donc le `$_POST` AVANT que WooCommerce ne construise ses objets
+ * (`WC_Meta_Box_Product_Data::save` est en priorité 10 sur ce hook, d'où le 5) :
+ * `prepare_downloads()` est `private static` et n'offre aucun filtre.
+ *
+ * Filet complémentaire pour les chemins qui n'entrent pas par cet écran (import
+ * REST) : `pf_epub_register_approved_dir()` déclare aussi la forme URL.
+ */
+add_action( 'woocommerce_process_product_meta', 'pf_epub_normalize_posted_paths', 5 );
+function pf_epub_normalize_posted_paths(): void {
+	foreach ( [ '_wc_file_urls', '_wc_variation_file_urls' ] as $key ) {
+		if ( ! isset( $_POST[ $key ] ) || ! is_array( $_POST[ $key ] ) ) {
+			continue;
+		}
+		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- réécriture de valeurs que WooCommerce assainit ensuite.
+		array_walk_recursive( $_POST[ $key ], 'pf_epub_normalize_posted_path' );
+	}
+}
+
+/** Une valeur de chemin : réécrite seulement si elle désigne un ePub déjà protégé. */
+function pf_epub_normalize_posted_path( &$value ): void {
+	if ( ! is_string( $value ) || '' === trim( $value ) ) {
+		return;
+	}
+
+	$candidate = wp_unslash( trim( $value ) );
+	if ( pf_epub_stored_path( basename( $candidate ) ) === $candidate ) {
+		return; // Déjà à la bonne forme.
+	}
+
+	if ( pf_epub_is_protected_path( $candidate ) ) {
+		$value = wp_slash( pf_epub_stored_path( basename( wp_parse_url( $candidate, PHP_URL_PATH ) ) ) );
+	}
+}

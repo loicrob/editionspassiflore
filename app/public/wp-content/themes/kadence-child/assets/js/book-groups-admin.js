@@ -1,71 +1,9 @@
 jQuery( document ).ready( function ( $ ) {
 	var BOOKS = Array.isArray( pfBG.books ) ? pfBG.books : [];
 
-	// Miroir JS de pf_search_normalize() (inc/search.php) : minuscules, sans
-	// accents NI ligatures (\u0153\u2192oe, \u00e6\u2192ae), ponctuation \u2192 s\u00e9parateurs.
-	function normalize( s ) {
-		return ( s == null ? '' : '' + s ).toLowerCase()
-			.replace( /\u0153/g, 'oe' ).replace( /\u00e6/g, 'ae' )
-			.normalize( 'NFD' ).replace( /[\u0300-\u036f]/g, '' )
-			.replace( /[^a-z0-9]+/g, ' ' ).trim();
-	}
-	BOOKS.forEach( function ( b ) { b._n = normalize( b.title ); } );
-
-	function lev( a, b ) {
-		var al = a.length, bl = b.length;
-		if ( ! al ) return bl;
-		if ( ! bl ) return al;
-		var prev = [], i, j;
-		for ( j = 0; j <= bl; j++ ) prev[ j ] = j;
-		for ( i = 1; i <= al; i++ ) {
-			var cur = [ i ];
-			for ( j = 1; j <= bl; j++ ) {
-				var cost = a.charAt( i - 1 ) === b.charAt( j - 1 ) ? 0 : 1;
-				cur[ j ] = Math.min( prev[ j ] + 1, cur[ j - 1 ] + 1, prev[ j - 1 ] + cost );
-			}
-			prev = cur;
-		}
-		return prev[ bl ];
-	}
-
-	function threshold( tok ) {
-		var n = tok.length;
-		if ( n < 4 ) return 0;
-		if ( n < 7 ) return 1;
-		return 2;
-	}
-
-	function tokenMatches( qt, ttoks ) {
-		var t, thr = threshold( qt );
-		for ( t = 0; t < ttoks.length; t++ ) {
-			if ( ttoks[ t ].indexOf( qt ) !== -1 ) return true;
-		}
-		if ( thr === 0 ) return false;
-		for ( t = 0; t < ttoks.length; t++ ) {
-			if ( Math.abs( ttoks[ t ].length - qt.length ) > thr ) continue;
-			if ( lev( qt, ttoks[ t ] ) <= thr ) return true;
-		}
-		return false;
-	}
-
+	// Filtre flou partagé (assets/js/book-filter.js), plafonné à 80 résultats.
 	function localFilter( q, max ) {
-		var qn     = normalize( q );
-		var tokens = qn ? qn.split( ' ' ) : [];
-		var qjoin  = qn.replace( / /g, '' );
-		var out = [];
-		for ( var i = 0; i < BOOKS.length && out.length < ( max || 80 ); i++ ) {
-			var n = BOOKS[ i ]._n, ok = true;
-			if ( qjoin && n.replace( / /g, '' ).indexOf( qjoin ) !== -1 ) {
-				out.push( BOOKS[ i ] );
-				continue;
-			}
-			var ttoks = n ? n.split( ' ' ) : [];
-			for ( var t = 0; t < tokens.length; t++ ) {
-				if ( ! tokenMatches( tokens[ t ], ttoks ) ) { ok = false; break; }
-			}
-			if ( ok ) out.push( BOOKS[ i ] );
-		}
-		return out;
+		return window.pfBookFilter( BOOKS, q, max || 80 );
 	}
 
 	// Picker de composition (séries / traductions / cibles « vous aimerez »).

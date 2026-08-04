@@ -83,10 +83,11 @@ add_action( 'admin_enqueue_scripts', function ( $hook ) {
     if ( ! in_array( $hook, [ 'post.php', 'post-new.php' ], true ) ) return;
     if ( ! isset( $post->post_type ) || $post->post_type !== 'tribe_events' ) return;
 
+    pf_enqueue_book_filter();
     wp_enqueue_script(
         'pf-book-picker',
         get_stylesheet_directory_uri() . '/assets/js/book-picker.js',
-        [ 'jquery', 'jquery-ui-sortable' ],
+        [ 'jquery', 'jquery-ui-sortable', 'pf-book-filter' ],
         filemtime( get_stylesheet_directory() . '/assets/js/book-picker.js' ),
         true
     );

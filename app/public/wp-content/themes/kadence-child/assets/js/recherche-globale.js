@@ -61,38 +61,28 @@
 		try { config = JSON.parse(root.dataset.config || '{}'); }
 		catch (e) { console.error('pf-gsearch: bad config', e); return; }
 
-		const btn         = root.querySelector('.pf-gsearch-btn');
-		const panel       = root.querySelector('.pf-gsearch-panel');
-		const input       = root.querySelector('.pf-gsearch-input');
-		const typeEl      = root.querySelector('.pf-gsearch-type');       // hidden input
-		const typeWrap    = root.querySelector('.pf-gsearch-type-wrap');
-		const typeBtn     = root.querySelector('.pf-gsearch-type-btn');
-		const typeMenu    = root.querySelector('.pf-gsearch-type-menu');
-		const typeLabel   = root.querySelector('.pf-gsearch-type-label');
-		const typeOptions = root.querySelectorAll('.pf-gsearch-type-option');
-		const closeBtn    = root.querySelector('.pf-gsearch-close');
-		const clearBtn    = root.querySelector('.pf-gsearch-clear');
-		const results     = root.querySelector('.pf-gsearch-results');
+		const btn      = root.querySelector('.pf-gsearch-btn');
+		const panel    = root.querySelector('.pf-gsearch-panel');
+		const input    = root.querySelector('.pf-gsearch-input');
+		const clearBtn = root.querySelector('.pf-gsearch-clear');
+		const results  = root.querySelector('.pf-gsearch-results');
 
 		if (!btn || !panel || !input || !results) return;
 
-		// Placeholder dépendant du type sélectionné (Tout/Livres/Auteurs/Événements),
-		// court sur mobile (≤768px) et long au-dessus. Le breakpoint suit celui du
-		// CSS (#mobile-header @media max-width:768px). L'instance desktop est
-		// masquée ≤768px, donc le swap n'y est jamais visible.
-		const placeholders = config.placeholders || {};
+		// Placeholder court sur mobile (≤768px) et long au-dessus. Le breakpoint
+		// suit celui du CSS (#mobile-header @media max-width:768px). L'instance
+		// desktop est masquée ≤768px, donc le swap n'y est jamais visible.
+		const ph   = config.placeholders || {};
 		const phMq = window.matchMedia('(max-width: 768px)');
 		function applyPlaceholder() {
-			const p = placeholders[typeEl ? typeEl.value : 'all'] || placeholders.all;
-			if (!p) return;
-			input.placeholder = phMq.matches ? p.short : p.long;
+			if (!ph.long) return;
+			input.placeholder = phMq.matches ? ph.short : ph.long;
 		}
 		applyPlaceholder();
 		phMq.addEventListener('change', applyPlaceholder);
 
-		// Déplace results et typeMenu dans <body> (contexte d'empilement racine).
+		// Déplace le panneau de résultats dans <body> (contexte d'empilement racine).
 		document.body.appendChild(results);
-		if (typeMenu) document.body.appendChild(typeMenu);
 
 		// ── Overlay ────────────────────────────────────────────────────────
 		let overlay = null;
@@ -121,12 +111,13 @@
 			removeOverlay();
 		}
 
-		// Le focus est-il encore DANS la recherche ? Le menu de type et le panneau
-		// de résultats sont déplacés dans <body> (contexte d'empilement racine) :
-		// ils sortent du root sans sortir de la recherche, un simple
-		// root.contains() les lirait à tort comme une sortie.
+		// Le focus est-il encore DANS la recherche ? Le panneau de résultats est
+		// déplacé dans <body> (contexte d'empilement racine) : il sort du root sans
+		// sortir de la recherche — et il contient des éléments focusables (les
+		// résultats eux-mêmes, et les boutons « + de résultats ») —, un simple
+		// root.contains() le lirait à tort comme une sortie.
 		function holdsFocus(el) {
-			return !!el && (root.contains(el) || (typeMenu && typeMenu.contains(el)) || results.contains(el));
+			return !!el && (root.contains(el) || results.contains(el));
 		}
 
 		// ── Tablette : le focus de la barre tient lieu d'ouverture/fermeture ──
@@ -165,14 +156,26 @@
 		// jamais posée, seuls l'overlay et le panneau de résultats existent.
 		// close() doit pouvoir s'exécuter dans ce cas (sinon un clic sur
 		// l'overlay ne fait rien), mais sans l'animation de repli du bouton.
+		// ⚠️ Garde de ré-entrance LOCALE à l'instance. Elle lisait la classe
+		// `pf-search-closing` de <body> — or il y a DEUX instances .pf-gsearch
+		// (header ordinateur + header mobile), chacune avec son close() et son
+		// écouteur Escape. Sur mobile, l'instance ordinateur (masquée, mais
+		// PREMIÈRE dans le DOM) s'exécutait d'abord, posait la classe et vidait
+		// SON panneau — vide — pendant que l'instance mobile sortait sur ce garde :
+		// son panneau, lui, gardait son contenu. Échapper puis rouvrir réaffichait
+		// donc les résultats périmés. Invisible à 1440px (l'instance visible est la
+		// première) et à 900px (barre permanente, pas de toggle → chemin finish()
+		// immédiat, qui ne pose jamais la classe).
+		let closing = false;
+
 		function close() {
-			if (document.body.classList.contains('pf-search-closing')) return;
+			if (closing) return;
 			const wasOpen = document.body.classList.contains('pf-search-open');
 			if (!wasOpen && !overlay) return;
 
 			clearTimeout(timer);
 			if (abortCtrl) { abortCtrl.abort(); abortCtrl = null; }
-			closeTypeMenu();
+			abortMore();
 			btn.blur(); // sinon la loupe garde l'état focus/actif après fermeture (le clic sur la croix laisse le focus sur le bouton)
 			// Le champ aussi : replié, il resterait focusé derrière un panneau de
 			// largeur nulle (desktop/mobile) ; et sur tablette, où le voile suit le
@@ -185,11 +188,13 @@
 			function finish() {
 				if (done) return;
 				done = true;
+				closing = false;
 				document.body.classList.remove('pf-search-open');
 				document.body.classList.remove('pf-search-closing');
 				btn.setAttribute('aria-expanded', 'false');
 				removeOverlay();
 				results.innerHTML = '';
+				renderedQuery = ''; // invariant : vidée partout où le panneau est vidé
 			}
 
 			if (!wasOpen) {
@@ -197,6 +202,7 @@
 				return;
 			}
 
+			closing = true;
 			document.body.classList.add('pf-search-closing');
 			panel.addEventListener('transitionend', function onEnd(e) {
 				if (e.propertyName === 'max-width') { panel.removeEventListener('transitionend', onEnd); finish(); }
@@ -210,60 +216,10 @@
 		if (clearBtn) clearBtn.addEventListener('click', function () {
 			input.value = '';
 			results.innerHTML = '';
+			renderedQuery = '';
+			abortMore();
 			removeOverlayIfClosed();
 			input.focus();
-		});
-
-		// ── Dropdown type ──────────────────────────────────────────────────────
-		function openTypeMenu() {
-			if (!typeMenu || !typeWrap || !typeBtn) return;
-			const rect = typeBtn.getBoundingClientRect();
-			typeMenu.style.top  = (rect.bottom + 4) + 'px';
-			typeMenu.style.left = rect.left + 'px';
-			typeMenu.classList.add('is-open');
-			typeWrap.classList.add('is-open');
-			typeBtn.setAttribute('aria-expanded', 'true');
-		}
-
-		function closeTypeMenu() {
-			if (!typeMenu || !typeWrap || !typeBtn) return;
-			typeMenu.classList.remove('is-open');
-			typeWrap.classList.remove('is-open');
-			typeBtn.setAttribute('aria-expanded', 'false');
-		}
-
-		if (typeBtn) {
-			typeBtn.addEventListener('click', function (e) {
-				e.stopPropagation();
-				typeMenu && typeMenu.classList.contains('is-open') ? closeTypeMenu() : openTypeMenu();
-			});
-		}
-
-		typeOptions.forEach(function (opt) {
-			opt.addEventListener('click', function () {
-				typeOptions.forEach(function (o) { o.classList.remove('is-selected'); });
-				opt.classList.add('is-selected');
-				if (typeEl)    typeEl.value = opt.dataset.value;
-				if (typeLabel) typeLabel.textContent = opt.textContent;
-				applyPlaceholder();
-				closeTypeMenu();
-				// Retour au champ : on vient de choisir un filtre, on repart taper.
-				// Nécessaire aussi pour le voile de tablette, qui suit le focus —
-				// le menu étant déplacé dans <body>, l'option cliquée porte le
-				// focus HORS de la barre, et sa fermeture (display:none) le
-				// renverrait sur <body>, donc hors recherche.
-				input.focus();
-				clearTimeout(timer);
-				runSearch();
-			});
-		});
-
-		document.addEventListener('click', function (e) {
-			if (typeMenu && typeMenu.classList.contains('is-open')) {
-				if (!typeWrap.contains(e.target) && !typeMenu.contains(e.target)) {
-					closeTypeMenu();
-				}
-			}
 		});
 
 		document.addEventListener('keydown', function (e) {
@@ -276,11 +232,24 @@
 		// ── Recherche AJAX ─────────────────────────────────────────────────
 		let timer     = null;
 		let abortCtrl = null;
+		let moreCtrl  = null;
+		// Requête qui a produit les résultats AFFICHÉS. C'est elle que rejoue le
+		// bouton « + de résultats », jamais input.value au moment du clic : le
+		// champ peut avoir bougé depuis (frappe en attente de débounce, collage)
+		// et le lot suivant ne se raccorderait plus au précédent.
+		// Invariant : vidée partout où results.innerHTML est vidé.
+		let renderedQuery = '';
+
+		function abortMore() {
+			if (moreCtrl) { moreCtrl.abort(); moreCtrl = null; }
+		}
 
 		function runSearch() {
 			const q = input.value.trim();
 
 			if (q.length < 2) {
+				renderedQuery = '';
+				abortMore();
 				results.innerHTML = '';
 				removeOverlayIfClosed();
 				return;
@@ -288,19 +257,20 @@
 
 			addOverlay();
 			if (abortCtrl) abortCtrl.abort();
+			abortMore(); // le panneau va être remplacé : un lot en vol n'a plus où s'insérer
 			abortCtrl = new AbortController();
 			results.classList.add('is-loading');
 
 			const fd = new FormData();
 			fd.append('action', 'pf_global_search');
 			fd.append('search', q);
-			fd.append('type',   typeEl ? typeEl.value : 'all');
 
 			fetch(config.ajax_url, { method: 'POST', body: fd, signal: abortCtrl.signal })
 				.then(function (r) { return r.json(); })
 				.then(function (payload) {
 					results.classList.remove('is-loading');
 					if (!payload || !payload.success) return;
+					renderedQuery     = q;
 					results.innerHTML = payload.data.html;
 				})
 				.catch(function (err) {
@@ -309,6 +279,155 @@
 						results.classList.remove('is-loading');
 					}
 				});
+		}
+
+		// ── « + de résultats » / « - de résultats » : lot suivant / repli d'UNE
+		// section ─────────────────────────────────────────────────────────────
+		// Écouteur DÉLÉGUÉ : results.innerHTML est remplacé en entier à chaque
+		// recherche, aucun écouteur posé sur un bouton ne survivrait.
+		results.addEventListener('click', function (e) {
+			const btnMore = e.target.closest('.pf-gsearch-more');
+			if (btnMore) { loadMore(btnMore); return; }
+			const btnLess = e.target.closest('.pf-gsearch-less');
+			if (btnLess) loadLess(btnLess);
+		});
+
+		// L'attente est rendue SUR LE BOUTON, jamais via results.is-loading : le
+		// filet d'attente partagé (style.css) est collé au bord HAUT du panneau,
+		// lequel défile avec son contenu (overflow-y:auto) — il serait invisible
+		// dès qu'on a défilé jusqu'au bouton. Même arbitrage que la recherche
+		// /evenements : l'attente se pose là où le résultat va apparaître.
+		//
+		// Pas d'attribut `disabled` pendant le vol : désactiver l'élément focusé le
+		// blure (le focus retombe sur <body>), ce qui égare un utilisateur au
+		// clavier en pleine requête. Le verrou est la classe .is-loading, doublée
+		// d'aria-disabled pour l'annoncer.
+		//
+		// « - de résultats » n'a besoin d'aucun aller-retour serveur : il MASQUE
+		// (display:none inline, jamais retiré du DOM) le dernier lot rendu
+		// visible par « + » (cf. loadLess()). Symétriquement, « + » commence par
+		// chercher un lot déjà chargé mais masqué avant d'interroger le serveur —
+		// re-cliquer + après - doit réafficher, pas re-télécharger. État par
+		// ligne .pf-gsearch-more-row (disparaît avec elle à la recherche
+		// suivante, sans nettoyage à écrire) :
+		//   pfBatches   — TOUS les lots jamais chargés pour cette section,
+		//                 dans l'ordre, chacun { nodes, offsetBefore, offsetAfter }
+		//   pfVisible   — nombre de lots, comptés depuis le début, actuellement
+		//                 affichés (pfBatches[pfVisible..] sont masqués)
+		//   pfExhausted — le DERNIER lot connu est-il la fin de la section ?
+		//                 (déterminé une seule fois, au moment de son fetch)
+		function loadMore(btnMore) {
+			if (btnMore.classList.contains('is-loading') || !renderedQuery) return;
+
+			const moreRow = btnMore.closest('.pf-gsearch-more-row');
+			if (!moreRow) return;
+			const btnLess = moreRow.querySelector('.pf-gsearch-less');
+			moreRow.pfBatches = moreRow.pfBatches || [];
+			moreRow.pfVisible  = moreRow.pfVisible  || 0;
+
+			// Un lot déjà chargé attend, masqué, d'être révélé : aucune requête.
+			if (moreRow.pfVisible < moreRow.pfBatches.length) {
+				const batch = moreRow.pfBatches[moreRow.pfVisible];
+				batch.nodes.forEach(function (node) { node.style.display = ''; });
+				moreRow.pfVisible++;
+				btnMore.dataset.offset = batch.offsetAfter;
+				if (btnLess) btnLess.hidden = false;
+				btnMore.hidden = moreRow.pfVisible === moreRow.pfBatches.length && !!moreRow.pfExhausted;
+				return;
+			}
+
+			const prevOffset = btnMore.dataset.offset || '0';
+
+			abortMore();
+			moreCtrl = new AbortController();
+			btnMore.classList.add('is-loading');
+			btnMore.setAttribute('aria-disabled', 'true');
+
+			const fd = new FormData();
+			fd.append('action',  'pf_global_search');
+			fd.append('search',  renderedQuery);
+			fd.append('section', btnMore.dataset.section || '');
+			fd.append('offset',  prevOffset);
+
+			fetch(config.ajax_url, { method: 'POST', body: fd, signal: moreCtrl.signal })
+				.then(function (r) { return r.json(); })
+				.then(function (payload) {
+					// Le panneau a pu être re-rendu entre-temps (nouvelle frappe) : ce
+					// bouton n'est alors plus dans le document et son lot n'a plus lieu
+					// d'être. Filet EN PLUS de l'abort, dont le rejet est asynchrone —
+					// une réponse déjà reçue voit son .then() s'exécuter quand même.
+					if (!btnMore.isConnected) return;
+					btnMore.classList.remove('is-loading');
+					btnMore.removeAttribute('aria-disabled');
+					if (!payload || !payload.success) return;
+
+					const data = payload.data || {};
+					moreRow.pfExhausted = !data.has_more;
+
+					if (data.html) {
+						const anchor = moreRow.previousElementSibling; // dernier item déjà en place
+						moreRow.insertAdjacentHTML('beforebegin', data.html);
+
+						// Nœuds insérés entre `anchor` (exclu) et `moreRow` (exclu) : c'est
+						// le lot que « - de résultats » devra pouvoir masquer.
+						const nodes = [];
+						let node = anchor ? anchor.nextElementSibling : moreRow.parentElement.firstElementChild;
+						while (node && node !== moreRow) { nodes.push(node); node = node.nextElementSibling; }
+
+						moreRow.pfBatches.push({ nodes: nodes, offsetBefore: prevOffset, offsetAfter: data.next_offset || prevOffset });
+						moreRow.pfVisible = moreRow.pfBatches.length;
+						if (btnLess) btnLess.hidden = false;
+					}
+
+					// L'offset du lot suivant vient du serveur : PAGE_SIZE ne vit qu'en PHP.
+					if (data.has_more && data.next_offset) {
+						btnMore.dataset.offset = data.next_offset;
+						return;
+					}
+
+					// Section épuisée : le bouton « + » se masque (jamais retiré du DOM —
+					// « - » doit pouvoir le faire réapparaître en masquant le dernier
+					// lot, qui redonne alors du répondant à « + »). S'il avait le focus
+					// (activation clavier), on le déplace sur « - » s'il est visible,
+					// sinon sur <body> n'aurait plus de sens ici.
+					const wasFocused = document.activeElement === btnMore;
+					btnMore.hidden = true;
+					if (wasFocused && btnLess && !btnLess.hidden) btnLess.focus();
+				})
+				.catch(function (err) {
+					if (err.name === 'AbortError') return;
+					console.error('pf-gsearch:', err);
+					if (btnMore.isConnected) {
+						btnMore.classList.remove('is-loading');
+						btnMore.removeAttribute('aria-disabled');
+					}
+				});
+		}
+
+		// Masque le dernier lot rendu visible par « + de résultats » (ses nœuds
+		// restent dans le DOM, cf. loadMore()) et restaure l'offset de « + » à sa
+		// valeur d'avant ce lot, pour qu'un nouveau clic sur « + » le RÉVÈLE au
+		// lieu de le re-télécharger. Ignoré si un chargement « + » est en vol sur
+		// la même ligne : le laisser se terminer d'abord évite qu'il n'écrase
+		// l'offset restauré ici avec le sien (calculé sur l'ancien état).
+		function loadLess(btnLess) {
+			const moreRow = btnLess.closest('.pf-gsearch-more-row');
+			const btnMore = moreRow ? moreRow.querySelector('.pf-gsearch-more') : null;
+			if (!moreRow || !btnMore || btnMore.classList.contains('is-loading')) return;
+
+			if (!moreRow.pfVisible) return;
+
+			moreRow.pfVisible--;
+			const batch = moreRow.pfBatches[moreRow.pfVisible];
+			batch.nodes.forEach(function (node) { node.style.display = 'none'; });
+
+			btnMore.dataset.offset = batch.offsetBefore;
+			btnMore.hidden = false; // il y a de nouveau du répondant : au moins ce lot masqué
+
+			if (!moreRow.pfVisible) {
+				btnLess.hidden = true;
+				if (document.activeElement === btnLess) btnMore.focus();
+			}
 		}
 
 		// Fermer ne vide pas l'input (cf. close()) : si une requête y est encore
@@ -326,8 +445,5 @@
 		input.addEventListener('keydown', function (e) {
 			if (e.key === 'Enter') { e.preventDefault(); clearTimeout(timer); runSearch(); }
 		});
-
-		// Le déclenchement de la recherche sur changement de type est géré
-		// directement dans le click handler des options ci-dessus.
 	}
 })();

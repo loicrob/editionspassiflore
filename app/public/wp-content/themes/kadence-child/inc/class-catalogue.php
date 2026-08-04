@@ -102,10 +102,30 @@ class Passiflore_Catalogue {
 
 		// URL query params override everything (so deep links work).
 		$atts = $this->merge_url_params( $atts );
+		// Critère puis direction non fournis dans l'URL (ni le shortcode,
+		// jamais appelé avec orderby/order explicites) → défauts contextuels,
+		// pas les statiques de default_atts() (n'ont de sens que hors
+		// Distinctions). Le critère doit se résoudre AVANT la direction : sa
+		// valeur détermine la direction naturelle. ajax_filter() n'en a pas
+		// besoin : le JS y poste toujours orderby/order explicites.
+		if ( ! isset( $_GET['tri'] ) ) {
+			$atts['orderby'] = $this->default_orderby( $atts );
+		}
+		if ( ! isset( $_GET['sens'] ) ) {
+			$atts['order'] = $this->default_order_for( sanitize_key( $atts['orderby'] ) );
+		}
 		$atts = $this->normalize_display( $atts );
 
 		wp_enqueue_style( 'pf-catalogue' );
 		wp_enqueue_script( 'pf-catalogue' );
+
+		// Infobulle « Distinctions » des étagères filtrées par
+		// distinctions. Enqueuée ICI sans condition, et pas seulement quand le
+		// filtre est déjà actif : la grille se recharge en AJAX, où un
+		// wp_enqueue_script() n'aboutit à rien (aucun wp_footer). Sans ça, le
+		// filtre « Distinctions » choisi depuis la barre injecterait des
+		// boutons sans contrôleur.
+		wp_enqueue_script( 'pf-shelf-distinctions' );
 
 		$bs            = new Passiflore_Bookshelf();
 		$counts        = $bs->get_filter_counts( $this->to_bookshelf_atts( $atts ) );
@@ -197,6 +217,32 @@ class Passiflore_Catalogue {
 			$atts['display'] = 'covers';
 		}
 		return $atts;
+	}
+
+	/**
+	 * Critère de tri silencieux (pas de chip, trigger non surligné) dans le
+	 * contexte courant : `defaut` (ordre curé) quand Distinctions est actif,
+	 * sinon `date` — le statut "par défaut" se déplace avec le filtre
+	 * Découvrir plutôt que de rester figé sur `date`.
+	 */
+	private function default_orderby( $atts ) {
+		return ( sanitize_title( $atts['decouvrir'] ) === 'distinctions' ) ? 'defaut' : 'date';
+	}
+
+	/**
+	 * Direction silencieuse d'un critère : DESC pour date/défaut (plus
+	 * récent/mis en avant en tête), ASC pour tout le reste (alphabétique,
+	 * croissant) — un DESC unique pour tous les critères n'a de sens que pour
+	 * la date.
+	 */
+	private function default_order_for( $orderby ) {
+		return in_array( $orderby, [ 'date', 'defaut' ], true ) ? 'DESC' : 'ASC';
+	}
+
+	private function is_default_sort( $atts ) {
+		$orderby = sanitize_key( $atts['orderby'] );
+		return $orderby === $this->default_orderby( $atts )
+			&& strtoupper( $atts['order'] ) === $this->default_order_for( $orderby );
 	}
 
 	private function merge_url_params( $atts ) {
@@ -481,25 +527,34 @@ class Passiflore_Catalogue {
 					<div class="pf-cat-search">
 						<svg class="pf-cat-search-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.5" y2="16.5"/></svg>
 						<input type="search" class="pf-cat-search-input"
-							placeholder="Rechercher par titre, auteur, ISBN, prix littéraire, mot-clé…"
-							data-placeholder-sm="Par titre, auteur, ISBN, prix littéraire…"
+							placeholder="Rechercher par titre, thème, auteur, ISBN, distinction…"
+							data-placeholder-sm="Par titre, thème, auteur, ISBN, distinction…"
 							value="<?php echo esc_attr( $atts['search'] ); ?>" />
 						<button type="button" class="pf-cat-search-clear" aria-label="Effacer la recherche">×</button>
 					</div>
 
-					<?php /* Sort: criterion + direction. Trigger label is always "Tri". */ ?>
+					<?php /* Sort: criterion + direction. Trigger label is always "Tri".
+					       "Par défaut" (ordre curé, Produits → Groupes de livres → Tri
+					       distinctions) est toujours rendue, en tête, masquée en CSS
+					       (.is-hidden) sauf quand Distinctions est actif — le JS la
+					       montre/cache en direct, la grille se recharge en AJAX (pas de
+					       re-rendu PHP de la barre). */ ?>
 					<div class="pf-cat-sort">
 						<?php
-						$tri_is_active = ( $atts['orderby'] !== 'date' );
+						$tri_is_active = ( $atts['orderby'] !== $this->default_orderby( $atts ) );
 						echo $this->render_dropdown( 'orderby', 'Tri', [
+							[ 'value' => 'defaut', 'label' => 'Par défaut', 'hidden' => ( sanitize_title( $atts['decouvrir'] ) !== 'distinctions' ) ],
 							[ 'value' => 'date',  'label' => 'Date de parution' ],
 							[ 'value' => 'titre', 'label' => 'Titre' ],
 							[ 'value' => 'prix',  'label' => 'Prix' ],
 							[ 'value' => 'pages', 'label' => 'Nombre de pages' ],
 						], $atts['orderby'], false, [], [], $tri_is_active );
 						?>
-						<?php $sens = strtoupper( $atts['order'] ) === 'ASC' ? 'ASC' : 'DESC'; ?>
-						<button type="button" class="pf-cat-sort-dir <?php echo $sens === 'ASC' ? 'is-active' : ''; ?>"
+						<?php
+						$sens = strtoupper( $atts['order'] ) === 'ASC' ? 'ASC' : 'DESC';
+						$dir_is_active = ( $sens !== $this->default_order_for( sanitize_key( $atts['orderby'] ) ) );
+						?>
+						<button type="button" class="pf-cat-sort-dir <?php echo $dir_is_active ? 'is-active' : ''; ?>"
 						        data-sens="<?php echo $sens; ?>"
 						        aria-label="<?php echo $sens === 'ASC' ? 'Ordre croissant' : 'Ordre décroissant'; ?>">
 							<span class="pf-cat-arrow-asc">↓</span>
@@ -535,7 +590,7 @@ class Passiflore_Catalogue {
 
 				<?php echo $this->render_dropdown( 'decouvrir', 'Découvrir', [
 					[ 'value' => 'nouveautes',       'label' => 'Nouveautés' ],
-					[ 'value' => 'prix-litteraires', 'label' => 'Prix et distinctions' ],
+					[ 'value' => 'distinctions', 'label' => 'Distinctions' ],
 					[ 'value' => 'a-paraitre',       'label' => 'À paraître' ],
 				], $atts['decouvrir'], false, $counts['decouvrir'] ?? [], $global_counts['decouvrir'] ?? [] ); ?>
 
@@ -624,6 +679,7 @@ class Passiflore_Catalogue {
 					$count         = $label_counts[ $value ] ?? null;
 					$is_sel        = in_array( $value, $selected_values, true );
 					$is_disabled   = ( $count === 0 );
+					$is_hidden     = ! empty( $opt['hidden'] );
 					$indent_style  = ! empty( $opt['indent'] ) ? 'padding-left: ' . ( 12 + 16 * (int) $opt['indent'] ) . 'px;' : '';
 				?>
 					<?php if ( $multi ) : ?>
@@ -634,7 +690,7 @@ class Passiflore_Catalogue {
 						</label>
 					<?php else : ?>
 						<button type="button" role="menuitem"
-						        class="pf-cat-option pf-dropdown__option <?php echo $is_sel ? 'is-selected' : ''; ?> <?php echo $is_disabled ? 'is-disabled' : ''; ?>"
+						        class="pf-cat-option pf-dropdown__option <?php echo $is_sel ? 'is-selected' : ''; ?> <?php echo $is_disabled ? 'is-disabled' : ''; ?> <?php echo $is_hidden ? 'is-hidden' : ''; ?>"
 						        data-value="<?php echo esc_attr( $value ); ?>"
 						        style="<?php echo esc_attr( $indent_style ); ?>"
 						        <?php echo $is_disabled ? 'disabled' : ''; ?>>
@@ -751,17 +807,17 @@ class Passiflore_Catalogue {
 		if ( $atts['decouvrir'] !== '' ) {
 			$labels = [
 				'nouveautes'       => 'Nouveautés',
-				'prix-litteraires' => 'Prix et distinctions',
+				'distinctions' => 'Distinctions',
 				'a-paraitre'       => 'À paraître',
 			];
 			$chips[] = [ 'filter' => 'decouvrir', 'value' => $atts['decouvrir'],
 			             'label'  => 'Découvrir : ' . ( $labels[ $atts['decouvrir'] ] ?? $atts['decouvrir'] ) ];
 		}
 
-		// Sort chip: only if non-default
-		$is_default_sort = ( $atts['orderby'] === 'date' && strtoupper( $atts['order'] ) === 'DESC' );
-		if ( ! $is_default_sort && $atts['search'] === '' ) {
-			$sort_labels = [ 'date' => 'Date de parution', 'titre' => 'Titre', 'prix' => 'Prix', 'pages' => 'Nombre de pages' ];
+		// Sort chip: only if non-default — le critère ET la direction "par
+		// défaut" dépendent du contexte (cf. default_orderby/default_order_for).
+		if ( ! $this->is_default_sort( $atts ) && $atts['search'] === '' ) {
+			$sort_labels = [ 'defaut' => 'Par défaut', 'date' => 'Date de parution', 'titre' => 'Titre', 'prix' => 'Prix', 'pages' => 'Nombre de pages' ];
 			// Arrows inverted: DESC = ↑, ASC = ↓ (matches the toggle button).
 			$sens        = strtoupper( $atts['order'] ) === 'ASC' ? '↓' : '↑';
 			$chips[] = [ 'filter' => 'sort', 'value' => '',
