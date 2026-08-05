@@ -338,20 +338,50 @@ function pf_epub_upload_done( array $upload ): array {
  * authentification via `wp/v2/media` (`source_url` inclus) : exactement la fuite
  * d'origine, rouverte au prochain ePub envoyé si on ne le supprime pas ici.
  *
+ * ⚠️ Suppression reportée à `shutdown`, PAS faite dans `add_attachment` lui-même :
+ * `wp_insert_attachment()` (donc `add_attachment`) tourne au milieu de
+ * `media_handle_upload()` — l'appelant (l'AJAX d'upload de la médiathèque, comme
+ * le REST `wp/v2/media`) se sert encore de l'attachment juste après pour générer
+ * ses metadata et construire la réponse JSON (`wp_prepare_attachment_for_js()`).
+ * Le supprimer immédiatement fait échouer l'envoi côté navigateur alors que le
+ * fichier, lui, est bien arrivé au bon endroit — observé le 2026-08-05. Une fois
+ * différée à `shutdown`, la réponse est déjà partie, ce qui reste ne gêne plus
+ * personne.
+ *
  * `_wp_attached_file` est déjà posée quand `add_attachment` se déclenche
  * (`update_attached_file()` tourne avant, dans `wp_insert_attachment()`) : on la
  * retire avant `wp_delete_attachment( …, true )` pour que WordPress ne supprime
  * pas le fichier qu'il vient de router — même technique, et même raison, que
  * l'étape 7 de `tools/pf-migrate-epubs.php`.
  */
-add_action( 'add_attachment', 'pf_epub_strip_attachment_record' );
-function pf_epub_strip_attachment_record( int $attachment_id ): void {
+function pf_epub_pending_attachment_ids( ?int $add = null ): array {
+	static $ids = [];
+
+	if ( null !== $add ) {
+		$ids[] = $add;
+	}
+
+	return $ids;
+}
+
+add_action( 'add_attachment', 'pf_epub_queue_attachment_strip' );
+function pf_epub_queue_attachment_strip( int $attachment_id ): void {
 	if ( 'application/epub+zip' !== get_post_mime_type( $attachment_id ) ) {
 		return;
 	}
 
-	delete_post_meta( $attachment_id, '_wp_attached_file' );
-	wp_delete_attachment( $attachment_id, true );
+	if ( ! pf_epub_pending_attachment_ids() ) {
+		add_action( 'shutdown', 'pf_epub_strip_pending_attachments' );
+	}
+
+	pf_epub_pending_attachment_ids( $attachment_id );
+}
+
+function pf_epub_strip_pending_attachments(): void {
+	foreach ( pf_epub_pending_attachment_ids() as $attachment_id ) {
+		delete_post_meta( $attachment_id, '_wp_attached_file' );
+		wp_delete_attachment( $attachment_id, true );
+	}
 }
 
 /**
