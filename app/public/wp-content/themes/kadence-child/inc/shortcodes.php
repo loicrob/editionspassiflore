@@ -133,16 +133,64 @@ add_shortcode( 'pf_frais_de_port', function () {
 
 	$rows = [];
 
-	$collect = function ( $methods, $prefix ) use ( &$rows ) {
+	/**
+	 * Boxtal Connect (méthode `boxtal_connect`, utilisée pour le point relais) ne pose
+	 * pas d'option `cost` : ses tarifs vivent dans sa propre table (`bw_pricing_items`),
+	 * en paliers prix/poids réglés depuis son propre écran de zone d'expédition. Sans
+	 * ce helper, `$method->get_option( 'cost' )` renvoie toujours vide → affiché
+	 * « Gratuit » quel que soit le tarif réellement configuré côté Boxtal.
+	 *
+	 * On ne reprend que les paliers déclenchés par un seuil de PRIX (poids ignoré : les
+	 * CGV ne détaillent pas par poids, comme le reste de ce tableau) pour rester dans le
+	 * même modèle « tarif de base + un seuil réduit » que pf_seuil/pf_cout_reduit ci-
+	 * dessous — un éventuel 3e palier de prix ne serait pas repris ici.
+	 */
+	$boxtal_tiers = function ( $method ) {
+		if ( ! class_exists( '\Boxtal\BoxtalConnectWoocommerce\Shipping_Method\Controller' ) ) return [];
+
+		$items = \Boxtal\BoxtalConnectWoocommerce\Shipping_Method\Controller::get_pricing_items(
+			$method->id . ':' . $method->instance_id
+		);
+
+		$tiers = []; // clé = seuil en chaîne (évite la troncature des clés float en int)
+		foreach ( $items as $item ) {
+			if ( ! in_array( $item['pricing'], [ 'rate', 'free' ], true ) ) continue; // palier désactivé
+
+			$from = ( null !== $item['price_from'] ) ? (float) $item['price_from'] : 0.0;
+			if ( isset( $tiers[ (string) $from ] ) ) continue; // 1er palier rencontré à ce seuil
+
+			$tiers[ (string) $from ] = [ $from, ( 'free' === $item['pricing'] ) ? '' : (string) $item['flat_rate'] ];
+		}
+
+		ksort( $tiers, SORT_NUMERIC );
+		return array_values( $tiers );
+	};
+
+	$collect = function ( $methods, $prefix ) use ( &$rows, $boxtal_tiers ) {
 		foreach ( $methods as $method ) {
 			if ( ! $method->is_enabled() ) continue;
+
+			$label = $prefix ? $prefix . ' — ' . $method->get_title() : $method->get_title();
+
+			if ( 'boxtal_connect' === $method->id ) {
+				$tiers  = $boxtal_tiers( $method );
+				$seuil  = $tiers[1][0] ?? 0.0;
+
+				$rows[] = [
+					'label'  => $label,
+					'cost'   => $tiers[0][1] ?? '',
+					'seuil'  => $seuil,
+					'reduit' => $seuil > 0 ? ( $tiers[1][1] ?? null ) : null,
+				];
+				continue;
+			}
 
 			$seuil = ( 'flat_rate' === $method->id )
 				? (float) str_replace( ',', '.', (string) $method->get_option( 'pf_seuil' ) )
 				: 0.0;
 
 			$rows[] = [
-				'label'  => $prefix ? $prefix . ' — ' . $method->get_title() : $method->get_title(),
+				'label'  => $label,
 				'cost'   => ( 'free_shipping' === $method->id ) ? '' : $method->get_option( 'cost' ),
 				'seuil'  => $seuil,
 				'reduit' => $seuil > 0 ? $method->get_option( 'pf_cout_reduit' ) : null,

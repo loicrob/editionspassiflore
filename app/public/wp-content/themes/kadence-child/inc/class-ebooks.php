@@ -81,6 +81,11 @@ class Passiflore_Ebooks {
 		// Content-Disposition ; fichier et valeur en base restent intacts.
 		add_filter( 'woocommerce_file_download_filename', [ $this, 'filter_download_filename' ], 10, 2 );
 
+		// Libellé du bouton de téléchargement (commande, email, bloc de
+		// confirmation) : titre du livre, jamais le champ « Nom du fichier » saisi
+		// en admin sur le fichier téléchargeable du produit.
+		add_filter( 'woocommerce_order_get_downloadable_items', [ $this, 'filter_downloadable_item_names' ] );
+
 		add_action( 'wp_enqueue_scripts', [ $this, 'enqueue' ], 20 );
 		add_action( 'wp_ajax_pf_epub_position', [ $this, 'ajax_save_position' ] );
 
@@ -570,6 +575,44 @@ class Passiflore_Ebooks {
 		$title = pf_format_root( $product_id );
 
 		return '' !== $title ? sanitize_file_name( $title ) . '.epub' : $filename;
+	}
+
+	/**
+	 * Libellé affiché sur `.woocommerce-MyAccount-downloads-file` (page commande,
+	 * email de commande, bloc « Téléchargements » de confirmation) :
+	 * « <titre>.<extension> », titre sans le suffixe de format — jamais le champ
+	 * « Nom du fichier » de `_downloadable_files` (saisie admin superflue,
+	 * appelée à disparaître de l'écran produit).
+	 *
+	 * Couvre tout produit téléchargeable du site, pas seulement les ePub :
+	 * `WC_Order::get_downloadable_items()` alimente les trois affichages
+	 * ci-dessus via ce même filtre, quel que soit le type de fichier.
+	 */
+	public function filter_downloadable_item_names( array $downloads ): array {
+		if ( ! function_exists( 'pf_format_root' ) ) {
+			return $downloads;
+		}
+
+		foreach ( $downloads as &$download ) {
+			$product_id = isset( $download['product_id'] ) ? (int) $download['product_id'] : 0;
+			$file       = isset( $download['file']['file'] ) ? (string) $download['file']['file'] : '';
+
+			if ( ! $product_id || '' === $file ) {
+				continue;
+			}
+
+			$ext = strtolower( pathinfo( (string) wp_parse_url( $file, PHP_URL_PATH ), PATHINFO_EXTENSION ) );
+			if ( '' === $ext ) {
+				continue;
+			}
+
+			$title = pf_format_root( $product_id );
+			if ( '' !== $title ) {
+				$download['download_name'] = $title . '.' . $ext;
+			}
+		}
+
+		return $downloads;
 	}
 
 	/**
