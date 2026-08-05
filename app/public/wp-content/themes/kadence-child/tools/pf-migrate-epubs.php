@@ -182,15 +182,25 @@ function pf_mig_process( int $product_id ): string {
 		// ── Étape 2 : déjà à l'abri ? (c'est ce test, et non un marqueur en base,
 		// qui rend le script reprenable et rejouable sans effet.)
 		if ( pf_epub_is_protected_path( $stored ) ) {
+			// Fichier déjà routé au bon endroit dès l'envoi (cf. inc/epub-storage.php)
+			// mais l'attachment créé par l'écran d'admin peut avoir survécu si ce
+			// produit a été ajouté avant le hook add_attachment de prévention — même
+			// suppression sans délier de fichier qu'à l'étape 7 plus bas.
+			$att_id = pf_mig_attachment_id( $product_id );
+			if ( $att_id ) {
+				delete_post_meta( $att_id, '_wp_attached_file' );
+				wp_delete_attachment( $att_id, true );
+			}
+
 			$portable = pf_epub_stored_path( basename( wp_parse_url( $stored, PHP_URL_PATH ) ) );
 			if ( $stored === $portable ) {
-				$notes[] = 'déjà protégé';
+				$notes[] = $att_id ? 'déjà protégé ; attachment orphelin supprimé' : 'déjà protégé';
 				continue;
 			}
 			// Bon répertoire mais forme non portable → simple réécriture.
 			$files[ $key ]['file'] = $portable;
 			$changed               = true;
-			$notes[]               = 'chemin normalisé';
+			$notes[]               = 'chemin normalisé' . ( $att_id ? ' ; attachment orphelin supprimé' : '' );
 			continue;
 		}
 

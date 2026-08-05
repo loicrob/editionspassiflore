@@ -179,7 +179,7 @@ Les 64 ePub étaient auparavant dans la médiathèque, donc listables via `/wp-j
 **⚠️ Contraintes à ne jamais lever :**
 - Sur un hôte **nginx**, le `.htaccess` est inopérant — il faut le bloc équivalent (`location ~* ^/wp-content/uploads/pf-epub/ { deny all; }`). Ionos est Apache, `.htaccess` y suffit.
 - **`woocommerce_file_download_method` doit rester `force`** (lecture par PHP `readfile_chunked()`, pas de redirect vers l'URL réelle).
-- **Ne jamais réintroduire d'ePub par la médiathèque sans passer par le routage** : `pf_epub_upload_prefilter`/`pf_epub_upload_dir` placent tout nouvel ePub dans le répertoire protégé sous nom non devinable.
+- **Ne jamais réintroduire d'ePub par la médiathèque sans passer par le routage** : `pf_epub_upload_prefilter`/`pf_epub_upload_dir` placent tout nouvel ePub dans le répertoire protégé sous nom non devinable ; `pf_epub_strip_attachment_record()` (hook `add_attachment`) supprime ensuite le post attachment lui-même — sans ce dernier, l'écran d'admin en créerait un quand même, listable via `wp/v2/media` malgré le bon emplacement du fichier (fuite découverte le 2026-08-05 sur un envoi fait avant le déploiement de ce hook).
 
 **Chemins stockés en RACINE-RELATIF** (`/wp-content/uploads/pf-epub/x.epub`), jamais en URL absolue — portable face à un changement de domaine/chemin disque (`WC_Download_Handler::parse_file_path()` a une branche `/wp-content` dédiée).
 

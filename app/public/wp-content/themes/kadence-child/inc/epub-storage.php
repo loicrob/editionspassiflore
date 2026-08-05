@@ -329,6 +329,32 @@ function pf_epub_upload_done( array $upload ): array {
 }
 
 /**
+ * Supprime l'enregistrement d'attachment de tout ePub envoyé.
+ *
+ * Le routage ci-dessus place déjà le FICHIER dans le répertoire protégé sous un
+ * nom non devinable — mais l'écran d'admin (médiathèque comme panneau « Fichiers
+ * téléchargeables ») crée toujours un post `attachment` pour ce qu'on envoie,
+ * quel que soit l'endroit où atterrissent les octets. Ce post reste listable sans
+ * authentification via `wp/v2/media` (`source_url` inclus) : exactement la fuite
+ * d'origine, rouverte au prochain ePub envoyé si on ne le supprime pas ici.
+ *
+ * `_wp_attached_file` est déjà posée quand `add_attachment` se déclenche
+ * (`update_attached_file()` tourne avant, dans `wp_insert_attachment()`) : on la
+ * retire avant `wp_delete_attachment( …, true )` pour que WordPress ne supprime
+ * pas le fichier qu'il vient de router — même technique, et même raison, que
+ * l'étape 7 de `tools/pf-migrate-epubs.php`.
+ */
+add_action( 'add_attachment', 'pf_epub_strip_attachment_record' );
+function pf_epub_strip_attachment_record( int $attachment_id ): void {
+	if ( 'application/epub+zip' !== get_post_mime_type( $attachment_id ) ) {
+		return;
+	}
+
+	delete_post_meta( $attachment_id, '_wp_attached_file' );
+	wp_delete_attachment( $attachment_id, true );
+}
+
+/**
  * Ramène à la forme portable les chemins d'ePub soumis par l'écran produit.
  *
  * Le panneau « Fichiers téléchargeables » insère l'URL du média, donc une URL
