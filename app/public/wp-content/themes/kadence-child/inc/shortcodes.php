@@ -134,6 +134,24 @@ add_shortcode( 'pf_frais_de_port', function () {
 	$rows = [];
 
 	/**
+	 * Boxtal filtre ses paliers sur le sous-total HT du panier (`contents_cost`, cf.
+	 * Shipping_Method::calculate_shipping()), alors que pf_seuil (inc/shipping.php)
+	 * compare le sous-total TTC affiché au client — un même seuil réel (35 € TTC) est
+	 * donc saisi différemment aux deux endroits (33,18 € HT côté Boxtal). Sans
+	 * conversion, ce sont deux seuils numériquement différents pour un même seuil réel
+	 * → le tableau basculerait à tort en une seule colonne. Conversion via le taux
+	 * effectivement configuré pour la classe de taxe « taux-reduit » (TVA livre à 5,5 %,
+	 * celle de la quasi-totalité du catalogue) plutôt qu'un taux recopié en dur.
+	 */
+	$ht_to_ttc = 1.0;
+	if ( class_exists( 'WC_Tax' ) ) {
+		$vat_rates = WC_Tax::get_rates_for_tax_class( 'taux-reduit' );
+		if ( $vat_rates ) {
+			$ht_to_ttc = 1 + ( (float) reset( $vat_rates )->tax_rate / 100 );
+		}
+	}
+
+	/**
 	 * Boxtal Connect (méthode `boxtal_connect`, utilisée pour le point relais) ne pose
 	 * pas d'option `cost` : ses tarifs vivent dans sa propre table (`bw_pricing_items`),
 	 * en paliers prix/poids réglés depuis son propre écran de zone d'expédition. Sans
@@ -145,21 +163,24 @@ add_shortcode( 'pf_frais_de_port', function () {
 	 * même modèle « tarif de base + un seuil réduit » que pf_seuil/pf_cout_reduit ci-
 	 * dessous — un éventuel 3e palier de prix ne serait pas repris ici.
 	 */
-	$boxtal_tiers = function ( $method ) {
+	$boxtal_tiers = function ( $method ) use ( $ht_to_ttc ) {
 		if ( ! class_exists( '\Boxtal\BoxtalConnectWoocommerce\Shipping_Method\Controller' ) ) return [];
 
 		$items = \Boxtal\BoxtalConnectWoocommerce\Shipping_Method\Controller::get_pricing_items(
 			$method->id . ':' . $method->instance_id
 		);
 
-		$tiers = []; // clé = seuil en chaîne (évite la troncature des clés float en int)
+		$tiers = []; // clé = seuil HT en chaîne (évite la troncature des clés float en int)
 		foreach ( $items as $item ) {
 			if ( ! in_array( $item['pricing'], [ 'rate', 'free' ], true ) ) continue; // palier désactivé
 
 			$from = ( null !== $item['price_from'] ) ? (float) $item['price_from'] : 0.0;
 			if ( isset( $tiers[ (string) $from ] ) ) continue; // 1er palier rencontré à ce seuil
 
-			$tiers[ (string) $from ] = [ $from, ( 'free' === $item['pricing'] ) ? '' : (string) $item['flat_rate'] ];
+			// Seuil converti en TTC (comparable à pf_seuil) ; le tarif lui-même n'a pas
+			// besoin de conversion, il est déjà affiché tel que réglé, comme les coûts
+			// des méthodes « Forfait » ci-dessous.
+			$tiers[ (string) $from ] = [ round( $from * $ht_to_ttc, 2 ), ( 'free' === $item['pricing'] ) ? '' : (string) $item['flat_rate'] ];
 		}
 
 		ksort( $tiers, SORT_NUMERIC );
