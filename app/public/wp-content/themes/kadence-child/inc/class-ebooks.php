@@ -76,6 +76,11 @@ class Passiflore_Ebooks {
 
 		add_filter( 'woocommerce_account_menu_items', [ $this, 'filter_menu_item' ] );
 
+		// Nom proposé au téléchargement : le titre du livre, pas le nom stocké sur
+		// le disque (à entropie — cf. inc/epub-storage.php). Ne change que l'en-tête
+		// Content-Disposition ; fichier et valeur en base restent intacts.
+		add_filter( 'woocommerce_file_download_filename', [ $this, 'filter_download_filename' ], 10, 2 );
+
 		add_action( 'wp_enqueue_scripts', [ $this, 'enqueue' ], 20 );
 		add_action( 'wp_ajax_pf_epub_position', [ $this, 'ajax_save_position' ] );
 
@@ -536,6 +541,35 @@ class Passiflore_Ebooks {
 			. '<button type="button" class="pf-roundbtn pf-roundbtn--outline" data-pf-epub-action="next" aria-label="Page suivante">' . $icon( $next ) . '</button>'
 			. '</nav>'
 			. '</div>';
+	}
+
+	/**
+	 * Nom de fichier proposé au navigateur : le titre du livre (sans le suffixe de
+	 * format, « (numérique) ») plutôt que le nom réel sur le disque, qui garde son
+	 * suffixe à entropie pour l'unicité et la protection contre l'énumération (cf.
+	 * inc/epub-storage.php). Ce filtre WooCommerce ne réécrit que l'en-tête
+	 * `Content-Disposition` envoyé au moment du téléchargement — le fichier
+	 * physique et `_downloadable_files` en base restent inchangés.
+	 *
+	 * Scopé à l'extension `.epub` : ce filtre s'applique à TOUT téléchargement
+	 * WooCommerce du site (extraits PDF, catalogues…), pas seulement aux ePub.
+	 *
+	 * `pf_format_root()` retire le suffixe de format à partir de l'attribut du
+	 * produit, jamais d'une liste de suffixes en dur (même fonction que le dos
+	 * fictif de l'étagère et le titre composé de l'écran produit).
+	 */
+	public function filter_download_filename( string $filename, int $product_id ): string {
+		if ( 'epub' !== strtolower( pathinfo( $filename, PATHINFO_EXTENSION ) ) ) {
+			return $filename;
+		}
+
+		if ( ! function_exists( 'pf_format_root' ) ) {
+			return $filename;
+		}
+
+		$title = pf_format_root( $product_id );
+
+		return '' !== $title ? sanitize_file_name( $title ) . '.epub' : $filename;
 	}
 
 	/**
