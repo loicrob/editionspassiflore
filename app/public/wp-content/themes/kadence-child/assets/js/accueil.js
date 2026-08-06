@@ -251,7 +251,9 @@ function initRelocateActualites( splide ) {
 // Sur grand écran (≥769px), l'encart actualités occupe la colonne droite du hero,
 // de hauteur fixe (100svh − header). Sur mobile+tablette (<769px), relogé dans
 // « En ce moment » (hauteur libre par ailleurs), même traitement pour qu'une
-// diapo ne dépasse jamais l'écran : budget = 100vh − header collant − une marge.
+// diapo ne dépasse jamais l'écran : budget = 100lvh − header collant − une marge.
+// lvh (pas vh) : évite que le budget change quand la barre d'URL mobile se
+// replie/réapparaît (window.innerHeight suit la barre, contrairement à lvh).
 // Dans les deux cas, deux problèmes, insolubles en CSS pur (circularité de
 // hauteur + effondrement des hauteurs en % dès qu'on retire les flex:1 de la
 // chaîne .pf-actualites-carousel/.splide__track, bug WebKit déjà documenté plus
@@ -293,14 +295,26 @@ function initActualiteFit( splide ) {
         return px;
     }
 
+    // 100lvh en px, même idiome que pxVar. Repli sur innerHeight si lvh n'est
+    // pas supporté (le budget redevient alors sensible à la barre d'URL, mais
+    // reste fonctionnel).
+    function pxLvh() {
+        var probe = document.createElement( 'div' );
+        probe.style.cssText = 'position:absolute;visibility:hidden;height:100lvh;width:0;';
+        document.body.appendChild( probe );
+        var px = parseFloat( getComputedStyle( probe ).height ) || window.innerHeight;
+        document.body.removeChild( probe );
+        return px;
+    }
+
     // Hauteur dispo pour l'encart :
     //   - grand écran : hauteur intérieure du slot (colonne droite du hero),
     //     STABLE (ne dépend que du viewport, pas de la taille de la carte ni de
     //     la boîte réduite du carousel) → base de mesure fiable, sans boucle de
     //     feedback ;
     //   - mobile/tablette : le slot est masqué (encart relogé dans « En ce
-    //     moment », hauteur libre par ailleurs) → 100vh − header collant − une
-    //     marge, pour la même raison de stabilité.
+    //     moment », hauteur libre par ailleurs) → 100lvh − header collant − une
+    //     marge, pour la même raison de stabilité (insensible à la barre d'URL).
     function colHeight() {
         if ( mql.matches ) {
             if ( ! slot ) return 0;
@@ -311,7 +325,7 @@ function initActualiteFit( splide ) {
         var offset = parseFloat(
             getComputedStyle( document.documentElement ).getPropertyValue( '--pf-sticky-offset' )
         ) || 0; // posé en JS (recherche-globale.js) → déjà en px
-        return window.innerHeight - offset - pxVar( '--pf-space-12' );
+        return pxLvh() - offset - pxVar( '--pf-space-12' );
     }
 
     // Ajuste UNE carte pour qu'image + légende tiennent dans cardMaxH ; si le
