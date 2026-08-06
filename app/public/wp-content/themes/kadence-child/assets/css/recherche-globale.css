@@ -164,6 +164,7 @@ body.pf-search-closing .pf-gsearch-panel {
 	border-top: 1px solid var(--pf-border-light);
 	max-height: calc(100vh - var(--pf-sticky-offset, 0px));
 	overflow-y: auto;
+	overflow-x: hidden;
 	z-index: 9998;
 	box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
 }

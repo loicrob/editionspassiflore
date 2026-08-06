@@ -1328,7 +1328,8 @@ body.admin-bar { --pf-adminbar: 32px; }
     display: inline-flex;
     align-items: center;
     gap: 0.35em;
-    padding: 0.25em 0.75em;
+    padding: 0.5em 1.125em;
+    line-height: 1rem;
     border-radius: 999px;
     font-family: var(--pf-font-body);
     font-size: 0.78rem;
@@ -1892,7 +1893,12 @@ html.pf-notices-js .wc-block-components-notices__snackbar {
    plus proche : c'est ce qui le rend pleine largeur d'écran sur /evenements
    (cf. events.css) — ne pas poser `position` sur .pf-sub-header.
    La lueur sort de sa boîte de ±100 % : le clip est assuré par l'hôte ou par
-   #wrapper (overflow: clip), jamais par une barre de défilement horizontale. ========================================================= */
+   #wrapper (overflow: clip), jamais par une barre de défilement horizontale.
+   ⚠️ Un hôte en position:fixed (cas de .pf-gsearch-results) échappe à ce clip de
+   #wrapper : il doit poser lui-même `overflow-x: hidden` explicite — un simple
+   `overflow-y: auto` sans `overflow-x` fait computer ce dernier en `auto` (jamais
+   `visible`) par la spec CSS, ce qui fait apparaître une vraie barre de défilement
+   horizontale au lieu de rogner silencieusement le débordement. ========================================================= */
 .pf-gsearch-results.is-loading::before,
 .pf-sub-header.is-loading::after {
     content: '';

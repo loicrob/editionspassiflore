@@ -124,6 +124,19 @@
 	flex-shrink: 0;
 }
 
+/* Kadence/WooCommerce mettent l'<ins> en gras (700) et le <del> à la même
+   taille que le prix seul — on veut l'inverse : le nouveau prix repris tel
+   quel (poids hérité, comme sans réduction), l'ancien réduit. !important
+   nécessaire : la règle Kadence (.woocommerce div.product p.price ins) a
+   3 classes, plus spécifique que .bs-price-row .price ins. */
+.bs-price-row .price del {
+	font-size: 0.8em;
+}
+
+.bs-price-row .price ins {
+	font-weight: inherit !important;
+}
+
 .bs-price-row .pf-numerique-offer {
 	min-width: 0;
 }

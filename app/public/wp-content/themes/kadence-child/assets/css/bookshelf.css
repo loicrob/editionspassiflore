@@ -1581,6 +1581,10 @@ img.pf-spine-icon--white {
 	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1), 0 0 0 0.5px rgba(0, 0, 0, 0.05);
 	border-radius: 1px;
 	transform: skewX(6deg);
+	/* .pf-chevalet (ancêtre) est pointer-events:none — hérité par défaut, sans
+	   ce override le survol du prix retombe sur .pf-book (:hover cascade vers
+	   l'ancêtre quel que soit le descendant visé), cf. règles :has() plus bas. */
+	pointer-events: auto;
 }
 
 /* Counter-skew pour que le texte reste droit. .woocommerce-Price-amount est
@@ -1594,6 +1598,7 @@ img.pf-spine-icon--white {
 .pf-chevalet-price del {
 	opacity: 0.5;
 	font-size: 0.85em;
+	margin-right: 0.4em;
 }
 
 .pf-chevalet-price ins {
@@ -1604,6 +1609,35 @@ img.pf-spine-icon--white {
 .pf-chevalet-price .woocommerce-Price-amount {
 	font-size: inherit;
 	color: inherit;
+}
+
+/* Le barré par défaut de <del> ne traverse pas un descendant inline-block
+   (.woocommerce-Price-amount ci-dessus) — une décoration héritée s'arrête à
+   la frontière d'une boîte inline atomique. Redéclarée directement sur le
+   span pour qu'elle s'affiche malgré le inline-block requis par le skew. */
+.pf-chevalet-price del .woocommerce-Price-amount {
+	text-decoration: line-through;
+}
+
+/* :hover cascade vers l'ancêtre .pf-book quel que soit le descendant visé —
+   survoler le prix déclenchait donc à tort l'agrandissement/l'ouverture de
+   couverture réservés à la SAISIE du livre lui-même (même neutralisation par
+   :has() que .pf-book-distinctions plus bas). */
+.pf-bookshelf--covers .pf-book:has(.pf-chevalet-price:hover) .pf-book-inner {
+	transform: none;
+	z-index: auto;
+}
+
+.pf-bookshelf--covers .pf-book:has(.pf-chevalet-price:hover) .pf-book-cover {
+	transform: none;
+}
+
+.pf-bookshelf--covers .pf-book:has(.pf-chevalet-price:hover) {
+	z-index: 2;
+}
+
+.pf-bookshelf--covers .pf-book:has(.pf-chevalet-price:hover) .pf-chevalet {
+	opacity: 1;
 }
 
 /* ─── Étiquette de disponibilité ─────────────────────────────────
