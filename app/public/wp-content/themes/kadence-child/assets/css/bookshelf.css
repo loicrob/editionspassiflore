@@ -1606,7 +1606,7 @@ img.pf-spine-icon--white {
 	color: inherit;
 }
 
-/* ─── Étiquette « À paraître » ───────────────────────────────────
+/* ─── Étiquette de disponibilité ─────────────────────────────────
    Petite étiquette posée sur le chant de la planche (le ::after de
    .pf-shelf-plank), centrée horizontalement sous le livre. Enfant de
    .pf-book : --book-h la place juste sous le pied du livre, sur le
@@ -1722,6 +1722,14 @@ img.pf-spine-icon--white {
 	background: var(--pf-surface);
 	color: var(--pf-text);
 }
+
+/* Étiquettes de disponibilité autres que « À paraître » (qui garde le fond
+   accent par défaut de .pf-book-shelf-label) : même couleur que le texte des
+   badges .bs-dispo-line correspondants sur la fiche livre, posée ici en fond
+   avec le texte blanc hérité de la règle de base. */
+.pf-book-shelf-label--info    { background: var(--pf-info); }
+.pf-book-shelf-label--warning { background: var(--pf-warning); }
+.pf-book-shelf-label--danger  { background: var(--pf-danger); }
 
 /* Si un livre de la planche porte un shelf-label sans chevalet, on lève
    TOUS les livres de 8px pour créer un espace visuel uniforme. L'ombre

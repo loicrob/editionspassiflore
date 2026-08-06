@@ -288,7 +288,7 @@ $description     = $product->get_description(); // même source que la section �
 			// libraires_url : rendu par Passiflore_Bookshelf dans .pf-shelf, sous la
 			// planche (mode hero uniquement) — rawurlencode() pour traverser le
 			// parseur de shortcode sans risque (guillemets/esperluettes de l'URL).
-			$etagere_shortcode = '[passiflore_etagere ids="' . $id . '" hero="true" nb_books_first_displayed="1" display-aparaitre="false"';
+			$etagere_shortcode = '[passiflore_etagere ids="' . $id . '" hero="true" nb_books_first_displayed="1" display-disponibilite="false"';
 			if ( $lien_libraires ) {
 				$etagere_shortcode .= ' libraires_url="' . rawurlencode( $lien_libraires ) . '"';
 			}

@@ -372,14 +372,14 @@ class Passiflore_Bookshelf {
 		// une charge HÉTÉROGÈNE par livre.
 		$this->epub_reader = filter_var( $atts['epub-reader'], FILTER_VALIDATE_BOOLEAN ) && ! $is_hero;
 
-		// Étiquettes « À paraître » / « Nouveauté » : actives par défaut.
+		// Étiquettes « Disponibilité » / « Nouveauté » : actives par défaut.
 		// Si l'une ou l'autre est désactivée, on neutralise le drapeau correspondant.
-		$show_ap  = filter_var( $atts['display-aparaitre'],  FILTER_VALIDATE_BOOLEAN );
-		$show_nv  = filter_var( $atts['display-nouveautes'], FILTER_VALIDATE_BOOLEAN );
-		if ( ! $show_ap || ! $show_nv ) {
+		$show_dispo = filter_var( $atts['display-disponibilite'], FILTER_VALIDATE_BOOLEAN );
+		$show_nv    = filter_var( $atts['display-nouveautes'],    FILTER_VALIDATE_BOOLEAN );
+		if ( ! $show_dispo || ! $show_nv ) {
 			foreach ( $books as &$b ) {
-				if ( ! $show_ap ) $b['is_aparaitre'] = false;
-				if ( ! $show_nv ) $b['is_nouveaute'] = false;
+				if ( ! $show_dispo ) $b['dispo_badge'] = null;
+				if ( ! $show_nv )    $b['is_nouveaute'] = false;
 			}
 			unset( $b );
 		}
@@ -417,7 +417,7 @@ class Passiflore_Bookshelf {
 			'mode'                     => 'shelves',   // shelves | scroll
 			'display'                  => 'covers',    // covers | spines
 			'show_price'               => 'false',
-			'display-aparaitre'        => 'true',     // étiquette « À paraître » sur le chant de la planche
+			'display-disponibilite'    => 'true',     // étiquette de disponibilité (à paraître, bientôt disponible, bientôt épuisé, épuisé) sur le chant de la planche
 			'display-nouveautes'       => 'false',    // étiquette « Nouveauté » sur le chant de la planche
 			'category'                 => '',
 			'tag'                      => '',
@@ -1199,9 +1199,10 @@ class Passiflore_Bookshelf {
 			// ni bloc pages ni couverture cartonnée → rien à extraire.
 			$cover_color = $is_ereader ? '' : self::extract_cover_color( $thumb_id );
 
-			// « À paraître » = valeur brute du champ SCF `disponibilite`
-			// (slug stocké tel quel, cf. apply_decouvrir_filter).
-			$is_aparaitre = ( 'a-paraitre' === get_post_meta( $post->ID, 'disponibilite', true ) );
+			// Étiquette de disponibilité = valeur brute du champ SCF `disponibilite`
+			// (slug stocké tel quel, cf. apply_decouvrir_filter), résolue en
+			// libellé + couleur par dispo_badge() ; null pour « disponible ».
+			$dispo_badge  = self::dispo_badge( get_post_meta( $post->ID, 'disponibilite', true ) );
 			$is_nouveaute = ( '1' === (string) get_post_meta( $post->ID, 'nouveaute', true ) );
 
 			// $format_terms déjà résolu en tête de boucle (cf. is_ereader/is_cd).
@@ -1227,7 +1228,7 @@ class Passiflore_Bookshelf {
 				'spine_w_px'   => $spine_w_px,
 				'is_ereader'   => $is_ereader,
 				'is_cd'        => $is_cd,
-				'is_aparaitre' => $is_aparaitre,
+				'dispo_badge'  => $dispo_badge,
 				'is_nouveaute' => $is_nouveaute,
 				'format_label' => $format_label,
 				'authors'      => $spine_meta[ $post->ID ]['authors'] ?? [],
@@ -1727,7 +1728,7 @@ class Passiflore_Bookshelf {
 		$classes = 'pf-book';
 		if ( $with_price ) {
 			$classes .= ' pf-book--has-price';
-		} elseif ( $display === 'covers' && ( ! empty( $b['is_aparaitre'] ) || ! empty( $b['is_nouveaute'] ) || $with_formats || $with_distinctions ) ) {
+		} elseif ( $display === 'covers' && ( ! empty( $b['dispo_badge'] ) || ! empty( $b['is_nouveaute'] ) || $with_formats || $with_distinctions ) ) {
 			$classes .= ' pf-book--has-shelf-label';
 		}
 		if ( $is_ereader ) {
@@ -1871,15 +1872,16 @@ class Passiflore_Bookshelf {
 		}
 
 		// Étiquette sur le chant de la planche, uniquement en covers.
-		// Priorité : Distinctions > À paraître > Nouveauté > Format.
+		// Priorité : Distinctions > Disponibilité > Nouveauté > Format.
 		// Les distinctions passent devant, mais l'ordre est théorique : elles ne
 		// sont résolues que sur une étagère filtrée par distinctions, qui ne peut
-		// afficher ni « À paraître » ni un format (cf. render_shortcode).
+		// afficher ni la disponibilité ni un format (cf. render_shortcode).
 		if ( $display === 'covers' ) {
 			if ( $with_distinctions ) {
 				$html .= $this->distinctions_html( $b );
-			} elseif ( ! empty( $b['is_aparaitre'] ) ) {
-				$html .= '<span class="pf-book-shelf-label">' . esc_html__( 'À paraître', 'kadence-child' ) . '</span>';
+			} elseif ( ! empty( $b['dispo_badge'] ) ) {
+				$badge_class = 'pf-book-shelf-label' . ( $b['dispo_badge']['class'] ? ' ' . $b['dispo_badge']['class'] : '' );
+				$html .= '<span class="' . esc_attr( $badge_class ) . '">' . esc_html( $b['dispo_badge']['label'] ) . '</span>';
 			} elseif ( ! empty( $b['is_nouveaute'] ) ) {
 				$html .= '<span class="pf-book-shelf-label">' . esc_html__( 'Nouveauté', 'kadence-child' ) . '</span>';
 			} elseif ( $with_formats ) {
@@ -1904,6 +1906,23 @@ class Passiflore_Bookshelf {
 		// alors que la distinction a été saisie sur une autre édition (grands
 		// caractères…) — cf. son docblock, book-single-tabs.php.
 		return function_exists( 'pf_distinction_labels_shared' ) ? pf_distinction_labels_shared( (int) $id ) : [];
+	}
+
+	/**
+	 * Libellé + couleur de l'étiquette de disponibilité — mêmes textes et
+	 * mêmes couleurs (var(--pf-accent/info/warning/danger)) que les badges
+	 * `.bs-dispo-line` de la fiche livre (woocommerce/content-single-product.php),
+	 * ici posés en fond avec texte blanc plutôt qu'en texte teinté sur fond
+	 * clair. « Disponible » n'a pas d'étiquette (état par défaut).
+	 */
+	private static function dispo_badge( $value ) {
+		$map = [
+			'a-paraitre'         => [ 'label' => 'À paraître',         'class' => '' ],
+			'bientot-disponible' => [ 'label' => 'Bientôt disponible', 'class' => 'pf-book-shelf-label--info' ],
+			'bientot-epuise'     => [ 'label' => 'Bientôt épuisé',     'class' => 'pf-book-shelf-label--warning' ],
+			'epuise'             => [ 'label' => 'Épuisé',             'class' => 'pf-book-shelf-label--danger' ],
+		];
+		return $map[ $value ] ?? null;
 	}
 
 	/**

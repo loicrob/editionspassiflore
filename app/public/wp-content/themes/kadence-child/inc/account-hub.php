@@ -58,7 +58,7 @@ function pf_account_hub_state( string $key ): string {
 			}
 			$n = count( Passiflore_Ebooks::entitled_product_ids( $user_id ) );
 
-			return $n ? esc_html( sprintf( _n( '%s livre à feuilleter', '%s livres à feuilleter', $n, 'kadence-child' ), number_format_i18n( $n ) ) ) : '';
+			return $n ? esc_html( sprintf( _n( '%s livre à lire ou télécharger', '%s livres à lire ou télécharger', $n, 'kadence-child' ), number_format_i18n( $n ) ) ) : '';
 
 		case 'liste-de-lecture':
 			if ( ! class_exists( 'Passiflore_Reading_List' ) ) {
