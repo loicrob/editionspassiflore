@@ -877,7 +877,11 @@
     padding: 0;
     gap: var(--pf-space-1);
     max-height: 130px;
-    overflow-y: scroll;
+    overflow-y: auto;
+}
+
+.pf-card--compact .pf-card-content .pf-card-text {
+    font-size: 0.7rem;
 }
 
 .tribe-events-event-image img {
