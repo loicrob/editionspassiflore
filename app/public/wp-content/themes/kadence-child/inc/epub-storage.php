@@ -430,3 +430,109 @@ function pf_epub_normalize_posted_path( &$value ): void {
 		$value = wp_slash( pf_epub_stored_path( basename( wp_parse_url( $candidate, PHP_URL_PATH ) ) ) );
 	}
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   Écran produit — panneau natif « Fichiers téléchargeables »
+   ═══════════════════════════════════════════════════════════════ */
+
+/**
+ * Deux champs du panneau natif ne collent plus au fonctionnement du site :
+ *
+ *  - « Nom » (`_wc_file_names[]`) : jamais lu. Le libellé montré au client est
+ *    toujours composé à partir du titre (`filter_downloadable_item_names()` et
+ *    `render_download_list()` dans `inc/class-ebooks.php`), ce champ n'est
+ *    consulté nulle part — masqué en entier (en-tête + cellule).
+ *  - « URL du fichier » (`_wc_file_urls[]`) : une saisie manuelle contournerait
+ *    le routage vers le répertoire protégé (cf. en-tête de ce fichier) — seule
+ *    la voie « Choisir un fichier » (upload réel, passe par
+ *    `wp_handle_upload_prefilter`) doit pouvoir la renseigner. Champ laissé
+ *    VISIBLE en lecture seule plutôt que masqué : c'est la seule façon de
+ *    retrouver, pour un livre donné, le nom à entropie du fichier sur le
+ *    disque — nécessaire pour le supprimer manuellement (plus d'attachment
+ *    listable depuis la médiathèque, cf. `pf_epub_strip_pending_attachments()`
+ *    plus haut).
+ *
+ * `readonly` (pas `disabled`) : la valeur reste sélectionnable/copiable et
+ * continue d'être postée avec le formulaire ; seule la saisie clavier est
+ * bloquée. Réappliqué après chaque clic sur « Add File » car WooCommerce
+ * ajoute cette ligne par un simple `.append()` du template HTML, sans repasser
+ * par un hook PHP.
+ *
+ * Sur une ligne qui a déjà un fichier, « Choisir un fichier » devient
+ * « Supprimer le fichier » (confirmation, puis vidage client des deux champs
+ * texte de la ligne). ⚠️ Le champ caché `_wc_file_hashes[]` n'est JAMAIS
+ * touché : c'est ce hash qui sert de `download_id` dans
+ * `wc_customer_download` (droits déjà accordés aux acheteurs). Le préserver
+ * permet — dans la MÊME sauvegarde — de choisir un fichier de remplacement
+ * pour la même ligne : au prochain enregistrement, `prepare_downloads()`
+ * (cœur WooCommerce) réutilise ce hash, et les client·es déjà ayant droit au
+ * téléchargement reçoivent le nouveau fichier sans repasser par un achat. Si
+ * le produit est enregistré alors que le champ est vide, la ligne disparaît
+ * de `_downloadable_files` et ce même hash devient orphelin : c'est la
+ * suppression réelle, d'où l'avertissement dans la confirmation.
+ */
+add_action( 'admin_enqueue_scripts', function ( $hook ) {
+	global $post;
+
+	if ( ! in_array( $hook, [ 'post.php', 'post-new.php' ], true ) ) {
+		return;
+	}
+	if ( ! ( $post instanceof WP_Post ) || 'product' !== $post->post_type ) {
+		return;
+	}
+
+	wp_add_inline_style( 'wp-admin', '
+		.downloadable_files th:nth-child(2),
+		.downloadable_files td.file_name { display: none; }
+		.downloadable_files td.file_url input { background: #f6f7f7; color: #50575e; }
+	' );
+
+	wp_enqueue_script( 'jquery' );
+	wp_add_inline_script( 'jquery', '
+		jQuery( function ( $ ) {
+			var CONFIRM_MSG = "Des client·es ont peut-être déjà acheté ce livre numérique : elles perdront l’accès à ce fichier tant qu’un nouveau fichier n’aura pas été choisi ici et le produit enregistré. Continuer ?";
+
+			function pfFileUrlInput( $row ) {
+				return $row.find( "td.file_url input" );
+			}
+
+			function pfRefreshRow( $row ) {
+				var hasFile = pfFileUrlInput( $row ).val() !== "";
+				var $btn    = $row.find( "td.file_url_choose a" );
+
+				$btn
+					.toggleClass( "upload_file_button", ! hasFile )
+					.toggleClass( "pf-delete-file-button button-link-delete", hasFile )
+					.text( hasFile ? "Supprimer le fichier" : $btn.data( "choose" ) );
+			}
+
+			function pfInitRows() {
+				$( ".downloadable_files tbody tr" ).each( function () {
+					var $row = $( this );
+					pfFileUrlInput( $row ).prop( "readonly", true );
+					pfRefreshRow( $row );
+				} );
+			}
+
+			pfInitRows();
+
+			// Nouvelle ligne (« Add File ») : toujours vide, verrou readonly seul.
+			$( document ).on( "click", ".downloadable_files a.insert", pfInitRows );
+
+			// Fichier choisi via le sélecteur média natif : la ligne redevient supprimable.
+			$( document ).on( "change", ".downloadable_files td.file_url input", function () {
+				pfRefreshRow( $( this ).closest( "tr" ) );
+			} );
+
+			$( document ).on( "click", ".pf-delete-file-button", function ( e ) {
+				e.preventDefault();
+				if ( ! window.confirm( CONFIRM_MSG ) ) {
+					return;
+				}
+				var $row = $( this ).closest( "tr" );
+				$row.find( "td.file_name input, td.file_url input" ).val( "" );
+				pfRefreshRow( $row );
+			} );
+		} );
+	' );
+} );

@@ -375,10 +375,9 @@ add_filter( 'woocommerce_terms_and_conditions_page_id', function ( $id ) {
  * versionnée en code plutôt que dans l'attribut `text` du bloc en base (contenu
  * de page non versionné, cf. tête de fichier).
  *
- * Lien Politique de confidentialité résolu par slug, même schéma que le bloc
- * newsletter (`inc/newsletter.php`) — la page y est déjà liée avec ce markup
- * exact (`target="_blank" rel="noopener"` + mention d'accessibilité), reproduit
- * ici à l'identique.
+ * Pas de mention de la politique de confidentialité ici : le RGPD (art. 13)
+ * impose que l'information soit accessible, pas qu'une case en affirme la
+ * lecture — le lien déjà présent dans le footer (`inc/newsletter.php`) suffit.
  */
 function pf_consent_cgv_texte(): string {
 	$cgv_id  = wc_terms_and_conditions_page_id();
@@ -388,14 +387,7 @@ function pf_consent_cgv_texte(): string {
 		? '<a href="' . esc_url( $cgv_url ) . '" target="_blank" rel="noopener">Conditions Générales de Vente' . pf_new_window_note() . '</a>'
 		: 'Conditions Générales de Vente';
 
-	$privacy     = get_page_by_path( 'politique-de-confidentialite' );
-	$privacy_url = $privacy ? get_permalink( $privacy ) : '';
-
-	$lien_privacy = $privacy_url
-		? '<a href="' . esc_url( $privacy_url ) . '" target="_blank" rel="noopener">Politique de confidentialité' . pf_new_window_note() . '</a>'
-		: 'Politique de confidentialité';
-
-	return 'J’accepte les ' . $lien_cgv . ' et affirme avoir lu la ' . $lien_privacy . ' pour procéder à l’achat.';
+	return 'J’accepte les ' . $lien_cgv . ' pour procéder à l’achat.';
 }
 
 /**
@@ -422,5 +414,62 @@ add_filter( 'render_block_data', function ( $parsed ) {
 	if ( 'woocommerce/checkout-additional-information-block' === ( $parsed['blockName'] ?? '' ) ) {
 		$parsed['attrs']['title'] = '';
 	}
+	return $parsed;
+} );
+
+/* ═══════════════════════════════════════════════════════════════
+   7. Ordre des blocs enfants de « checkout-fields-block »
+   ═══════════════════════════════════════════════════════════════ */
+
+/**
+ * Fige l'ordre relatif des blocs Note de commande / CGV / Informations
+ * complémentaires (celui-ci porte la case de renonciation), quel que soit
+ * l'ordre enregistré dans le contenu de la page « Commander » sur chaque
+ * environnement — même logique que le forçage d'attributs ci-dessus, le
+ * contenu de page n'étant pas versionné. Constaté : le contenu par défaut
+ * généré par WooCommerce à la création de la page place « Informations
+ * complémentaires » avant la Note de commande et les CGV
+ * (`WC_Install::get_checkout_block_content()`), alors que la page a été
+ * réordonnée manuellement en local (Note, CGV, Informations complémentaires).
+ *
+ * Ne déplace que ces trois blocs, à l'intérieur de la plage qu'ils occupent
+ * déjà — les autres enfants de checkout-fields-block (paiement express,
+ * adresses…) gardent leur position telle qu'enregistrée.
+ */
+add_filter( 'render_block_data', function ( $parsed ) {
+	if ( 'woocommerce/checkout-fields-block' !== ( $parsed['blockName'] ?? '' ) || empty( $parsed['innerBlocks'] ) ) {
+		return $parsed;
+	}
+
+	$ordre_voulu = [
+		'woocommerce/checkout-order-note-block',
+		'woocommerce/checkout-terms-block',
+		'woocommerce/checkout-additional-information-block',
+	];
+
+	$blocs = $parsed['innerBlocks'];
+
+	$emplacements = [];
+	foreach ( $blocs as $i => $bloc ) {
+		if ( in_array( $bloc['blockName'] ?? '', $ordre_voulu, true ) ) {
+			$emplacements[] = $i;
+		}
+	}
+	if ( count( $emplacements ) < 2 ) {
+		return $parsed;
+	}
+
+	$cibles = array_values( array_filter( $blocs, static function ( $bloc ) use ( $ordre_voulu ) {
+		return in_array( $bloc['blockName'] ?? '', $ordre_voulu, true );
+	} ) );
+	usort( $cibles, static function ( $a, $b ) use ( $ordre_voulu ) {
+		return array_search( $a['blockName'], $ordre_voulu, true ) <=> array_search( $b['blockName'], $ordre_voulu, true );
+	} );
+
+	foreach ( $emplacements as $j => $i ) {
+		$blocs[ $i ] = $cibles[ $j ];
+	}
+
+	$parsed['innerBlocks'] = $blocs;
 	return $parsed;
 } );
