@@ -459,8 +459,9 @@ function pf_epub_normalize_posted_path( &$value ): void {
  * par un hook PHP.
  *
  * Sur une ligne qui a déjà un fichier, « Choisir un fichier » devient
- * « Supprimer le fichier » (confirmation, puis vidage client des deux champs
- * texte de la ligne). ⚠️ Le champ caché `_wc_file_hashes[]` n'est JAMAIS
+ * « Remplacer le fichier » (confirmation, puis vidage client des deux champs
+ * texte de la ligne — ce qui fait réapparaître le bouton natif pour choisir le
+ * remplaçant). ⚠️ Le champ caché `_wc_file_hashes[]` n'est JAMAIS
  * touché : c'est ce hash qui sert de `download_id` dans
  * `wc_customer_download` (droits déjà accordés aux acheteurs). Le préserver
  * permet — dans la MÊME sauvegarde — de choisir un fichier de remplacement
@@ -490,7 +491,7 @@ add_action( 'admin_enqueue_scripts', function ( $hook ) {
 	wp_enqueue_script( 'jquery' );
 	wp_add_inline_script( 'jquery', '
 		jQuery( function ( $ ) {
-			var CONFIRM_MSG = "Des client·es ont peut-être déjà acheté ce livre numérique : elles perdront l’accès à ce fichier tant qu’un nouveau fichier n’aura pas été choisi ici et le produit enregistré. Continuer ?";
+			var CONFIRM_MSG = "Les client·es qui ont déjà acheté ce livre numérique auront accès au fichier que vous choisirez en remplacement. Si vous enregistrez sans en choisir un, elles perdront l’accès. Continuer ?";
 
 			function pfFileUrlInput( $row ) {
 				return $row.find( "td.file_url input" );
@@ -502,8 +503,8 @@ add_action( 'admin_enqueue_scripts', function ( $hook ) {
 
 				$btn
 					.toggleClass( "upload_file_button", ! hasFile )
-					.toggleClass( "pf-delete-file-button button-link-delete", hasFile )
-					.text( hasFile ? "Supprimer le fichier" : $btn.data( "choose" ) );
+					.toggleClass( "pf-replace-file-button button-link-delete", hasFile )
+					.text( hasFile ? "Remplacer le fichier" : $btn.data( "choose" ) );
 			}
 
 			function pfInitRows() {
@@ -519,12 +520,12 @@ add_action( 'admin_enqueue_scripts', function ( $hook ) {
 			// Nouvelle ligne (« Add File ») : toujours vide, verrou readonly seul.
 			$( document ).on( "click", ".downloadable_files a.insert", pfInitRows );
 
-			// Fichier choisi via le sélecteur média natif : la ligne redevient supprimable.
+			// Fichier choisi via le sélecteur média natif : la ligne redevient remplaçable.
 			$( document ).on( "change", ".downloadable_files td.file_url input", function () {
 				pfRefreshRow( $( this ).closest( "tr" ) );
 			} );
 
-			$( document ).on( "click", ".pf-delete-file-button", function ( e ) {
+			$( document ).on( "click", ".pf-replace-file-button", function ( e ) {
 				e.preventDefault();
 				if ( ! window.confirm( CONFIRM_MSG ) ) {
 					return;
