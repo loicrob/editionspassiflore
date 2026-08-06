@@ -579,8 +579,8 @@ span.bs-format-btn--active:active {
    d'un contexte hero-only : celui-ci est fit-content à la largeur du bookshelf). */
 .bs-dispo-line {
 	position: absolute;
-	top: calc(-1 * var(--pf-space-3) - 3px);
-	right: calc(-1 * var(--pf-space-3) - 3px);
+	top: calc(-1 * var(--pf-space-3) - 5px);
+	right: calc(-1 * var(--pf-space-3) + 3px);
 	z-index: 5;
 	display: flex;
 	align-items: center;
@@ -589,11 +589,20 @@ span.bs-format-btn--active:active {
 	transition: opacity var(--pf-transition);
 }
 
-/* --pf-red-soft est translucide (fond cream normalement) : opaque ici, sinon
-   la bordure de .pf-bookshelf transparaît sous le badge flottant. */
-.bs-dispo-line .pf-badge--accent {
-	background: color-mix(in srgb, var(--pf-accent) 8%, var(--pf-surface));
+/* Fond plein (couleur du texte des variantes .pf-badge de base) + texte blanc,
+   plutôt que texte teinté sur fond clair translucide — même parti pris que
+   .pf-book-shelf-label--info/--warning/--danger (bookshelf.css). */
+.bs-dispo-line .pf-badge--accent,
+.bs-dispo-line .pf-badge--info,
+.bs-dispo-line .pf-badge--warning,
+.bs-dispo-line .pf-badge--danger {
+	color: white;
 }
+
+.bs-dispo-line .pf-badge--accent  { background: var(--pf-accent); }
+.bs-dispo-line .pf-badge--info    { background: var(--pf-info); }
+.bs-dispo-line .pf-badge--warning { background: var(--pf-warning); }
+.bs-dispo-line .pf-badge--danger  { background: var(--pf-danger); }
 
 /* Masqué pendant le survol du livre (zoom/relevé de couverture) : évite le
    chevauchement visuel avec l'animation, même logique que .bs-hero__libraires

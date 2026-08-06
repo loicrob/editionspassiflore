@@ -297,10 +297,9 @@ $description     = $product->get_description(); // même source que la section �
 			?>
 			<noscript><style>.pf-bookshelf--hero .pf-book { visibility: visible; }</style></noscript>
 			<?php
-			// Priorité : À paraître > Nouveauté (même règle que l'étiquette de
-			// planche de l'étagère, class-bookshelf.php) — un livre à paraître
-			// n'affiche pas aussi « Nouveauté ».
-			$show_nouveaute = $nouveaute && $dispo_val !== 'a-paraitre';
+			// Priorité : disponibilité (hors Disponible) > Nouveauté — un livre
+			// à paraître/bientôt épuisé/épuisé… n'affiche pas aussi « Nouveauté ».
+			$show_nouveaute = $nouveaute && ! $dispo;
 			?>
 			<?php if ( $show_nouveaute || $dispo ) : ?>
 			<div class="bs-dispo-line">
