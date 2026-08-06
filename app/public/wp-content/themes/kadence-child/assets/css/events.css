@@ -880,10 +880,6 @@
     overflow-y: auto;
 }
 
-.pf-card--compact .pf-card-content .pf-card-text {
-    font-size: 0.7rem;
-}
-
 .tribe-events-event-image img {
     max-height: 500px;
     width: auto;
