@@ -588,7 +588,7 @@ h6 { font-family: var(--pf-font-body);    font-weight: var(--pf-weight-normal); 
     font-weight: var(--pf-weight-normal);
     display: inline-flex;
     flex-wrap: wrap;
-    gap: var(--pf-space-1);
+    column-gap: var(--pf-space-1);
 }
 .pf-auteur-nom-de-famille {
     font-weight: var(--pf-weight-bold);

@@ -865,7 +865,19 @@
 
 /* Variante compacte de la tuile auteur */
 .pf-card--compact {
-    width: 200px;
+    width: 170px;
+}
+
+.pf-card--compact .pf-card-title {
+    font-size: var(--pf-text-sm);
+}
+
+.pf-card--compact .pf-card-content {
+    margin: var(--pf-space-3);
+    padding: 0;
+    gap: var(--pf-space-1);
+    max-height: 130px;
+    overflow-y: scroll;
 }
 
 .tribe-events-event-image img {
@@ -1207,7 +1219,7 @@ h3:has(> .tribe-events-calendar-list__month-separator-text) {
 .pf-event-tiles-scroll {
     display: flex;
     align-items: stretch;
-    gap: var(--pf-space-6);
+    gap: var(--pf-space-3);
     padding: var(--pf-space-3);
 }
 
