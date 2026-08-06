@@ -416,26 +416,29 @@ body.tax-product_cat .entry-hero.product-hero-section {
 
 /* ─── Chips ─────────────────────────────────────────────────────── */
 
-.pf-catalogue-chips {
+.pf-catalogue-chips-scroll {
 	display: flex;
 	flex-wrap: wrap;
 	gap: var(--pf-space-2);
 	align-items: center;
 }
-/* Aucun chip → l'attribut `hidden` (PHP + JS) doit masquer le conteneur. Sa
-   valeur UA `display:none` (0,1,0) est sinon battue par `.pf-catalogue-chips`
-   (display:flex, 0,1,0) → conteneur vide qui laisse un espace. On rétablit avec
-   une spécificité supérieure (0,2,0). */
-.pf-catalogue-chips[hidden] { display: none; }
 
 @media (max-width: 1023px) {
-	.pf-catalogue-chips {
+	.pf-catalogue-chips-scroll {
 		flex-wrap: nowrap;
 		overflow-x: auto;
 		scrollbar-width: thin;
 	}
-	.pf-catalogue-chips > * { flex-shrink: 0; }
+	.pf-catalogue-chips-scroll > * { flex-shrink: 0; }
 }
+
+/* Fondu de bord gauche/droite : masque du composant global .pf-scroll-fade
+   (style.css), porté par le wrapper .pf-catalogue-chips (invariant
+   scroll-fade.js : le scroller .pf-catalogue-chips-scroll reste son unique
+   enfant direct). Même rampe que .pf-cat-row-scroll — puces étroites, un
+   fondu long en effacerait une entière. Inerte au-dessus de 1023px (le
+   scroller ne déborde plus, scroll-fade.js n'y pose jamais .is-scroll-*). */
+.pf-catalogue-chips.pf-scroll-fade { --pf-fade-size: clamp(20px, 2.3vw, 32px); }
 
 .pf-cat-chip {
 	display: inline-flex;
@@ -590,12 +593,23 @@ body.tax-product_cat .entry-hero.product-hero-section {
 }
 
 
-/* Le trigger "Autres formats" s'intègre dans le switch format sans bordure propre */
+/* Le trigger "Autres formats" s'intègre dans le switch format sans bordure propre.
+   width:100% : le fond is-active (posé sur le trigger, cf. style.css) doit couvrir
+   tout le segment comme sur les boutons voisins, pas juste la largeur du texte.
+   Grid 1fr/auto/1fr plutôt que flex+justify-content : le libellé reste centré sur
+   la largeur totale du bouton pendant que le caret se cale sur le bord droit — les
+   deux colonnes 1fr se valent quelle que soit la largeur du caret (colonne 1 vide). */
 .pf-cat-format-switch .pf-cat-dropdown { display: flex; }
 .pf-cat-format-switch .pf-cat-trigger  {
 	border: 0;
 	border-radius: 0;
+	width: 100%;
+	display: grid;
+	grid-template-columns: 1fr auto 1fr;
+	align-items: center;
 }
+.pf-cat-format-switch .pf-cat-trigger .pf-cat-label { grid-column: 2; justify-self: center; }
+.pf-cat-format-switch .pf-cat-trigger .pf-cat-caret { grid-column: 3; justify-self: end; }
 
 
 /* Non-clickable header labels in the collection dropdown default group */
@@ -961,10 +975,6 @@ body.tax-product_cat .entry-hero.product-hero-section {
 	.pf-cat-filter-panel .pf-cat-format-switch > * { flex: 1 1 auto; }
 	.pf-cat-filter-panel .pf-cat-format-btn,
 	.pf-cat-filter-panel .pf-cat-format-switch .pf-cat-trigger { font-size: 13px; }
-	/* « Autres formats » centré comme les deux autres segments : le trigger fait
-	   la largeur de son contenu → on le centre dans son segment (le dropdown est
-	   déjà display:flex) plutôt que de centrer le contenu interne du trigger. */
-	.pf-cat-filter-panel .pf-cat-format-switch .pf-cat-dropdown { justify-content: center; }
 	/* Tri : « Tri » grandit, direction accolée. */
 	.pf-cat-filter-panel .pf-cat-sort { max-width: none; margin-left: 0; }
 	.pf-cat-filter-panel .pf-cat-sort > .pf-cat-dropdown { flex: 1 1 auto; }

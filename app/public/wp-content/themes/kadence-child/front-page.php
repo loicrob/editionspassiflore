@@ -237,16 +237,22 @@ if ( function_exists( 'pf_numerique_offer_teaser' ) ) {
 
                                             <?php if ( $titre || $contenu || $lien ) : ?>
                                             <div class="pf-actualite-contenu">
-                                                <div class="pf-actualite-corps">
-                                                    <?php if ( $titre ) : ?>
-                                                    <h3 class="<?php echo esc_attr( $titre_classes ); ?>"><?php echo esc_html( $titre ); ?></h3>
-                                                    <?php endif; ?>
+                                                <?php // .pf-scroll-fade(--v) : ombres de bord haut/bas quand max-height
+                                                // (posé en JS, initActualiteFit → fitOne) rend ce bloc scrollable.
+                                                // Le scroller doit rester l'unique enfant direct du wrapper
+                                                // (invariant scroll-fade.js) → contenu déplacé dans .pf-actualite-corps-scroll. ?>
+                                                <div class="pf-actualite-corps pf-scroll-fade pf-scroll-fade--v">
+                                                    <div class="pf-actualite-corps-scroll">
+                                                        <?php if ( $titre ) : ?>
+                                                        <h3 class="<?php echo esc_attr( $titre_classes ); ?>"><?php echo esc_html( $titre ); ?></h3>
+                                                        <?php endif; ?>
 
-                                                    <?php if ( $contenu ) : ?>
-                                                    <div class="<?php echo esc_attr( $texte_classes ); ?>">
-                                                        <?php echo wp_kses_post( $contenu ); ?>
+                                                        <?php if ( $contenu ) : ?>
+                                                        <div class="<?php echo esc_attr( $texte_classes ); ?>">
+                                                            <?php echo wp_kses_post( $contenu ); ?>
+                                                        </div>
+                                                        <?php endif; ?>
                                                     </div>
-                                                    <?php endif; ?>
                                                 </div>
 
                                                 <?php if ( $lien ) : ?>

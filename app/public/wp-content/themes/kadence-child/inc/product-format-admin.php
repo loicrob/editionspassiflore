@@ -16,6 +16,15 @@
  *   (post-slug-sync @10      → dérive le permalien du titre composé)
  *   woocommerce_process_… @10→ WooCommerce vide _product_attributes (onglet masqué)
  *   save_post_product @25    → groupe, format + attribut, représentant, cascade
+ *   woocommerce_process_… @30→ format posté (terme + attribut) + Virtuel/Téléchargeable dérivés
+ *
+ * Virtuel et Téléchargeable ne sont jamais saisis à la main : ce sont deux
+ * propriétés WooCommerce distinctes en général, mais dans ce catalogue elles ne
+ * varient jamais l'une sans l'autre — seul le format numérique est virtuel ET
+ * téléchargeable, aucun autre format n'est ni l'un ni l'autre. Le bloc natif
+ * (case à cocher + sélecteur « Type de produit », jamais utile ici puisque tous
+ * les produits sont des « Produit simple ») est masqué en CSS ; sa valeur POST
+ * est donc écrasée ici plutôt que lue.
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -300,7 +309,9 @@ add_action( 'admin_enqueue_scripts', function ( $hook ) {
 	wp_enqueue_script(
 		'pf-product-format-admin',
 		get_stylesheet_directory_uri() . '/assets/js/product-format-admin.js',
-		[ 'jquery', 'pf-book-filter' ],
+		// wc-admin-product-meta-boxes doit être lié AVANT nous : on déclenche
+		// 'change' sur ses cases Virtuel/Téléchargeable, son écouteur doit déjà exister.
+		[ 'jquery', 'pf-book-filter', 'wc-admin-product-meta-boxes' ],
 		filemtime( get_stylesheet_directory() . '/assets/js/product-format-admin.js' ),
 		true
 	);
@@ -357,6 +368,8 @@ add_action( 'admin_enqueue_scripts', function ( $hook ) {
 		.pf-fmt-row .pf-fmt-label { margin:0; }
 		.pf-fmt-rename-row { margin:0 0 8px; }
 		#title[readonly] { background:#f6f7f7; color:#50575e; }
+		/* Type de produit + Virtuel/Téléchargeable : dérivés du format ci-dessus, jamais saisis à la main. */
+		#woocommerce-product-data .type_box { display:none !important; }
 	' );
 } );
 
@@ -546,7 +559,9 @@ function pf_fmt_apply_posted_format( $post_id ) {
 	if ( ! current_user_can( 'edit_post', $post_id ) ) return;
 
 	$post_id = (int) $post_id;
-	pf_fmt_apply_format( $post_id, pf_fmt_posted_format() );
+	$slug    = pf_fmt_posted_format();
+	pf_fmt_apply_format( $post_id, $slug );
+	pf_fmt_sync_virtual_downloadable( $post_id, $slug );
 	wc_delete_product_transients( $post_id );
 }
 
@@ -579,6 +594,17 @@ function pf_fmt_apply_format( int $post_id, string $slug ) {
 			'is_taxonomy'  => 1,
 		],
 	] );
+}
+
+/**
+ * Seul le format numérique est virtuel ET téléchargeable ; aucun autre format
+ * n'est ni l'un ni l'autre — écrit en direct comme pf_fmt_apply_format(), les
+ * cases natives étant masquées (`type_box`) et jamais la source de vérité.
+ */
+function pf_fmt_sync_virtual_downloadable( int $post_id, string $slug ) {
+	$value = $slug === 'numerique' ? 'yes' : 'no';
+	update_post_meta( $post_id, '_virtual', $value );
+	update_post_meta( $post_id, '_downloadable', $value );
 }
 
 /**

@@ -73,6 +73,16 @@ class Passiflore_Catalogue {
 			filemtime( $dir . '/assets/js/catalogue.js' ),
 			true
 		);
+		// Composant global .pf-scroll-fade (ombres de bord) : requis par les puces
+		// de filtres actifs (.pf-catalogue-chips) en défilement mobile. Peut déjà
+		// être enregistré par une autre page (fiche livre, etc.) — sans conséquence.
+		wp_register_script(
+			'pf-scroll-fade',
+			$uri . '/assets/js/scroll-fade.js',
+			[],
+			filemtime( $dir . '/assets/js/scroll-fade.js' ),
+			true
+		);
 	}
 
 	/* ─── Shortcode render ───────────────────────────────────────── */
@@ -118,6 +128,7 @@ class Passiflore_Catalogue {
 
 		wp_enqueue_style( 'pf-catalogue' );
 		wp_enqueue_script( 'pf-catalogue' );
+		wp_enqueue_script( 'pf-scroll-fade' );
 
 		// Infobulle « Distinctions » des étagères filtrées par
 		// distinctions. Enqueuée ICI sans condition, et pas seulement quand le
@@ -740,19 +751,26 @@ class Passiflore_Catalogue {
 		$hidden = empty( $chips ) ? 'hidden' : '';
 		ob_start();
 		?>
-		<div class="pf-catalogue-chips" <?php echo $hidden; ?>>
-			<?php foreach ( $chips as $chip ) : ?>
-				<button type="button" class="pf-cat-chip"
-				        data-filter="<?php echo esc_attr( $chip['filter'] ); ?>"
-				        data-value="<?php echo esc_attr( $chip['value'] ); ?>"
-				        aria-label="Retirer le filtre <?php echo esc_attr( $chip['label'] ); ?>">
-					<span><?php echo esc_html( $chip['label'] ); ?></span>
-					<span class="pf-cat-chip-x" aria-hidden="true">×</span>
-				</button>
-			<?php endforeach; ?>
-			<?php if ( count( $chips ) >= 2 ) : ?>
-				<button type="button" class="pf-cat-reset-all">Tout réinitialiser</button>
-			<?php endif; ?>
+		<?php /* .pf-scroll-fade : ombres de bord du défilement mobile (composant
+		       global, style.css/scroll-fade.js). Le scroller doit rester l'unique
+		       enfant direct du wrapper (invariant scroll-fade.js) → boutons déplacés
+		       dans .pf-catalogue-chips-scroll ; le [hidden] reste sur le wrapper
+		       extérieur (JS ne touche qu'à lui, cf. catalogue.js updateChips()). */ ?>
+		<div class="pf-catalogue-chips pf-scroll-fade" <?php echo $hidden; ?>>
+			<div class="pf-catalogue-chips-scroll">
+				<?php foreach ( $chips as $chip ) : ?>
+					<button type="button" class="pf-cat-chip"
+					        data-filter="<?php echo esc_attr( $chip['filter'] ); ?>"
+					        data-value="<?php echo esc_attr( $chip['value'] ); ?>"
+					        aria-label="Retirer le filtre <?php echo esc_attr( $chip['label'] ); ?>">
+						<span><?php echo esc_html( $chip['label'] ); ?></span>
+						<span class="pf-cat-chip-x" aria-hidden="true">×</span>
+					</button>
+				<?php endforeach; ?>
+				<?php if ( count( $chips ) >= 2 ) : ?>
+					<button type="button" class="pf-cat-reset-all">Tout réinitialiser</button>
+				<?php endif; ?>
+			</div>
 		</div>
 		<?php
 		return ob_get_clean();

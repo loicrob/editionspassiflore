@@ -1015,10 +1015,25 @@ Workaround: stack two pseudo-elements. ::before is the base gradient (always vis
 }
 
 /* max-height posé en JS (initActualiteFit → fitOne) quand titre+texte ne
-   tiennent pas dans le budget de la carte : ce bloc défile plutôt que
+   tiennent pas dans le budget de la carte : le bloc défile plutôt que
    d'agrandir la carte (et avec elle toute la boîte du carrousel, cf. fitAll).
-   overflow-y:auto est sans effet tant qu'aucune max-height n'est posée. */
+   .pf-actualite-corps est le wrapper .pf-scroll-fade--v (masque + ombres de
+   bord haut/bas, style.css) ; le scroll réel a lieu sur son unique enfant
+   direct .pf-actualite-corps-scroll (invariant scroll-fade.js). flex column
+   ici + flex:1/min-height:0 sur l'enfant : le pourcentage height:100% ne se
+   résoudrait pas de façon fiable contre un parent en max-height/auto, la
+   distribution flex si. overflow:hidden est sans effet tant qu'aucune
+   max-height n'est posée (la boîte suit alors le contenu de l'enfant). */
 .pf-en-ce-moment-actualites .pf-actualite-corps {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    --pf-fade-size: clamp(18px, 4vw, 32px);
+}
+
+.pf-en-ce-moment-actualites .pf-actualite-corps-scroll {
+    flex: 1 1 auto;
+    min-height: 0;
     display: flex;
     flex-direction: column;
     gap: 0.35rem;

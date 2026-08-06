@@ -1239,63 +1239,36 @@ class Passiflore_Bookshelf {
 	}
 
 	/**
-	 * Look up a physical sibling (same ISBN, `pa_format_particulier`
-	 * neither `numerique` nor `audio`) and return its dimensions in mm.
-	 * Used as a fallback for digital/audio variants that don't have their
-	 * own physical dimensions. Matches the classic edition, grands
-	 * caractères, or poche — whichever shares the ISBN.
+	 * Dimensions d'un format physique frère dans le même `format_groupe` —
+	 * le premier de l'ordre canonique des formats (pf_format_order()) hors
+	 * numérique/audio. Fallback pour un format papier dont les dimensions
+	 * WooCommerce ne sont pas renseignées (ex. grands caractères hérite du
+	 * classique).
 	 *
-	 * Cached per request, keyed by ISBN.
+	 * ⚠️ Ne pas repasser par l'ISBN : deux formats d'une même œuvre n'ont pas
+	 * le même ISBN (chaque édition a le sien — cf. pf_format_isbn()).
+	 *
+	 * Pas de cache local : pf_group_members() mémoïse déjà la requête par
+	 * groupe, le reste n'est que du filtrage en mémoire sur quelques membres.
 	 */
 	private function get_base_dimensions( $product, $unit ) {
-		static $cache = [];
+		$group_id = pf_format_group_of( $product->get_id() );
+		if ( ! $group_id ) return null;
 
-		$isbn = $product->get_meta( '_global_unique_id' );
-		if ( ! $isbn ) return null;
+		$members = pf_group_members( $group_id );
+		unset( $members[ $product->get_id() ] );
+		$physical = array_filter( $members, fn( $slug ) => ! in_array( $slug, [ 'numerique', 'audio' ], true ) );
+		$ordered  = pf_group_sort_members( $physical );
+		if ( empty( $ordered ) ) return null;
 
-		if ( array_key_exists( $isbn, $cache ) ) {
-			return $cache[ $isbn ];
-		}
-
-		$base_ids = get_posts( [
-			'post_type'      => 'product',
-			'post_status'    => 'publish',
-			'posts_per_page' => 1,
-			'fields'         => 'ids',
-			'post__not_in'   => [ $product->get_id() ],
-			'meta_query'     => [ [
-				'key'   => '_global_unique_id',
-				'value' => $isbn,
-			] ],
-			'tax_query'      => [ [
-				'taxonomy' => 'pa_format_particulier',
-				'field'    => 'slug',
-				'terms'    => [ 'numerique', 'audio' ],
-				'operator' => 'NOT IN',
-			] ],
-			'no_found_rows'  => true,
-		] );
-
-		if ( empty( $base_ids ) ) {
-			return $cache[ $isbn ] = null;
-		}
-
-		$base = wc_get_product( $base_ids[0] );
-		if ( ! $base ) {
-			return $cache[ $isbn ] = null;
-		}
+		$base = wc_get_product( $ordered[0] );
+		if ( ! $base ) return null;
 
 		$h = $this->wc_dim_to_mm( $base->get_height(), $unit );
 		$w = $this->wc_dim_to_mm( $base->get_width(), $unit );
+		if ( ! $h && ! $w ) return null;
 
-		if ( ! $h && ! $w ) {
-			return $cache[ $isbn ] = null;
-		}
-
-		return $cache[ $isbn ] = [
-			'height_mm' => $h,
-			'width_mm'  => $w,
-		];
+		return [ 'height_mm' => $h, 'width_mm' => $w ];
 	}
 
 	private function wc_dim_to_mm( $value, $unit ) {

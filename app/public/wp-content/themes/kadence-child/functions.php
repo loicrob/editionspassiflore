@@ -149,6 +149,17 @@ function passiflore_enqueue_auteurs_styles() {
             filemtime( get_stylesheet_directory() . '/assets/js/add-to-cart-flight.js' ),
             true
         );
+
+        // Désactive le bouton d'ajout au panier quand le produit vendu à
+        // l'unité (sold_individually) y est déjà — évite le rechargement de
+        // page provoqué par l'erreur WooCommerce native sur un 2e clic.
+        wp_enqueue_script(
+            'pf-add-to-cart-sold-individually',
+            get_stylesheet_directory_uri() . '/assets/js/add-to-cart-sold-individually.js',
+            [],
+            filemtime( get_stylesheet_directory() . '/assets/js/add-to-cart-sold-individually.js' ),
+            true
+        );
     }
     if ( is_page( 'auteurs' ) ) {
         wp_enqueue_style(
@@ -385,6 +396,7 @@ function passiflore_redirect_empty_cart() {
 }
 
 require_once get_stylesheet_directory() . '/inc/a11y.php';
+require_once get_stylesheet_directory() . '/inc/isbn.php';
 require_once get_stylesheet_directory() . '/inc/format-groupe.php';
 require_once get_stylesheet_directory() . '/inc/product-format-admin.php';
 require_once get_stylesheet_directory() . '/inc/author-books-grouping.php';

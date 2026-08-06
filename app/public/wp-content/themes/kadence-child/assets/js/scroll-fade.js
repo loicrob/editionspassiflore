@@ -22,7 +22,19 @@
 			var scroll = wrap.firstElementChild;
 			if ( ! scroll ) return;
 
+			// .pf-scroll-fade--v : même mécanique, sur l'axe vertical (scrollTop/
+			// clientHeight/scrollHeight) plutôt qu'horizontal.
+			var vertical = wrap.classList.contains( 'pf-scroll-fade--v' );
+
 			function update() {
+				if ( vertical ) {
+					var atTop       = scroll.scrollTop <= 1;
+					var atBottom    = scroll.scrollTop + scroll.clientHeight >= scroll.scrollHeight - 1;
+					var hasOverflowV = scroll.scrollHeight > scroll.clientHeight;
+					wrap.classList.toggle( 'is-scroll-top',    ! atTop );
+					wrap.classList.toggle( 'is-scroll-bottom', hasOverflowV && ! atBottom );
+					return;
+				}
 				var atStart     = scroll.scrollLeft <= 1;
 				var atEnd       = scroll.scrollLeft + scroll.clientWidth >= scroll.scrollWidth - 1;
 				var hasOverflow = scroll.scrollWidth > scroll.clientWidth;

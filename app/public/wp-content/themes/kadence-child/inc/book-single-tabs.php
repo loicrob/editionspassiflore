@@ -1054,14 +1054,6 @@ function passiflore_render_podcasts_section( array $items ): void {
 
 /* ─── Caractéristiques ───────────────────────────────────────── */
 
-// Formate un ISBN-13 brut (13 chiffres) en "978-2-37946-130-9". Retourne la
-// valeur telle quelle si elle ne contient pas exactement 13 chiffres.
-function passiflore_format_isbn13( string $isbn ): string {
-	$digits = preg_replace( '/\D+/', '', $isbn );
-	if ( strlen( $digits ) !== 13 ) return $isbn;
-	return substr( $digits, 0, 3 ) . '-' . substr( $digits, 3, 1 ) . '-' . substr( $digits, 4, 5 ) . '-' . substr( $digits, 9, 3 ) . '-' . substr( $digits, 12, 1 );
-}
-
 function passiflore_tab_caracteristiques() {
 	global $product;
 	$id = $product->get_id();
@@ -1092,7 +1084,7 @@ function passiflore_tab_caracteristiques() {
 
 	$rows = [];
 	if ( $isbn ) {
-		$rows[] = [ 'ISBN', passiflore_format_isbn13( $isbn ) ];
+		$rows[] = [ 'ISBN', pf_format_isbn( $isbn ) ];
 	}
 	if ( $pages ) {
 		$rows[] = [ 'Pages', $pages . ' pages' ];

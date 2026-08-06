@@ -58,6 +58,18 @@ jQuery( document ).ready( function ( $ ) {
 		$preview.text( root ? root + suffixFor( $format.val() ) : '—' );
 	}
 
+	/**
+	 * Virtuel/Téléchargeable sont dérivés côté serveur (inc/product-format-admin.php),
+	 * mais les cases natives pilotent aussi l'affichage immédiat du panneau
+	 * « Fichier téléchargeable » (JS natif WooCommerce, meta-boxes-product.js) —
+	 * on les garde donc synchronisées en direct plutôt que d'attendre l'enregistrement.
+	 */
+	function syncDownloadable() {
+		var isNumerique = $format.val() === 'numerique';
+		$( '#_virtual' ).prop( 'checked', isNumerique ).trigger( 'change' );
+		$( '#_downloadable' ).prop( 'checked', isNumerique ).trigger( 'change' );
+	}
+
 	/* ── Autres formats du livre ─────────────────────────────── */
 
 	function refreshTaken() {
@@ -196,7 +208,8 @@ jQuery( document ).ready( function ( $ ) {
 	} );
 
 	$title.on( 'input', function () { refreshPreview(); refreshWarning(); } );
-	$format.on( 'change', refreshPreview );
+	$format.on( 'change', function () { refreshPreview(); syncDownloadable(); } );
 
 	refreshState();
+	syncDownloadable();
 } );

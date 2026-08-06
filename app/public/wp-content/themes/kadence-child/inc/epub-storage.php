@@ -471,7 +471,22 @@ function pf_epub_normalize_posted_path( &$value ): void {
  * le produit est enregistré alors que le champ est vide, la ligne disparaît
  * de `_downloadable_files` et ce même hash devient orphelin : c'est la
  * suppression réelle, d'où l'avertissement dans la confirmation.
+ *
+ * Un seul ePub par produit : label au singulier (`gettext` ciblé), colonne
+ * de réordonnancement, bouton « Ajouter un fichier » et lien « Supprimer »
+ * masqués (aucun sens à plusieurs lignes, et sans bouton d'ajout un
+ * « Supprimer » viderait la table sans moyen d'y remettre une ligne avant
+ * un rechargement), une ligne toujours présente (ajoutée en JS si le
+ * produit n'a encore aucun fichier) pour que « Choisir un fichier » soit
+ * immédiatement disponible.
  */
+add_filter( 'gettext', function ( $translated, $text, $domain ) {
+	if ( 'woocommerce' === $domain && 'Downloadable files' === $text ) {
+		return __( 'Fichier téléchargeable', 'kadence-child' );
+	}
+	return $translated;
+}, 10, 3 );
+
 add_action( 'admin_enqueue_scripts', function ( $hook ) {
 	global $post;
 
@@ -485,7 +500,15 @@ add_action( 'admin_enqueue_scripts', function ( $hook ) {
 	wp_add_inline_style( 'wp-admin', '
 		.downloadable_files th:nth-child(2),
 		.downloadable_files td.file_name { display: none; }
+		.downloadable_files th.sort,
+		.downloadable_files td.sort { display: none; }
+		.downloadable_files a.insert { display: none; }
+		.downloadable_files a.delete { display: none !important; }
 		.downloadable_files td.file_url input { background: #f6f7f7; color: #50575e; }
+		._download_limit_field { display: none !important; }
+		._download_expiry_field { display: none !important; }
+		._tax_status_field { display: none !important; }
+		._tax_class_field { display: none !important; }
 	' );
 
 	wp_enqueue_script( 'jquery' );
@@ -515,10 +538,18 @@ add_action( 'admin_enqueue_scripts', function ( $hook ) {
 				} );
 			}
 
-			pfInitRows();
+			// Bouton « Add File » masqué (un seul fichier) : on relit directement son
+			// template `data-row`, plutôt que de déclencher le clic natif, pour ne pas
+			// dépendre de l’ordre de chargement entre ce script et celui de WooCommerce.
+			function pfEnsureRow() {
+				var $panel = $( ".downloadable_files" );
+				if ( $panel.find( "tbody tr" ).length === 0 ) {
+					$panel.find( "tbody" ).append( $panel.find( "a.insert" ).data( "row" ) );
+				}
+			}
 
-			// Nouvelle ligne (« Add File ») : toujours vide, verrou readonly seul.
-			$( document ).on( "click", ".downloadable_files a.insert", pfInitRows );
+			pfEnsureRow();
+			pfInitRows();
 
 			// Fichier choisi via le sélecteur média natif : la ligne redevient remplaçable.
 			$( document ).on( "change", ".downloadable_files td.file_url input", function () {
@@ -531,9 +562,112 @@ add_action( 'admin_enqueue_scripts', function ( $hook ) {
 					return;
 				}
 				var $row = $( this ).closest( "tr" );
-				$row.find( "td.file_name input, td.file_url input" ).val( "" );
+				// ⚠️ Cibler par [name], jamais par la cellule "td.file_name input" :
+				// _wc_file_hashes[] vit DANS td.file_name (cf. html-product-download.php
+				// du cœur WooCommerce), un sélecteur par cellule l’effacerait aussi et
+				// ferait générer un nouvel UUID à l’enregistrement — orphelinant les
+				// droits déjà accordés (bug constaté le 2026-08-06).
+				$row.find( "input[name=\"_wc_file_names[]\"], input[name=\"_wc_file_urls[]\"]" ).val( "" );
 				pfRefreshRow( $row );
 			} );
 		} );
 	' );
 } );
+
+/* ═══════════════════════════════════════════════════════════════
+   Autocicatrisation des droits de téléchargement
+   ═══════════════════════════════════════════════════════════════ */
+
+/**
+ * Comble, pour chaque commande valide ayant déjà acheté ce produit, les droits
+ * de téléchargement manquants pour ses fichiers ACTUELS.
+ *
+ * Le cœur WooCommerce (`wc_downloadable_product_permissions()`) n'accorde les
+ * droits qu'UNE fois, à la transition de statut de la commande, pour les
+ * fichiers du produit à CET instant précis. Deux trous en découlent :
+ *  - un livre numérique vendu en précommande, sans fichier, n'accorde alors
+ *    RIEN — même une fois l'ePub ajouté plus tard, rien ne relie la commande
+ *    passée au nouveau fichier ;
+ *  - un remplacement de fichier change le hash (`download_id`) : les droits
+ *    déjà accordés restent figés sur l'ancien, orphelins (cf. le bug corrigé
+ *    ci-dessus, constaté le 2026-08-06).
+ *
+ * Purement additif : ne retire ni ne modifie jamais une permission existante,
+ * ne fait qu'ajouter les `download_id` manquants pour les commandes qui ont
+ * réellement acheté ce produit.
+ *
+ * ⚠️ `wp_woocommerce_downloadable_product_permissions` n'a AUCUNE contrainte
+ * d'unicité (product_id, order_id, download_id) — rejouer
+ * `wc_downloadable_file_permission()` pour un couple déjà accordé créerait une
+ * ligne en double. La vérification préalable protège donc les 99% des
+ * enregistrements du produit qui ne touchent aucun fichier (prix,
+ * description…), pas seulement les remplacements d'ePub, rares.
+ */
+add_action( 'woocommerce_process_product_meta', 'pf_epub_sync_permissions_for_product', 30 );
+function pf_epub_sync_permissions_for_product( int $post_id ): void {
+	$product = wc_get_product( $post_id );
+	if ( ! $product || ! $product->is_downloadable() ) {
+		return;
+	}
+
+	$current_download_ids = array_keys( $product->get_downloads() );
+	if ( ! $current_download_ids ) {
+		return;
+	}
+
+	global $wpdb;
+
+	// Une ligne par commande ayant acheté ce produit, quel que soit son statut
+	// actuel — filtré juste après par $order->has_status().
+	//
+	// ⚠️ PAS `wp_wc_order_product_lookup` : cette table analytique n'est peuplée
+	// que de façon ASYNCHRONE (Action Scheduler, sur woocommerce_new_order) —
+	// une commande qui vient d'être créée peut y être absente pendant plusieurs
+	// minutes (constaté en test : 0 ligne immédiatement après update_status()).
+	// `wp_woocommerce_order_items`/`_itemmeta` sont écrites de façon SYNCHRONE
+	// par `$order->save()`, quel que soit l'état d'Action Scheduler.
+	$order_rows = $wpdb->get_results(
+		$wpdb->prepare(
+			"SELECT oi.order_id, SUM( CAST( oim_qty.meta_value AS UNSIGNED ) ) AS qty
+			FROM {$wpdb->prefix}woocommerce_order_items oi
+			INNER JOIN {$wpdb->prefix}woocommerce_order_itemmeta oim_pid
+				ON oim_pid.order_item_id = oi.order_item_id AND oim_pid.meta_key = '_product_id'
+			INNER JOIN {$wpdb->prefix}woocommerce_order_itemmeta oim_qty
+				ON oim_qty.order_item_id = oi.order_item_id AND oim_qty.meta_key = '_qty'
+			WHERE oim_pid.meta_value = %d
+			GROUP BY oi.order_id",
+			$post_id
+		)
+	);
+
+	if ( ! $order_rows ) {
+		return;
+	}
+
+	// Même garde que le cœur WooCommerce (wc_downloadable_product_permissions) :
+	// une commande "en cours" n'ouvre les droits que si ce réglage l'autorise.
+	$grant_on_processing = 'no' !== get_option( 'woocommerce_downloads_grant_access_after_payment' );
+
+	foreach ( $order_rows as $row ) {
+		$order = wc_get_order( (int) $row->order_id );
+		if ( ! $order || ! $order->has_status( [ 'completed', 'processing' ] ) ) {
+			continue;
+		}
+		if ( $order->has_status( 'processing' ) && ! $grant_on_processing ) {
+			continue;
+		}
+
+		$already_granted = $wpdb->get_col(
+			$wpdb->prepare(
+				"SELECT download_id FROM {$wpdb->prefix}woocommerce_downloadable_product_permissions
+				WHERE order_id = %d AND product_id = %d",
+				$order->get_id(),
+				$post_id
+			)
+		);
+
+		foreach ( array_diff( $current_download_ids, $already_granted ) as $download_id ) {
+			wc_downloadable_file_permission( $download_id, $product, $order, max( 1, (int) $row->qty ) );
+		}
+	}
+}

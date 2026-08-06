@@ -21,6 +21,18 @@
 	const FORMAT_SWITCH_SLUGS = ['grands-caracteres', 'numerique'];
 	const FORMAT_LABELS = { 'grands-caracteres': 'Grands caractères', 'numerique': 'Numérique', 'tous': 'Tous les formats', 'classique': 'Classique' };
 
+	// Résout une longueur --pf-* (rem) en pixels. getComputedStyle sur une custom
+	// property renvoie la valeur BRUTE ("1rem"), pas la valeur résolue — un
+	// élément jetable la fait résoudre (même idiome que event-single-media.js).
+	function pxVar(name) {
+		const probe = document.createElement('div');
+		probe.style.cssText = 'position:absolute;visibility:hidden;height:var(' + name + ');width:0;';
+		document.body.appendChild(probe);
+		const px = parseFloat(getComputedStyle(probe).height) || 0;
+		document.body.removeChild(probe);
+		return px;
+	}
+
 	document.querySelectorAll('.pf-catalogue').forEach(initCatalogue);
 
 	function initCatalogue(root) {
@@ -99,10 +111,16 @@
 		const panelBody      = filterPanel ? filterPanel.querySelector('.pf-cat-filter-panel__body') : null;
 		const filterCount    = filterTrigger ? filterTrigger.querySelector('.pf-cat-filter-count') : null;
 		const panelApply     = filterPanel ? filterPanel.querySelector('.pf-cat-panel-apply') : null;
+		// Instantané de l'état à l'ouverture du panneau — restauré par
+		// cancelPanel() (croix/fond/Échap) si le panneau se ferme sans passer
+		// par « Voir les résultats » : rien n'est committé pendant l'édition,
+		// donc annuler n'a besoin que de revenir à cet état.
+		let panelSnapshot    = null;
 
-		// Compteur « N résultats » sur le bouton du panneau (les filtres sont
-		// appliqués en direct → il se met à jour à chaque réponse AJAX). Même règle
-		// de pluriel FR que le rendu PHP (results_label).
+		// Compteur « N résultats » sur le bouton du panneau — aperçu recalculé à
+		// chaque réponse AJAX même pendant l'édition différée (cf. fetchAndUpdate),
+		// pour que le bouton annonce le bon total avant même de committer. Même
+		// règle de pluriel FR que le rendu PHP (results_label).
 		function updateResultCount(total) {
 			if (!panelApply || total == null) return;
 			const n = parseInt(total, 10) || 0;
@@ -147,10 +165,11 @@
 			}
 		}
 		placeControls();
-		mqDesktop.addEventListener('change', () => { placeControls(); closePanel(); });
+		mqDesktop.addEventListener('change', () => { placeControls(); commitPanel(); });
 
 		function openPanel() {
 			if (!filterPanel) return;
+			panelSnapshot = Object.assign({}, state);
 			filterPanel.classList.add('is-open');
 			if (filterBackdrop) filterBackdrop.classList.add('is-open');
 			if (filterTrigger) filterTrigger.setAttribute('aria-expanded', 'true');
@@ -164,17 +183,69 @@
 			document.body.style.overflow = '';
 			closeAllDropdowns();
 		}
+
+		// Le panneau mobile édite l'état en différé (cf. setFilters) : rien
+		// n'est appliqué à la grille/URL tant que ces deux fonctions n'ont pas
+		// tranché entre commit et annulation.
+		function isPanelDeferring() {
+			return !!(filterPanel && filterPanel.classList.contains('is-open'));
+		}
+		// Compare à l'instantané d'ouverture — si rien n'a bougé, commit/annulation
+		// n'ont ni requête ni re-rendu à faire (évite la barre de chargement au
+		// simple aller-retour ouvrir/fermer le panneau sans y toucher).
+		function panelChanged() {
+			if (!panelSnapshot) return false;
+			const keys = new Set([...Object.keys(state), ...Object.keys(panelSnapshot)]);
+			for (const k of keys) { if ((state[k] ?? '') !== (panelSnapshot[k] ?? '')) return true; }
+			return false;
+		}
+		// « Voir les résultats » — ou croisement du seuil desktop en cours
+		// d'édition (le mode desktop n'a pas de notion d'annulation, on
+		// applique donc plutôt que d'abandonner silencieusement le choix).
+		function commitPanel() {
+			if (!isPanelDeferring()) return;
+			const changed = panelChanged();
+			panelSnapshot = null;
+			closePanel();
+			if (!changed) return;
+			syncUrl();
+			fetchAndUpdate(false);
+		}
+		// Croix / fond / Échap — restaure l'état au moment de l'ouverture. Les
+		// aperçus (compteurs, « N résultats ») affichés pendant l'édition n'ont
+		// jamais touché la grille/URL ; on les recharge simplement sur l'état
+		// restauré pour qu'ils redeviennent exacts.
+		function cancelPanel() {
+			if (!isPanelDeferring()) { closePanel(); return; }
+			const changed = panelChanged();
+			if (panelSnapshot) {
+				Object.keys(state).forEach(k => delete state[k]);
+				Object.assign(state, panelSnapshot);
+				panelSnapshot = null;
+			}
+			closePanel();
+			if (!changed) return;
+			root.querySelectorAll('.pf-cat-dropdown').forEach(dd => {
+				const f = dd.dataset.filter;
+				if (f === '_pdf' || f === 'category') return;
+				setSelectedInDropdown(dd, state[f] || '', dd.dataset.multi === 'true');
+			});
+			if (searchInput) { searchInput.value = state.search || ''; refreshSearchState(); }
+			syncControlsUI();
+			fetchAndUpdate(true);
+		}
+
 		if (filterTrigger) {
 			filterTrigger.addEventListener('click', () => {
-				if (filterPanel && filterPanel.classList.contains('is-open')) closePanel();
+				if (filterPanel && filterPanel.classList.contains('is-open')) cancelPanel();
 				else openPanel();
 			});
 		}
-		if (filterBackdrop) filterBackdrop.addEventListener('click', closePanel);
+		if (filterBackdrop) filterBackdrop.addEventListener('click', cancelPanel);
 		if (filterPanel) {
 			const closeBtn = filterPanel.querySelector('.pf-cat-filter-close');
-			if (closeBtn) closeBtn.addEventListener('click', closePanel);
-			if (panelApply) panelApply.addEventListener('click', closePanel);
+			if (closeBtn) closeBtn.addEventListener('click', cancelPanel);
+			if (panelApply) panelApply.addEventListener('click', commitPanel);
 			const panelReset = filterPanel.querySelector('.pf-cat-panel-reset');
 			if (panelReset) panelReset.addEventListener('click', resetAll);
 		}
@@ -252,7 +323,7 @@
 			closeAllDropdowns();
 		}, true);
 
-		document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeAllDropdowns(); closePanel(); } });
+		document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeAllDropdowns(); cancelPanel(); } });
 		window.addEventListener('scroll', closeAllDropdowns, { passive: true });
 		window.addEventListener('resize', closeAllDropdowns);
 
@@ -268,12 +339,31 @@
 		}
 
 		function positionMenu(menu, trigger) {
+			const margin = pxVar('--pf-space-4');
 			const r = trigger.getBoundingClientRect();
-			const menuW = Math.min(menu.scrollWidth, 320);
+			// Plancher = largeur du trigger (ex. triggers pleine largeur du panneau
+			// filtres) — l'emporte sur le max-width CSS de .pf-cat-menu si besoin, min-width
+			// étant prioritaire sur max-width en cas de conflit. Mesuré APRÈS coup (offsetWidth)
+			// pour que le calcul horizontal ci-dessous reflète la largeur réellement rendue.
+			menu.style.minWidth = r.width + 'px';
+			const menuW = menu.offsetWidth;
+			const menuH = menu.offsetHeight;
+
 			let left = r.left;
-			const maxLeft = window.innerWidth - menuW - 8;
-			if (left > maxLeft) left = Math.max(8, maxLeft);
-			menu.style.top  = (r.bottom + 4) + 'px';
+			const maxLeft = window.innerWidth - menuW - margin;
+			if (left > maxLeft) left = Math.max(margin, maxLeft);
+
+			// Pas la place en dessous → au-dessus du trigger plutôt que remonté
+			// (et donc partiellement superposé au bouton) en restant "en dessous".
+			let top;
+			const fitsBelow = r.bottom + 4 + menuH <= window.innerHeight - margin;
+			if (fitsBelow) {
+				top = r.bottom + 4;
+			} else {
+				top = Math.max(margin, r.top - 4 - menuH);
+			}
+
+			menu.style.top  = top + 'px';
 			menu.style.left = left + 'px';
 		}
 
@@ -594,9 +684,21 @@
 		function setFilters(patch) {
 			Object.assign(state, patch);
 			enforceDisplayRule();
+			syncControlsUI();
+			// Dans le panneau mobile, un changement ne fait que mettre à jour
+			// l'aperçu (compteurs/« N résultats », cf. fetchAndUpdate) — la
+			// grille et l'URL restent sur le dernier état réellement appliqué
+			// tant que commitPanel()/cancelPanel() n'a pas tranché.
+			if (isPanelDeferring()) {
+				fetchAndUpdate(true);
+			} else {
+				syncUrl();
+				fetchAndUpdate(false);
+			}
+		}
+
+		function syncControlsUI() {
 			syncDisplayUI();
-			syncUrl();
-			fetchAndUpdate();
 			// Category dropdown is-active (per-collection: only mark the one owning the selected subcategory)
 			root.querySelectorAll('.pf-cat-dropdown[data-filter="category"]').forEach(catDd => {
 				const ddUnivers = catDd.dataset.univers;
@@ -739,6 +841,8 @@
 		onScroll();
 
 		// ── Fade indicators on each scrollable row
+		// .pf-catalogue-chips utilise le composant global .pf-scroll-fade
+		// (scroll-fade.js), pas ce mécanisme maison — cf. updateChips() plus bas.
 		const scrollRows = root.querySelectorAll('.pf-cat-row-scroll');
 		scrollRows.forEach(row => {
 			row.addEventListener('scroll', () => updateFades(row), { passive: true });
@@ -754,7 +858,7 @@
 
 		// ── AJAX
 		let abortCtrl = null;
-		function fetchAndUpdate() {
+		function fetchAndUpdate(deferred) {
 			if (abortCtrl) abortCtrl.abort();
 			abortCtrl = new AbortController();
 			setLoading(true);
@@ -768,9 +872,14 @@
 				.then(payload => {
 					setLoading(false);
 					if (!payload || !payload.success) return;
-					grid.innerHTML = payload.data.html;
 					updateCounts(payload.data.counts || {});
 					updateResultCount(payload.data.total);
+					// Panneau mobile en cours d'édition : seuls les compteurs et le
+					// « N résultats » ci-dessus reflètent l'aperçu. La grille, les
+					// chips et l'URL restent sur le dernier état appliqué jusqu'à
+					// commitPanel() — sinon cancelPanel() n'aurait plus rien à annuler.
+					if (deferred) return;
+					grid.innerHTML = payload.data.html;
 					updateChips();
 					scrollRows.forEach(updateFades);
 					// Re-bind bookshelf behaviors (spine hover flip, etc.)
@@ -819,9 +928,12 @@
 
 		function updateChips() {
 			const container = root.querySelector('.pf-catalogue-chips');
-			if (!container) return;
+			// Le scroller (.pf-scroll-fade) doit rester l'unique enfant direct du
+			// wrapper : seul son contenu est réécrit, le [hidden] reste sur le wrapper.
+			const scroll = container ? container.querySelector('.pf-catalogue-chips-scroll') : null;
+			if (!container || !scroll) return;
 			const labels = collectChipLabels();
-			container.innerHTML = labels.map(c =>
+			scroll.innerHTML = labels.map(c =>
 				'<button type="button" class="pf-cat-chip" data-filter="' + escAttr(c.filter) + '" data-value="' + escAttr(c.value) + '">' +
 				'<span>' + escHtml(c.label) + '</span><span class="pf-cat-chip-x" aria-hidden="true">×</span></button>'
 			).join('') + (labels.length >= 2 ? '<button type="button" class="pf-cat-reset-all">Tout réinitialiser</button>' : '');

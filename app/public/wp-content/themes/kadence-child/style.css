@@ -1990,6 +1990,8 @@ html.pf-notices-js .wc-block-components-notices__snackbar {
    par contexte : --pf-fade-size, la longueur de la rampe. ==================== */
 @property --pf-fade-l { syntax: '<length>'; inherits: false; initial-value: 0px; }
 @property --pf-fade-r { syntax: '<length>'; inherits: false; initial-value: 0px; }
+@property --pf-fade-t { syntax: '<length>'; inherits: false; initial-value: 0px; }
+@property --pf-fade-b { syntax: '<length>'; inherits: false; initial-value: 0px; }
 
 /* .pf-cat-row-scroll (rangée de filtres du catalogue) est le seul hôte qui scrolle
    LUI-MÊME et dont l'état vient de son propre contrôleur (catalogue.js, classes
@@ -2019,6 +2021,21 @@ html.pf-notices-js .wc-block-components-notices__snackbar {
    clamp, réduite au prorata (200/250) pour rester dans la même proportion visuelle
    au lieu de partager tel quel le fondu taillé pour des cartes plus larges. */
 .pf-scroll-fade:has(.pf-event-auteurs-scroll) { --pf-fade-size: clamp(24px, 3.4vw, 48px); }
+
+/* Variante verticale — même masque, orienté haut/bas au lieu de gauche/droite.
+   Même invariant que ci-dessus : le scroller reste l'unique enfant direct du
+   wrapper, seule la classe modificatrice change le sens du dégradé. Sélecteur
+   à 2 classes (0,2,0) pour gagner sur la règle horizontale (0,1,0) sans
+   dépendre de l'ordre des blocs dans le fichier. */
+.pf-scroll-fade.pf-scroll-fade--v {
+    --pf-fade-t: 0px;
+    --pf-fade-b: 0px;
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 var(--pf-fade-t), #000 calc(100% - var(--pf-fade-b)), transparent 100%);
+            mask-image: linear-gradient(to bottom, transparent 0, #000 var(--pf-fade-t), #000 calc(100% - var(--pf-fade-b)), transparent 100%);
+    transition: --pf-fade-t 0.25s ease, --pf-fade-b 0.25s ease;
+}
+.pf-scroll-fade--v.is-scroll-top    { --pf-fade-t: var(--pf-fade-size); }
+.pf-scroll-fade--v.is-scroll-bottom { --pf-fade-b: var(--pf-fade-size); }
 
 /* =========================================================
    Popup d'événement flottant (.pf-map-pop) — COMPOSANT PARTAGÉ.

@@ -94,10 +94,16 @@
 	margin: 0;
 }
 
+.bs-hero__title-group {
+	display: flex;
+	flex-direction: column;
+	gap: var(--pf-space-1);
+}
+
 .bs-hero__subtitle {
-	font-size: 1rem;
+	font-size: 1.15rem;
 	font-style: italic;
-	color: var(--pf-text);
+	color: var(--pf-heading);
 	margin: 0;
 }
 
@@ -200,6 +206,14 @@
 	width: 1.4em;
 	height: 1.4em;
 	flex: none;
+}
+
+/* Produit sold_individually déjà au panier (add-to-cart-sold-individually.js) :
+   grisé, comme les autres états désactivés du thème (cf. .pf-dropdown__option.is-disabled).
+   Le clic reste intercepté en JS (garde clavier) plutôt que pointer-events:none. */
+.bs-hero__cart.is-in-cart {
+	opacity: 0.4;
+	cursor: not-allowed;
 }
 
 /* Coche que WooCommerce colle dans le bouton après un ajout AJAX (glyphe de sa
