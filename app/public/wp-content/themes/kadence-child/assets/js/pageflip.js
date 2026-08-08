@@ -23,9 +23,22 @@ function showZoomIndicator(overlay, zoomFactor) {
     zoomIndicatorTimer = setTimeout(() => el.classList.remove('is-visible'), 1000);
 }
 
+// À ≤100%, le contenu tient toujours dans le viewport par construction
+// (baseScale l'y a calé) : overflow:auto ne sert alors qu'à rogner les
+// débords purement visuels (ombre StPageFlip au coin qui tourne...) sans
+// jamais permettre un vrai scroll. On ne le repasse en scrollable que
+// lorsqu'un zoom > 100% peut effectivement dépasser le viewport.
+function syncViewportOverflow(viewport, zoomFactor) {
+    if (viewport) viewport.style.overflow = zoomFactor <= 1 ? 'visible' : 'auto';
+}
+
 // Pinch-to-zoom tactile — pilote le même `setZoom` continu que les boutons
 // (mêmes bornes, même rendu, même indicateur), pas de geste concurrent maison.
-function attachPinchZoom(target, { getZoom, setZoom, minZoom, maxZoom }) {
+// `onSettle` (optionnel) : rappelé au relâchement des doigts — pour le
+// flipbook PDF, c'est là que la taille réelle de StPageFlip est recalée
+// (voir commitZoom) ; pendant le pincement lui-même, seul un transform CSS
+// bouge, jamais de reconstruction StPageFlip (trop coûteux à 60fps).
+function attachPinchZoom(target, { getZoom, setZoom, onSettle, minZoom, maxZoom }) {
     if (!target) return;
     let startDist = 0;
     let startZoom = 1;
@@ -58,7 +71,12 @@ function attachPinchZoom(target, { getZoom, setZoom, minZoom, maxZoom }) {
         setZoom(Math.min(maxZoom, Math.max(minZoom, startZoom * ratio)));
     }, { passive: false, capture: true });
 
-    const reset = (e) => { if (e.touches.length < 2) startDist = 0; };
+    const reset = (e) => {
+        if (e.touches.length < 2 && startDist !== 0) {
+            startDist = 0;
+            onSettle?.();
+        }
+    };
     target.addEventListener('touchend', reset, { passive: true, capture: true });
     target.addEventListener('touchcancel', reset, { passive: true, capture: true });
 }
@@ -140,6 +158,7 @@ function initCoverOnly(container, coverEl) {
         innerEl.style.height = height + 'px';
         innerEl.style.transformOrigin = 'top left';
         innerEl.style.transform = `scale(${scale})`;
+        syncViewportOverflow(viewport, zoomFactor);
     }
 
     function updateZoomButtons() {
@@ -284,9 +303,13 @@ async function initFlipbook(container) {
     let pdfRenderPromise  = null;
     let shouldFlipOnCover = false;
     let flipState         = 'cover';
-    let baseScale         = 1;
     let zoomFactor        = 1.0;
-    let currentScale      = 1;
+    // Taille RÉELLE (px déjà à l'échelle) à laquelle StPageFlip est
+    // actuellement construit — cf. createFlip()/computeNativeScale().
+    let nativePageW           = width;
+    let nativePageH           = height;
+    let currentNativeScale    = 1;
+    let lastSettledZoomFactor = 1;
     // Page d'affichage : ≤480 (téléphone) toujours simple — un roman portrait
     // y est illisible en double page ; 481-1024 (tablette) simple seulement
     // pour un livre au format paysage ; >1024 toujours double. Uniquement le
@@ -328,10 +351,24 @@ async function initFlipbook(container) {
                 requestAnimationFrame(() => { if (flip) flip.flipNext(); });
             } else {
                 flipState = e.data === 0 ? 'cover' : e.data === lastIndex ? 'end' : 'open';
-                applyFlipOffset();
+                applyFlipOffset(nativePageW);
                 updateToolbarState();
             }
         });
+    }
+
+    // Taille réelle (fit viewport × zoom) à laquelle StPageFlip doit être
+    // construit pour que SES propres zones de clic (calculées sur son
+    // width/height de config) tombent au même endroit que le clic/tap réel
+    // — sinon, dès que cette taille ne vaut plus 1:1 avec le rendu visuel
+    // (cas courant : double page qui déborde un écran étroit), StPageFlip
+    // se trompe de moitié en silence (page précédente au lieu de suivante).
+    function computeNativeScale() {
+        if (!viewport || !viewport.clientWidth || !viewport.clientHeight) return zoomFactor;
+        const maxW  = viewport.clientWidth;
+        const maxH  = viewport.clientHeight;
+        const flipW = singlePageMode ? width : width * 2;
+        return Math.min(maxW / flipW, maxH / height) * zoomFactor;
     }
 
     function createFlip() {
@@ -345,8 +382,13 @@ async function initFlipbook(container) {
         pagesToLoad.forEach(el => container.appendChild(el));
         container.querySelectorAll('.stf__wrapper, canvas').forEach(el => el.remove());
 
+        currentNativeScale    = computeNativeScale();
+        nativePageW            = Math.max(1, Math.round(width  * currentNativeScale));
+        nativePageH            = Math.max(1, Math.round(height * currentNativeScale));
+        lastSettledZoomFactor = zoomFactor;
+
         flip = new St.PageFlip(container, {
-            width, height,
+            width: nativePageW, height: nativePageH,
             size: 'fixed',
             showCover: true,
             usePortrait: singlePageMode,
@@ -356,6 +398,7 @@ async function initFlipbook(container) {
         });
         flip.loadFromHTML(pagesToLoad);
         attachFlipHandlers();
+        applySizing();
     }
 
     function ensureFlipInit() {
@@ -411,63 +454,93 @@ async function initFlipbook(container) {
     };
 
     // ── Mise à l'échelle ──────────────────────────────────────────
-    // En mode portrait (single), StPageFlip utilise width×height.
-    // En mode paysage (double), le canvas fait (width×2)×height.
-    function scaleToViewport() {
-        if (!scaleWrapper || !innerEl || !viewport) return;
-        const maxW  = viewport.clientWidth;
-        const maxH  = viewport.clientHeight;
-        const flipW = singlePageMode ? width : width * 2;
-        baseScale    = Math.min(maxW / flipW, maxH / height);
-        currentScale = baseScale * zoomFactor;
-        scaleWrapper.style.width  = (flipW * currentScale) + 'px';
-        scaleWrapper.style.height = (height * currentScale) + 'px';
-        innerEl.style.width       = flipW + 'px';
-        innerEl.style.height      = height + 'px';
+    // Pose scaleWrapper/innerEl à la taille NATIVE actuelle (nativePageW/H,
+    // déjà à l'échelle par createFlip) — aucun transform CSS ici : StPageFlip
+    // rend déjà à la bonne taille, l'affichage et ses coordonnées internes
+    // coïncident. Le transform ne sert plus qu'à l'aperçu live du pincement
+    // (previewZoom), jamais à l'état posé.
+    function applySizing() {
+        if (!scaleWrapper || !innerEl) return;
+        const flipMult = singlePageMode ? 1 : 2;
+        scaleWrapper.style.width  = (nativePageW * flipMult) + 'px';
+        scaleWrapper.style.height = nativePageH + 'px';
+        innerEl.style.width       = (nativePageW * flipMult) + 'px';
+        innerEl.style.height      = nativePageH + 'px';
         innerEl.style.transformOrigin = 'top left';
-        applyFlipOffset();
+        innerEl.style.transform  = '';
+        applyFlipOffset(nativePageW);
+        syncViewportOverflow(viewport, zoomFactor);
     }
 
     // En mode paysage : la couverture (page 0) et la dernière page occupent
     // une seule moitié du canvas double-largeur → translateX pour centrer.
     // En mode portrait : StPageFlip gère le layout, aucun décalage manuel.
-    function applyFlipOffset() {
-        if (!scaleWrapper || !innerEl) return;
-        innerEl.style.transform = `scale(${currentScale})`;
-        innerEl.style.transformOrigin = 'top left';
+    // `visualPageW` : largeur d'UNE page telle qu'actuellement affichée
+    // (nativePageW à l'état posé, ou nativePageW×ratio pendant un pincement).
+    function applyFlipOffset(visualPageW) {
+        if (!scaleWrapper) return;
         if (singlePageMode) {
             scaleWrapper.style.transform = '';
             return;
         }
-        const half   = (width * currentScale) / 2;
+        const half   = visualPageW / 2;
         const offset = flipState === 'cover' ? -half
                      : flipState === 'end'   ?  half
                      : 0;
         scaleWrapper.style.transform = offset ? `translateX(${offset}px)` : '';
     }
 
-    // Cible continue (pinch tactile) — les boutons passent par adjustZoom,
-    // qui arrondit au pas de 0.1 avant de retomber ici.
-    function setZoom(factor) {
-        zoomFactor   = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, factor));
+    // Aperçu live (pincement en cours) : un simple transform CSS relatif à
+    // la dernière taille posée — pas touche à StPageFlip, ~free niveau perf,
+    // contrairement à un re-init (voir commitZoom) qu'on ne peut pas se
+    // permettre à chaque touchmove (60×/s pendant un pincement).
+    function previewZoom(factor) {
+        zoomFactor = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, factor));
         showZoomIndicator(overlay, zoomFactor);
-        currentScale = baseScale * zoomFactor;
         if (!scaleWrapper || !innerEl) return;
-        const flipW = singlePageMode ? width : width * 2;
-        scaleWrapper.style.width  = (flipW * currentScale) + 'px';
-        scaleWrapper.style.height = (height * currentScale) + 'px';
-        applyFlipOffset();
+        const liveRatio = zoomFactor / lastSettledZoomFactor;
+        const flipMult  = singlePageMode ? 1 : 2;
+        scaleWrapper.style.width  = (nativePageW * flipMult * liveRatio) + 'px';
+        scaleWrapper.style.height = (nativePageH * liveRatio) + 'px';
+        innerEl.style.transformOrigin = 'top left';
+        innerEl.style.transform  = liveRatio === 1 ? '' : `scale(${liveRatio})`;
+        applyFlipOffset(nativePageW * liveRatio);
+        syncViewportOverflow(viewport, zoomFactor);
+        updateToolbarState();
+    }
+
+    // Fige le zoom courant dans StPageFlip lui-même (re-init à la taille
+    // réelle) — remet le transform CSS à neutre du même coup. Appelé au
+    // clic sur un bouton zoom (immédiat) et au relâchement d'un pincement
+    // (jamais pendant, cf. previewZoom).
+    function commitZoom() {
+        const savedIdx = flip ? flip.getCurrentPageIndex() : 0;
+        createFlip();
+        if (savedIdx > 0) flip.turnToPage(savedIdx);
         updateToolbarState();
     }
 
     function adjustZoom(delta) {
-        setZoom(Math.round((zoomFactor + delta) * 10) / 10);
+        previewZoom(Math.round((zoomFactor + delta) * 10) / 10);
+        commitZoom();
+    }
+
+    // Resize/orientation : ne re-crée StPageFlip que si l'échelle de calage
+    // a réellement changé (évite un re-init pour un resize vertical seul,
+    // sans effet sur une largeur déjà contrainte par la largeur).
+    function resyncNativeSize() {
+        if (!flip) return;
+        if (Math.abs(computeNativeScale() - currentNativeScale) < 0.001) return;
+        const savedIdx = flip.getCurrentPageIndex();
+        createFlip();
+        if (savedIdx > 0) flip.turnToPage(savedIdx);
+        updateToolbarState();
     }
 
     function toggleSinglePageMode() {
         const savedIdx = flip ? flip.getCurrentPageIndex() : 0;
         singlePageMode = !singlePageMode;
-        // Mise à jour du flipState avant scaleToViewport (qui appelle applyFlipOffset)
+        // Mise à jour du flipState avant createFlip (qui appelle applyFlipOffset)
         flipState = savedIdx === 0 ? 'cover' : savedIdx === lastIndex ? 'end' : 'open';
 
         // Réinitialisation de StPageFlip avec usePortrait mis à jour
@@ -475,7 +548,6 @@ async function initFlipbook(container) {
         if (savedIdx > 0) flip.turnToPage(savedIdx);
 
         if (scaleWrapper) scaleWrapper.style.transition = 'none';
-        scaleToViewport();
         requestAnimationFrame(() => {
             if (scaleWrapper) scaleWrapper.style.transition = '';
         });
@@ -503,8 +575,13 @@ async function initFlipbook(container) {
         if (btnSinglePage) btnSinglePage.setAttribute('aria-pressed', singlePageMode ? 'true' : 'false');
     }
 
+    // Débounce : un resize/rotation peut émettre en rafale, et chaque
+    // resync potentiel est un re-init StPageFlip complet (loadFromHTML...).
+    let resizeDebounceTimer = null;
     window.addEventListener('resize', () => {
-        if (overlay?.classList.contains('is-open')) scaleToViewport();
+        if (!overlay?.classList.contains('is-open')) return;
+        clearTimeout(resizeDebounceTimer);
+        resizeDebounceTimer = setTimeout(resyncNativeSize, 150);
     });
 
     window.addEventListener('popstate', () => {
@@ -527,7 +604,7 @@ async function initFlipbook(container) {
         updateToolbarState();
         if (scaleWrapper) scaleWrapper.style.transition = 'none';
         requestAnimationFrame(() => {
-            scaleToViewport();
+            resyncNativeSize();
             requestAnimationFrame(() => {
                 if (scaleWrapper) scaleWrapper.style.transition = '';
             });
@@ -561,6 +638,10 @@ async function initFlipbook(container) {
             if (flipState === 'cover' ? onLeftHalf : !onLeftHalf) closeOverlay();
         }
     });
+    // Le tourne-page au clic/tap reste 100% natif (StPageFlip) : depuis que
+    // createFlip() le construit toujours à sa taille RÉELLEMENT affichée
+    // (cf. computeNativeScale), ses zones de clic internes tombent juste
+    // sans qu'on ait à les recalculer ou à intercepter quoi que ce soit.
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape' && overlay?.classList.contains('is-open')) closeOverlay();
     });
@@ -573,7 +654,7 @@ async function initFlipbook(container) {
     btnLastPage?.addEventListener('click',   () => { if (flip) flip.turnToPage(lastIndex); });
     btnZoomOut?.addEventListener('click',    () => adjustZoom(-ZOOM_STEP));
     btnZoomIn?.addEventListener('click',     () => adjustZoom( ZOOM_STEP));
-    attachPinchZoom(viewport, { getZoom: () => zoomFactor, setZoom, minZoom: ZOOM_MIN, maxZoom: ZOOM_MAX });
+    attachPinchZoom(viewport, { getZoom: () => zoomFactor, setZoom: previewZoom, onSettle: commitZoom, minZoom: ZOOM_MIN, maxZoom: ZOOM_MAX });
     btnDownload?.addEventListener('click',   () => { if (pdfUrl) window.open(pdfUrl, '_blank', 'noopener'); });
 
     // ── Bouton "Feuilleter l'extrait" → ouvre + flippe ───────────

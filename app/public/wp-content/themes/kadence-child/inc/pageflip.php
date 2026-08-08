@@ -54,7 +54,7 @@ add_action('wp_enqueue_scripts', function () {
         'passiflore-pageflip',
         get_stylesheet_directory_uri() . '/assets/js/pageflip.js',
         $deps,
-        '2.9',
+        '4.1',
         true
     );
 });
