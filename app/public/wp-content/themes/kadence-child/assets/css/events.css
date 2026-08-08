@@ -878,6 +878,7 @@
     gap: var(--pf-space-1);
     max-height: 130px;
     overflow-y: auto;
+    scrollbar-width: thin;
 }
 
 .tribe-events-event-image img {

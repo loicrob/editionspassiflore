@@ -273,8 +273,8 @@ $description     = $product->get_description(); // même source que la section �
 					   data-quantity="1"
 					   <?= $product->is_sold_individually() ? 'data-pf-sold-individually="1"' : '' ?>
 					   rel="nofollow">
-						<?= esc_html( $product->single_add_to_cart_text() ) ?>
-						<svg class="bs-hero__cart-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 -960 960 960" fill="currentColor" aria-hidden="true"><path d="M223.5-103.5Q200-127 200-160t23.5-56.5Q247-240 280-240t56.5 23.5Q360-193 360-160t-23.5 56.5Q313-80 280-80t-56.5-23.5Zm400 0Q600-127 600-160t23.5-56.5Q647-240 680-240t56.5 23.5Q760-193 760-160t-23.5 56.5Q713-80 680-80t-56.5-23.5ZM120-800H80q-17 0-28.5-11.5T40-840q0-17 11.5-28.5T80-880h66q11 0 21 6t15 17l159 337h280l145-260q5-10 14-15t20-5q23 0 34.5 19.5t.5 39.5L692-482q-11 20-29.5 31T622-440H324l-44 80h440q17 0 28.5 11.5T760-320q0 17-11.5 28.5T720-280H280q-45 0-68.5-39t-1.5-79l54-98-144-304Zm367 120H360q-17 0-28.5-11.5T320-720q0-17 11.5-28.5T360-760h127l-36-36q-12-12-11.5-28t12.5-28q12-11 28-11.5t28 11.5l104 104q12 12 12 28t-12 28L508-588q-11 11-27.5 11.5T452-588q-11-11-11-28t11-28l35-36Z"/></svg>
+						<?= esc_html( $product->get_stock_status() === 'onbackorder' ? 'Précommander' : $product->single_add_to_cart_text() ) ?>
+						<svg class="bs-hero__cart-icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 -960 960 960" fill="currentColor" aria-hidden="true"><path d="M240-80q-33 0-56.5-23.5T160-160v-480q0-33 23.5-56.5T240-720h80q0-66 47-113t113-47q66 0 113 47t47 113h80q33 0 56.5 23.5T800-640v480q0 33-23.5 56.5T720-80H240Zm0-80h480v-480h-80v80q0 17-11.5 28.5T600-520q-17 0-28.5-11.5T560-560v-80H400v80q0 17-11.5 28.5T360-520q-17 0-28.5-11.5T320-560v-80h-80v480Zm160-560h160q0-33-23.5-56.5T480-800q-33 0-56.5 23.5T400-720ZM240-160v-480 480Z"></path><path d="M480-440L480-280M400-360L560-360" fill="none" stroke="currentColor" stroke-width="80" stroke-linecap="round"></path></svg>
 					</a>
 					<?php endif; ?>
 				</div>

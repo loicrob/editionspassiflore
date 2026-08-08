@@ -418,18 +418,19 @@ body.tax-product_cat .entry-hero.product-hero-section {
 
 .pf-catalogue-chips-scroll {
 	display: flex;
-	flex-wrap: wrap;
+	flex-wrap: nowrap;
+	overflow-x: auto;
+	scrollbar-width: thin;
 	gap: var(--pf-space-2);
 	align-items: center;
 }
 
+.pf-catalogue-chips-scroll > * { flex-shrink: 0; }
+
 @media (max-width: 1023px) {
 	.pf-catalogue-chips-scroll {
-		flex-wrap: nowrap;
-		overflow-x: auto;
-		scrollbar-width: thin;
+		scrollbar-width: none;
 	}
-	.pf-catalogue-chips-scroll > * { flex-shrink: 0; }
 }
 
 /* Fondu de bord gauche/droite : masque du composant global .pf-scroll-fade
