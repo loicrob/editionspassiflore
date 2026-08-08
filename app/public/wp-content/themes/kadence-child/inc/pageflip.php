@@ -36,18 +36,25 @@ add_action('wp_enqueue_scripts', function () {
         [],
         '1.9'
     );
-    wp_enqueue_script(
-        'stpageflip',
-        'https://cdn.jsdelivr.net/npm/page-flip@2.0.7/dist/js/page-flip.browser.js',
-        [],
-        '2.0.7',
-        true
-    );
+    // StPageFlip ne sert qu'aux livres avec un extrait PDF réel — un livre
+    // sans extrait affiche sa couverture en simple image zoomable (pageflip.js),
+    // pas la peine de tirer la lib de feuilletage pour ça.
+    $deps = [];
+    if ( get_field( 'extrait', get_the_ID() ) ) {
+        wp_enqueue_script(
+            'stpageflip',
+            'https://cdn.jsdelivr.net/npm/page-flip@2.0.7/dist/js/page-flip.browser.js',
+            [],
+            '2.0.7',
+            true
+        );
+        $deps[] = 'stpageflip';
+    }
     wp_enqueue_script(
         'passiflore-pageflip',
         get_stylesheet_directory_uri() . '/assets/js/pageflip.js',
-        ['stpageflip'],
-        '2.2',
+        $deps,
+        '2.9',
         true
     );
 });

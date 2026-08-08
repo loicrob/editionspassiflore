@@ -452,8 +452,11 @@ span.bs-format-btn--active:active {
 	min-height: 0;
 	overflow: auto;
 	display: flex;
-	align-items: center;
-	justify-content: center;
+	/* "safe" : reste centré tant que ça tient, mais bascule en alignement
+	   départ dès que le zoom déborde — sinon le débord côté haut/gauche
+	   est rogné et inatteignable au scroll (piège classique du centrage flex). */
+	align-items: safe center;
+	justify-content: safe center;
 }
 
 .bs-flipbook-scale-wrapper {
@@ -479,6 +482,7 @@ span.bs-format-btn--active:active {
 /* ─── Toolbar flipbook ───────────────────────────────────────── */
 
 .bs-flipbook-toolbar {
+	position: relative; /* ancre .bs-zoom-indicator */
 	flex-shrink: 0;
 	display: flex;
 	align-items: center;
@@ -490,6 +494,30 @@ span.bs-format-btn--active:active {
 	padding: 0.3rem 0.45rem;
 	user-select: none;
 	white-space: nowrap;
+}
+
+/* Pourcentage de zoom, flottant au-dessus de la toolbar le temps d'un zoom. */
+.bs-zoom-indicator {
+	position: absolute;
+	bottom: calc(100% + 0.6rem);
+	left: 50%;
+	transform: translateX(-50%);
+	background: rgba(20, 12, 8, 0.88);
+	backdrop-filter: blur(10px);
+	-webkit-backdrop-filter: blur(10px);
+	color: #fff;
+	font-size: 0.85rem;
+	font-weight: 600;
+	padding: 0.35rem 0.85rem;
+	border-radius: 1rem;
+	pointer-events: none;
+	opacity: 0;
+	transition: opacity 0.2s ease;
+	white-space: nowrap;
+}
+
+.bs-zoom-indicator.is-visible {
+	opacity: 1;
 }
 
 .bs-tb-btn {

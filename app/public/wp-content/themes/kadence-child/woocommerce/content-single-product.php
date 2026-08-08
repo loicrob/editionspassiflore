@@ -317,7 +317,7 @@ $description     = $product->get_description(); // même source que la section �
 
 	<!-- ═══ Overlay fullscreen — flipbook ════════════════════════ -->
 	<?php if ( $pdf_id || $thumb_id ) : ?>
-	<div class="bs-flipbook-overlay" aria-hidden="true" role="dialog" aria-modal="true" aria-label="Extrait feuilletable"
+	<div class="bs-flipbook-overlay" aria-hidden="true" role="dialog" aria-modal="true" aria-label="<?= $pdf_id ? 'Extrait feuilletable' : 'Couverture du livre' ?>"
 		data-extrait-url="<?= esc_attr( trailingslashit( get_the_permalink() ) . 'extrait' ) ?>">
 		<button type="button" class="bs-flipbook-close" aria-label="Fermer (Échap)">✕</button>
 		<div class="bs-flipbook-viewport">
@@ -345,8 +345,11 @@ $description     = $product->get_description(); // même source que la section �
 			</div><!-- /.bs-flipbook-scale-wrapper -->
 		</div><!-- /.bs-flipbook-viewport -->
 
-		<div class="bs-flipbook-toolbar" role="toolbar" aria-label="Contrôles du feuilleteur">
+		<div class="bs-flipbook-toolbar" role="toolbar" aria-label="<?= $pdf_id ? 'Contrôles du feuilleteur' : 'Contrôles de zoom' ?>">
 
+			<span class="bs-zoom-indicator" aria-hidden="true">100 %</span>
+
+			<?php if ( $pdf_id ) : ?>
 			<button type="button" class="bs-tb-btn bs-tb-btn--mode" data-action="single-page" aria-pressed="false" aria-label="Mode page simple">
 				<!-- Affiché en mode double → icône simple page (état cible) -->
 				<span class="bs-tb-icon-double" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="1.5" width="10" height="13" rx="0.75"/><line x1="5.5" y1="5.5" x2="10.5" y2="5.5"/><line x1="5.5" y1="8" x2="10.5" y2="8"/><line x1="5.5" y1="10.5" x2="9" y2="10.5"/></svg></span>
@@ -365,6 +368,7 @@ $description     = $product->get_description(); // même source que la section �
 			</button>
 
 			<div class="bs-tb-sep" aria-hidden="true"></div>
+			<?php endif; ?>
 
 			<button type="button" class="bs-tb-btn" data-action="zoom-out" aria-label="Dézoomer">
 				<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" aria-hidden="true"><circle cx="7" cy="7" r="4.5"/><line x1="10.5" y1="10.5" x2="13.5" y2="13.5"/><line x1="4.75" y1="7" x2="9.25" y2="7"/></svg>
@@ -374,6 +378,7 @@ $description     = $product->get_description(); // même source que la section �
 				<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" aria-hidden="true"><circle cx="7" cy="7" r="4.5"/><line x1="10.5" y1="10.5" x2="13.5" y2="13.5"/><line x1="7" y1="4.75" x2="7" y2="9.25"/><line x1="4.75" y1="7" x2="9.25" y2="7"/></svg>
 			</button>
 
+			<?php if ( $pdf_id ) : ?>
 			<div class="bs-tb-sep" aria-hidden="true"></div>
 
 			<button type="button" class="bs-tb-btn bs-tb-btn--next" data-action="next-page" aria-label="Page suivante">
@@ -385,7 +390,6 @@ $description     = $product->get_description(); // même source que la section �
 				<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><rect x="12" y="2.5" width="2" height="11" rx="0.75"/><path d="M3 3.5 10.5 8 3 12.5z"/></svg>
 			</button>
 
-			<?php if ( $pdf_id ) : ?>
 			<div class="bs-tb-sep" aria-hidden="true"></div>
 
 			<button type="button" class="bs-tb-btn" data-action="download" aria-label="Ouvrir dans un nouvel onglet">

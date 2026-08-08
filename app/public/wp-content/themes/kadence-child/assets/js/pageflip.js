@@ -1,7 +1,67 @@
-import * as pdfjsLib from 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4/build/pdf.min.mjs';
+let pdfjsLibPromise = null;
 
-pdfjsLib.GlobalWorkerOptions.workerSrc =
-    'https://cdn.jsdelivr.net/npm/pdfjs-dist@4/build/pdf.worker.min.mjs';
+// Chargé à la demande : un livre sans extrait ne doit jamais tirer pdf.js du CDN.
+function loadPdfjs() {
+    if (!pdfjsLibPromise) {
+        pdfjsLibPromise = import('https://cdn.jsdelivr.net/npm/pdfjs-dist@4/build/pdf.min.mjs')
+            .then((lib) => {
+                lib.GlobalWorkerOptions.workerSrc =
+                    'https://cdn.jsdelivr.net/npm/pdfjs-dist@4/build/pdf.worker.min.mjs';
+                return lib;
+            });
+    }
+    return pdfjsLibPromise;
+}
+
+let zoomIndicatorTimer = null;
+function showZoomIndicator(overlay, zoomFactor) {
+    const el = overlay?.querySelector('.bs-zoom-indicator');
+    if (!el) return;
+    el.textContent = Math.round(zoomFactor * 100) + ' %';
+    el.classList.add('is-visible');
+    clearTimeout(zoomIndicatorTimer);
+    zoomIndicatorTimer = setTimeout(() => el.classList.remove('is-visible'), 1000);
+}
+
+// Pinch-to-zoom tactile — pilote le même `setZoom` continu que les boutons
+// (mêmes bornes, même rendu, même indicateur), pas de geste concurrent maison.
+function attachPinchZoom(target, { getZoom, setZoom, minZoom, maxZoom }) {
+    if (!target) return;
+    let startDist = 0;
+    let startZoom = 1;
+
+    function distance(touches) {
+        const dx = touches[0].clientX - touches[1].clientX;
+        const dy = touches[0].clientY - touches[1].clientY;
+        return Math.hypot(dx, dy);
+    }
+
+    // Capture (pas bubble) : StPageFlip a son propre listener de drag-page
+    // sur le conteneur interne et coupe la propagation en bubble avant qu'elle
+    // ne remonte jusqu'ici — en capture on l'intercepte avant qu'il le voie.
+    // Un seul doigt : return immédiat, rien n'est intercepté, son drag marche toujours.
+    target.addEventListener('touchstart', (e) => {
+        if (e.touches.length !== 2) return;
+        const d = distance(e.touches);
+        if (d > 0) {
+            startDist = d;
+            startZoom = getZoom();
+            e.stopPropagation();
+        }
+    }, { passive: true, capture: true });
+
+    target.addEventListener('touchmove', (e) => {
+        if (e.touches.length !== 2 || startDist === 0) return;
+        e.preventDefault();  // laisse le scroll tactile à un seul doigt intact
+        e.stopPropagation();
+        const ratio = distance(e.touches) / startDist;
+        setZoom(Math.min(maxZoom, Math.max(minZoom, startZoom * ratio)));
+    }, { passive: false, capture: true });
+
+    const reset = (e) => { if (e.touches.length < 2) startDist = 0; };
+    target.addEventListener('touchend', reset, { passive: true, capture: true });
+    target.addEventListener('touchcancel', reset, { passive: true, capture: true });
+}
 
 async function renderPdfSpread(pdf, pageNum, scale) {
     const page     = await pdf.getPage(pageNum);
@@ -44,21 +104,145 @@ async function renderPdfPage(pdf, pageNum, scale) {
     return div;
 }
 
+// Pas d'extrait PDF : la couverture s'affiche seule dans l'overlay, en
+// image zoomable — jamais dans StPageFlip (pas de "livre" avec une seule
+// page à feuilleter, pas de chargement de StPageFlip/pdf.js pour rien).
+function initCoverOnly(container, coverEl) {
+    const width  = parseInt(container.dataset.width,  10) || 400;
+    const height = parseInt(container.dataset.height, 10) || 570;
+
+    const overlay      = document.querySelector('.bs-flipbook-overlay');
+    const closeBtn     = overlay?.querySelector('.bs-flipbook-close');
+    const scaleWrapper = overlay?.querySelector('.bs-flipbook-scale-wrapper');
+    const innerEl      = overlay?.querySelector('.bs-flipbook-inner');
+    const viewport      = overlay?.querySelector('.bs-flipbook-viewport');
+    const btnZoomOut    = overlay?.querySelector('[data-action="zoom-out"]');
+    const btnZoomIn     = overlay?.querySelector('[data-action="zoom-in"]');
+
+    coverEl.style.width  = width + 'px';
+    coverEl.style.height = height + 'px';
+
+    const ZOOM_STEP = 0.1;
+    const ZOOM_MIN  = 0.5;
+    const ZOOM_MAX  = 2.0;
+    let zoomFactor  = 1.0;
+
+    const extraitUrl = overlay?.dataset.extraitUrl || '';
+    const baseUrl    = extraitUrl ? extraitUrl.replace(/\/extrait\/?$/, '/') : '';
+
+    function scaleToViewport() {
+        if (!scaleWrapper || !innerEl || !viewport) return;
+        const baseScale = Math.min(viewport.clientWidth / width, viewport.clientHeight / height);
+        const scale     = baseScale * zoomFactor;
+        scaleWrapper.style.width  = (width * scale) + 'px';
+        scaleWrapper.style.height = (height * scale) + 'px';
+        innerEl.style.width  = width + 'px';
+        innerEl.style.height = height + 'px';
+        innerEl.style.transformOrigin = 'top left';
+        innerEl.style.transform = `scale(${scale})`;
+    }
+
+    function updateZoomButtons() {
+        if (btnZoomOut) btnZoomOut.disabled = zoomFactor <= ZOOM_MIN + 0.001;
+        if (btnZoomIn)  btnZoomIn.disabled  = zoomFactor >= ZOOM_MAX - 0.001;
+    }
+
+    // Cible continue (pinch tactile) — les boutons passent par adjustZoom,
+    // qui arrondit au pas de 0.1 avant de retomber ici.
+    function setZoom(factor) {
+        zoomFactor = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, factor));
+        showZoomIndicator(overlay, zoomFactor);
+        scaleToViewport();
+        updateZoomButtons();
+    }
+
+    function adjustZoom(delta) {
+        setZoom(Math.round((zoomFactor + delta) * 10) / 10);
+    }
+
+    function openOverlay(skipHistory = false) {
+        if (!overlay) return;
+        overlay.classList.add('is-open');
+        overlay.removeAttribute('aria-hidden');
+        document.body.style.overflow = 'hidden';
+        zoomFactor = 1.0;
+        updateZoomButtons();
+        if (scaleWrapper) scaleWrapper.style.transition = 'none';
+        requestAnimationFrame(() => {
+            scaleToViewport();
+            requestAnimationFrame(() => {
+                if (scaleWrapper) scaleWrapper.style.transition = '';
+            });
+        });
+        if (!skipHistory && extraitUrl && !window.location.pathname.endsWith('/extrait')) {
+            history.pushState({ pfFlipbook: true }, '', extraitUrl);
+        }
+    }
+
+    function closeOverlay(skipHistory = false) {
+        if (!overlay) return;
+        overlay.classList.remove('is-open');
+        overlay.setAttribute('aria-hidden', 'true');
+        document.body.style.overflow = '';
+        if (!skipHistory && extraitUrl && window.location.pathname.endsWith('/extrait')) {
+            history.pushState({}, '', baseUrl);
+        }
+    }
+
+    closeBtn?.addEventListener('click', () => closeOverlay());
+    overlay?.addEventListener('click', (e) => { if (e.target === overlay || e.target === viewport) closeOverlay(); });
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && overlay?.classList.contains('is-open')) closeOverlay();
+    });
+    btnZoomOut?.addEventListener('click', () => adjustZoom(-ZOOM_STEP));
+    btnZoomIn?.addEventListener('click',  () => adjustZoom( ZOOM_STEP));
+    attachPinchZoom(viewport, { getZoom: () => zoomFactor, setZoom, minZoom: ZOOM_MIN, maxZoom: ZOOM_MAX });
+
+    window.addEventListener('resize', () => {
+        if (overlay?.classList.contains('is-open')) scaleToViewport();
+    });
+
+    window.addEventListener('popstate', () => {
+        const atExtrait = window.location.pathname.endsWith('/extrait');
+        if (atExtrait && overlay && !overlay.classList.contains('is-open')) {
+            openOverlay(true);
+        } else if (!atExtrait && overlay && overlay.classList.contains('is-open')) {
+            closeOverlay(true);
+        }
+    });
+
+    document.querySelectorAll('[data-trigger-flipbook]').forEach(book => {
+        book.addEventListener('click', () => openOverlay());
+        book.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openOverlay(); }
+        });
+    });
+
+    // Auto-ouverture si l'URL se termine par /extrait (lien partagé)
+    if (window.location.pathname.endsWith('/extrait')) {
+        requestAnimationFrame(() => openOverlay(true));
+    }
+}
+
 async function initFlipbook(container) {
     const coverEl = container.querySelector('.pf-page--cover');
     if (!coverEl) return;
 
+    const pdfUrl = container.dataset.pdf || '';
+    if (!pdfUrl) {
+        initCoverOnly(container, coverEl);
+        return;
+    }
+
     const width  = parseInt(container.dataset.width,  10) || 400;
     const height = parseInt(container.dataset.height, 10) || 570;
-    const pdfUrl = container.dataset.pdf || '';
 
     let pdf = null;
-    if (pdfUrl) {
-        try {
-            pdf = await pdfjsLib.getDocument(pdfUrl).promise;
-        } catch (err) {
-            console.error('[passiflore-pageflip] PDF load error', err);
-        }
+    try {
+        const pdfjsLib = await loadPdfjs();
+        pdf = await pdfjsLib.getDocument(pdfUrl).promise;
+    } catch (err) {
+        console.error('[passiflore-pageflip] PDF load error', err);
     }
     const pdfNumPages = pdf ? pdf.numPages : 1;
     const hasCover4   = pdfNumPages >= 2;
@@ -103,8 +287,16 @@ async function initFlipbook(container) {
     let baseScale         = 1;
     let zoomFactor        = 1.0;
     let currentScale      = 1;
-    let singlePageMode    = window.innerWidth <= 782 && width > height;
-    let pdfReady          = !pdfUrl;
+    // Page d'affichage : ≤480 (téléphone) toujours simple — un roman portrait
+    // y est illisible en double page ; 481-1024 (tablette) simple seulement
+    // pour un livre au format paysage ; >1024 toujours double. Uniquement le
+    // mode de DÉPART : le bouton de la toolbar reste libre de le changer.
+    let singlePageMode    = window.innerWidth <= 480
+        ? true
+        : window.innerWidth <= 1024
+            ? width > height
+            : false;
+    let pdfReady          = false;
 
     const ZOOM_STEP = 0.1;
     const ZOOM_MIN  = 0.5;
@@ -254,8 +446,11 @@ async function initFlipbook(container) {
         scaleWrapper.style.transform = offset ? `translateX(${offset}px)` : '';
     }
 
-    function adjustZoom(delta) {
-        zoomFactor   = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, Math.round((zoomFactor + delta) * 10) / 10));
+    // Cible continue (pinch tactile) — les boutons passent par adjustZoom,
+    // qui arrondit au pas de 0.1 avant de retomber ici.
+    function setZoom(factor) {
+        zoomFactor   = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, factor));
+        showZoomIndicator(overlay, zoomFactor);
         currentScale = baseScale * zoomFactor;
         if (!scaleWrapper || !innerEl) return;
         const flipW = singlePageMode ? width : width * 2;
@@ -263,6 +458,10 @@ async function initFlipbook(container) {
         scaleWrapper.style.height = (height * currentScale) + 'px';
         applyFlipOffset();
         updateToolbarState();
+    }
+
+    function adjustZoom(delta) {
+        setZoom(Math.round((zoomFactor + delta) * 10) / 10);
     }
 
     function toggleSinglePageMode() {
@@ -351,7 +550,17 @@ async function initFlipbook(container) {
     }
 
     closeBtn?.addEventListener('click', () => closeOverlay());
-    overlay?.addEventListener('click', (e) => { if (e.target === overlay) closeOverlay(); });
+    overlay?.addEventListener('click', (e) => {
+        if (e.target === overlay || e.target === viewport) { closeOverlay(); return; }
+        // Double page : la couverture/dernière page n'occupe qu'une moitié
+        // du canvas (l'autre reste vide, cf. applyFlipOffset) — un clic dans
+        // cette moitié vide doit fermer comme un clic à côté du livre.
+        if (!singlePageMode && (flipState === 'cover' || flipState === 'end') && scaleWrapper?.contains(e.target)) {
+            const rect       = scaleWrapper.getBoundingClientRect();
+            const onLeftHalf = e.clientX < rect.left + rect.width / 2;
+            if (flipState === 'cover' ? onLeftHalf : !onLeftHalf) closeOverlay();
+        }
+    });
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape' && overlay?.classList.contains('is-open')) closeOverlay();
     });
@@ -364,6 +573,7 @@ async function initFlipbook(container) {
     btnLastPage?.addEventListener('click',   () => { if (flip) flip.turnToPage(lastIndex); });
     btnZoomOut?.addEventListener('click',    () => adjustZoom(-ZOOM_STEP));
     btnZoomIn?.addEventListener('click',     () => adjustZoom( ZOOM_STEP));
+    attachPinchZoom(viewport, { getZoom: () => zoomFactor, setZoom, minZoom: ZOOM_MIN, maxZoom: ZOOM_MAX });
     btnDownload?.addEventListener('click',   () => { if (pdfUrl) window.open(pdfUrl, '_blank', 'noopener'); });
 
     // ── Bouton "Feuilleter l'extrait" → ouvre + flippe ───────────
