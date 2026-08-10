@@ -183,6 +183,12 @@ Updated: 2026-03-23 12:48:18
     text-transform: uppercase;
     letter-spacing: 0.1em;
 }
+/* Titre <h1> discret pour les pages structurelles sans contenu éditorial
+   (Catalogue, Panier, Commander) — pas de barre de titre Kadence sur ces
+   pages, et rien à éditer où en poser un à la main. */
+.pf-page-titre {
+    margin: 0 0 var(--pf-space-6) !important;
+}
 /* Étiquette / valeur réutilisables : petite voix typo en capitales espacées, ton atténué.
    .pf-value partage la même voix que .pf-label mais reste pleine opacité (et cliquable)
    quand c'est un lien. */
@@ -1338,12 +1344,15 @@ body.admin-bar { --pf-adminbar: 32px; }
     text-transform: uppercase;
     white-space: nowrap;
 }
+.pf-badge--sm {
+    font-size: 0.6rem;
+}
 .pf-badge--success { background: var(--pf-success-bg); color: var(--pf-success); }
 .pf-badge--info    { background: var(--pf-info-bg);    color: var(--pf-info); }
 .pf-badge--warning { background: var(--pf-warning-bg); color: var(--pf-warning); }
 .pf-badge--danger  { background: var(--pf-danger-bg);  color: var(--pf-danger); }
 .pf-badge--muted   { background: #eee;    color: var(--pf-muted); }
-.pf-badge--accent  { background: var(--pf-red-soft); color: var(--pf-accent); }
+.pf-badge--accent  { background: var(--pf-accent); color: white; }
 .pf-badge--attente { background: var(--pf-sand); color: #6b5836; /* brun foncé lisible sur sable */ }
 
 /* =========================================================
@@ -1390,12 +1399,14 @@ body.admin-bar { --pf-adminbar: 32px; }
 }
 
 /* =========================================================
-   Infobulle « offre numérique » (.pf-numerique-tip) — composant partagé :
-   fiche livre (après le prix barré) + encart panier. Icône inline dans le texte ;
-   bulle en verre dépoli au survol/focus/tap. Ancrée à droite (l'icône est en bout
-   de ligne) → s'ouvre vers la gauche ; le recalage horizontal dans .site-container
-   est assuré par pf-tooltip.js. ========================================================= */
-.pf-numerique-tip {
+   Infobulle « i » générique (.pf-tooltip) — composant partagé : offre
+   numérique (fiche livre + encart panier), précision téléchargement ePub,
+   badge « En précommande » du panier (cart-backorder-badge.js), et tout
+   futur point d'aide contextuel. Icône inline dans le texte ; bulle en verre
+   dépoli au survol/focus/tap. Ancrée à droite (l'icône est en bout de ligne)
+   → s'ouvre vers la gauche ; le recalage horizontal dans .site-container est
+   assuré par pf-tooltip.js. ========================================================= */
+.pf-tooltip {
     position: relative;
     display: inline-flex;
     align-items: center;
@@ -1403,18 +1414,18 @@ body.admin-bar { --pf-adminbar: 32px; }
     margin-left: 0.15em;
     margin-bottom: 0.15em;
 }
-.pf-numerique-tip__trigger {
+.pf-tooltip__trigger {
     display: inline-flex;
     color: var(--pf-muted);
     cursor: help;
     border-radius: 50%;
 }
-.pf-numerique-tip__trigger svg { display: block; }
-.pf-numerique-tip:hover .pf-numerique-tip__trigger,
-.pf-numerique-tip__trigger:focus-visible {
+.pf-tooltip__trigger svg { display: block; }
+.pf-tooltip:hover .pf-tooltip__trigger,
+.pf-tooltip__trigger:focus-visible {
     color: var(--pf-accent);
 }
-.pf-numerique-tip__bubble {
+.pf-tooltip__bubble {
     position: absolute;
     bottom: calc(100% + 8px);
     right: 0;
@@ -1444,11 +1455,19 @@ body.admin-bar { --pf-adminbar: 32px; }
     pointer-events: none;
     cursor: default;
 }
-.pf-numerique-tip:hover .pf-numerique-tip__bubble,
-.pf-numerique-tip:focus-within .pf-numerique-tip__bubble,
-.pf-numerique-tip.is-open .pf-numerique-tip__bubble {
+.pf-tooltip:hover .pf-tooltip__bubble,
+.pf-tooltip:focus-within .pf-tooltip__bubble,
+.pf-tooltip.is-open .pf-tooltip__bubble {
     opacity: 1;
     visibility: visible;
+}
+
+/* Bascule verticale : bulle longue près du haut du viewport (ex. panneau
+   sticky) → ouverture vers le bas plutôt que vers le haut. Posée par
+   pf-tooltip.js (reposition()), jamais en CSS pur (dépend du scroll). */
+.pf-tooltip--below .pf-tooltip__bubble {
+    bottom: auto;
+    top: calc(100% + 8px);
 }
 
 /* Croix de fermeture — seulement épinglée (clic/tap/clavier, `.is-open`) : un
@@ -1459,10 +1478,10 @@ body.admin-bar { --pf-adminbar: 32px; }
    `.pf-roundbtn { display: flex; position: relative }` (même spécificité
    sinon en (0,1,0), et .pf-roundbtn est déclaré plus loin dans le fichier) —
    jamais !important entre fichiers du thème enfant (règle CSS du projet). */
-.pf-numerique-tip .pf-numerique-tip__close {
+.pf-tooltip .pf-tooltip__close {
     display: none;
 }
-.pf-numerique-tip.is-open .pf-numerique-tip__close {
+.pf-tooltip.is-open .pf-tooltip__close {
     display: flex;
     position: absolute;
     top: var(--pf-space-2);
@@ -1470,20 +1489,39 @@ body.admin-bar { --pf-adminbar: 32px; }
     pointer-events: auto; /* la bulle elle-même est pointer-events:none */
     --pf-roundbtn-size: 18px;
 }
-.pf-numerique-tip.is-open .pf-numerique-tip__close svg {
+.pf-tooltip.is-open .pf-tooltip__close svg {
     width: 10px;
     height: 10px;
 }
 /* Dégagement pour ne pas passer sous la croix : réservé seulement épinglée. */
-.pf-numerique-tip.is-open .pf-numerique-tip__bubble {
+.pf-tooltip.is-open .pf-tooltip__bubble {
     padding-right: var(--pf-space-5);
+}
+
+/* Icône du badge « En précommande » (panier + validation de commande,
+   cart-backorder-badge.js) : le fond est --pf-accent (rouge) avec texte
+   blanc — les couleurs par défaut de .pf-tooltip__trigger (--pf-muted au
+   repos, --pf-accent au survol) seraient illisibles dessus. Ici plutôt que
+   dans cart.css/checkout.css : le badge apparaît sur les deux pages. */
+.pf-cart-backorder-badge .pf-tooltip__trigger {
+    color: white;
+}
+.pf-cart-backorder-badge .pf-tooltip:hover .pf-tooltip__trigger,
+.pf-cart-backorder-badge .pf-tooltip__trigger:focus-visible {
+    color: color-mix(in srgb, white 80%, transparent);
+}
+
+/* Écart entre le prix et le badge (panier + récapitulatif de commande, même
+   wrapper natif dans les deux contextes). */
+.wc-block-cart-item__total-price-and-sale-badge-wrapper {
+    gap: var(--pf-space-1);
 }
 
 /* =========================================================
    Infobulle flottante des signets « liste de lecture » (.pf-book-bookmark-tip)
    Élément global unique posé en <body>, positionné en JS depuis le rect écran du
    signet (assets/js/shelf-bookmarks.js) → jamais rognée par l'overflow de la cover.
-   Reprend le verre dépoli de .pf-numerique-tip__bubble. ========================================================= */
+   Reprend le verre dépoli de .pf-tooltip__bubble. ========================================================= */
 .pf-book-bookmark-tip {
     position: fixed;
     top: 0;
@@ -1563,7 +1601,7 @@ body.admin-bar { --pf-adminbar: 32px; }
    en (0,2,0)/(0,3,0) pour battre `.pf-roundbtn { display: flex; position:
    relative }` (même spécificité sinon en (0,1,0), et .pf-roundbtn est
    déclaré plus loin dans le fichier) — jamais !important entre fichiers du
-   thème enfant (règle CSS du projet, cf. .pf-numerique-tip__close). */
+   thème enfant (règle CSS du projet, cf. .pf-tooltip__close). */
 .pf-distinctions-tip .pf-distinctions-tip__close {
     display: none;
 }

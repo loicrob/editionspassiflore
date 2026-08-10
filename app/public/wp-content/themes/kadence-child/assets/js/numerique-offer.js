@@ -82,7 +82,7 @@
 	// cocher, preventClick pour ne pas la cocher au clic) et le tooltip
 	// « téléchargement » d'un produit numérique (icône hors label).
 	if ( window.pfTooltip ) {
-		document.querySelectorAll( '.pf-numerique-tip' ).forEach( function ( tip ) {
+		document.querySelectorAll( '.pf-tooltip' ).forEach( function ( tip ) {
 			var inLabel = !! tip.closest( '.pf-numerique-offer' );
 			window.pfTooltip.wire( tip, inLabel ? { preventClick: true } : undefined );
 		} );

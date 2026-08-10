@@ -123,7 +123,7 @@ if ( function_exists( 'pf_numerique_offer_teaser' ) ) {
             <div class="pf-hero-inner site-container">
             <div class="pf-hero-haut">
             <div class="pf-hero-contenu">
-                <h1 class="screen-reader-text">Éditions Passiflore – En toute indépendance, depuis 2009.</h1>
+                <h1 class="screen-reader-text">Éditions Passiflore – En toute indépendance, depuis 2009</h1>
                 <div class="pf-hero-marque">
                     <div class="pf-hero-logo-wrap">
                         <?php

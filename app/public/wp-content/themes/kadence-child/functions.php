@@ -328,6 +328,24 @@ function passiflore_enqueue_auteurs_styles() {
     // Pages portant les blocs Cart/Checkout (Store API) : resynchronise le
     // compteur du panier dans le header, que les blocs ne rafraîchissent pas.
     if ( ( function_exists( 'is_cart' ) && is_cart() ) || ( function_exists( 'is_checkout' ) && is_checkout() ) ) {
+        // Composant infobulle « i » partagé (registré ici indépendamment de
+        // inc/numerique-offer.php, qui ne l'enregistre pas sur /commander).
+        wp_enqueue_script(
+            'pf-tooltip',
+            get_stylesheet_directory_uri() . '/assets/js/pf-tooltip.js',
+            [],
+            filemtime( get_stylesheet_directory() . '/assets/js/pf-tooltip.js' ),
+            true
+        );
+        // Badge « En précommande » à la place du badge de promo (panier +
+        // récapitulatif de la validation de commande, tous deux en blocs).
+        wp_enqueue_script(
+            'pf-cart-backorder-badge',
+            get_stylesheet_directory_uri() . '/assets/js/cart-backorder-badge.js',
+            [ 'wp-data', 'pf-tooltip' ],
+            filemtime( get_stylesheet_directory() . '/assets/js/cart-backorder-badge.js' ),
+            true
+        );
         wp_enqueue_script(
             'pf-cart-count-sync',
             get_stylesheet_directory_uri() . '/assets/js/cart-count-sync.js',
@@ -439,6 +457,7 @@ require_once get_stylesheet_directory() . '/inc/account-hub.php';
 require_once get_stylesheet_directory() . '/inc/shipping.php';
 require_once get_stylesheet_directory() . '/inc/boxtal-perf.php';
 require_once get_stylesheet_directory() . '/inc/numerique-offer.php';
+require_once get_stylesheet_directory() . '/inc/cart-backorder-badge.php';
 require_once get_stylesheet_directory() . '/inc/epub-storage.php';
 require_once get_stylesheet_directory() . '/inc/class-ebooks.php';
 require_once get_stylesheet_directory() . '/inc/checkout.php';

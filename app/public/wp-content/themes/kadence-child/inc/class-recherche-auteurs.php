@@ -87,6 +87,9 @@ class Passiflore_Recherche_Auteurs {
 					</div>
 				</div>
 			</div>
+			<?php // Page Auteurs : contenu = shortcode pur, aucun <h1> ailleurs
+			// (pas de contenu éditorial où en poser un à la main). ?>
+			<h1 class="pf-page-titre">Nos auteurs</h1>
 			<div class="pf-rech-grid"><?php echo $this->render_grid( $search ); ?></div>
 		</div>
 		<?php

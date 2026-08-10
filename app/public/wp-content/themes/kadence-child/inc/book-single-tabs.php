@@ -1458,7 +1458,7 @@ function passiflore_render_avis_item( array $avis, bool $hidden = false ) {
 	echo '<blockquote class="pf-quote bs-avis-item' . ( $pending ? ' bs-avis-item--pending' : '' ) . ( $hidden ? ' bs-item--hidden' : '' ) . '"'
 		. ( $own ? ' data-comment-id="' . (int) $avis['comment_id'] . '"' : '' ) . '>';
 	if ( $avis['titre'] !== '' ) {
-		echo '<h4 class="bs-avis-titre">' . esc_html( $avis['titre'] ) . '</h4>';
+		echo '<h3 class="bs-avis-titre">' . esc_html( $avis['titre'] ) . '</h3>';
 	}
 	if ( $avis['text'] !== '' ) {
 		echo '<p class="bs-avis-text">' . nl2br( esc_html( $avis['text'] ) ) . '</p>';

@@ -28,3 +28,22 @@ add_filter( 'woocommerce_store_api_cart_item_images', function ( $images ) {
 	}
 	return $images;
 } );
+
+/**
+ * Panier et Commander sont des pages bloc pures (contenu = bloc Cart/Checkout
+ * uniquement) : pas de contenu éditorial où poser un <h1> à la main, et la
+ * barre de titre Kadence est désactivée sur les Pages. On le restitue en
+ * code pour le SEO et la navigation lecteur d'écran.
+ */
+add_filter( 'the_content', function ( $content ) {
+	if ( ! in_the_loop() || ! is_main_query() ) {
+		return $content;
+	}
+	if ( is_cart() ) {
+		return '<h1>Panier</h1>' . $content;
+	}
+	if ( is_checkout() ) {
+		return '<h1>Commander</h1>' . $content;
+	}
+	return $content;
+} );

@@ -55,6 +55,36 @@ class Passiflore_Catalogue {
 		add_action( 'wp_enqueue_scripts', [ $this, 'register_assets' ] );
 		add_action( 'wp_ajax_pf_catalogue_filter',        [ $this, 'ajax_filter' ] );
 		add_action( 'wp_ajax_nopriv_pf_catalogue_filter', [ $this, 'ajax_filter' ] );
+		// Priorité 20 : Kadence pose son propre filtre sur ce hook (même priorité
+		// par défaut) et écrase $title sans tenir compte de la valeur reçue —
+		// le nôtre doit donc s'exécuter après pour avoir le dernier mot.
+		add_filter( 'get_the_archive_title', [ $this, 'archive_title' ], 20 );
+	}
+
+	/**
+	 * <h1> visible des archives de catégorie (Kadence, via the_archive_title()
+	 * dans template-parts/archive-title/title.php) — « Notre catalogue –
+	 * {rayon} – {catégorie} », ou juste « Notre catalogue – {rayon} » pour un
+	 * rayon de premier niveau. Réutilise TOP_CATEGORY_LABELS pour le rayon,
+	 * cohérent avec le switch affiché dans la barre du catalogue.
+	 */
+	public function archive_title( $title ) {
+		if ( ! is_product_taxonomy() ) {
+			return $title;
+		}
+		$term = get_queried_object();
+		if ( ! ( $term instanceof WP_Term ) ) {
+			return $title;
+		}
+		if ( $term->parent ) {
+			$parent = get_term( $term->parent, 'product_cat' );
+			if ( $parent && ! is_wp_error( $parent ) ) {
+				$rayon = self::TOP_CATEGORY_LABELS[ $parent->slug ] ?? $parent->name;
+				return 'Notre catalogue – ' . $rayon . ' – ' . $term->name;
+			}
+		}
+		$rayon = self::TOP_CATEGORY_LABELS[ $term->slug ] ?? $term->name;
+		return 'Notre catalogue – ' . $rayon;
 	}
 
 	public function register_assets() {
@@ -164,6 +194,12 @@ class Passiflore_Catalogue {
 				<?php echo $this->render_bar( $atts, $counts, $global_counts ); ?>
 				<?php echo $this->render_chips( $atts ); ?>
 			</div>
+			<?php // Page boutique elle-même : contenu shortcode pur, aucun <h1> ailleurs.
+			// Archive de taxonomie (même shortcode, autre contexte) : Kadence affiche
+			// déjà un <h1> (titre du terme), pas besoin d'en ajouter un second. ?>
+			<?php if ( is_shop() ) : ?>
+			<h1 class="screen-reader-text">Notre catalogue</h1>
+			<?php endif; ?>
 			<div class="pf-catalogue-grid"><?php echo $grid; ?></div>
 			<?php echo $this->render_filter_panel( $total ); ?>
 		</div>

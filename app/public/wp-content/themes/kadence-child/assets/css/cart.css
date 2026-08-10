@@ -141,6 +141,31 @@ html.pf-cart-redirecting .wp-block-woocommerce-empty-cart-block {
 	}
 }
 
+/* ─── Panier en blocs (Store API, `.wc-block-cart`) ──────────────────── */
+/* Contrairement aux sections ci-dessus (markup classique .woocommerce-cart,
+   inerte sur cette page), la grille des articles est rendue en React. */
+
+/* Ligne « Offre » (numerique-offer.php) : fait double emploi avec le badge de
+   précommande ci-dessous / l'encart de rappel numérique. Cible sa classe
+   dédiée (`className` posé dans pf_numerique_cart_item_data()) plutôt que
+   .wc-block-components-product-details entier, qui rend aussi les attributs
+   de variation — vide aujourd'hui (catalogue 100% produits simples) mais un
+   display:none global les masquerait aussi si un produit variable apparaissait. */
+.wc-block-cart .pf-numerique-offer-line {
+	display: none;
+}
+
+/* Badge « Économisez X € » : remplacé par le badge « En précommande »
+   (cart-backorder-badge.js + inc/cart-backorder-badge.php) au même endroit,
+   sous le prix. */
+.wc-block-cart .wc-block-components-product-badge.wc-block-components-sale-badge {
+	display: none;
+}
+
+.wc-block-cart .pf-cart-backorder-badge {
+	margin-top: 4px;
+}
+
 /* ─── Encart de rappel « version numérique » (injecté au-dessus du bloc panier) ─── */
 .pf-numerique-nudge {
 	margin-bottom: var(--pf-space-6);

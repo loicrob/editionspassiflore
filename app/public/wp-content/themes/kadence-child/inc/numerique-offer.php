@@ -218,7 +218,7 @@ function pf_numerique_offer_sentence( array $offer ): string {
 	}
 
 	return sprintf(
-		"Pour l’achat d’un format %s, le format numérique est %s.\n➜ Vous pourrez le télécharger en ePub une fois la commande effectuée.",
+		"Pour l’achat d’un format %s, le format numérique est %s.\n➜ Vous pourrez le télécharger en ePub (sans DRM) une fois la commande effectuée. Si vous passez commande en étant connecté(e), vous pourrez directement le lire depuis votre compte.",
 		$format,
 		$term
 	);
@@ -320,7 +320,7 @@ function pf_numerique_render_offer_checkbox( int $physical_id ): string {
 	?>
 	<label class="pf-numerique-offer" data-pf-numerique-id="<?php echo esc_attr( (int) $offer['numerique_id'] ); ?>">
 		<input type="checkbox" class="pf-numerique-offer__check">
-		<span class="pf-numerique-offer__text">Inclure le format numérique <?php if ( $is_free ) : ?>— <?php echo $price_html; // phpcs:ignore WordPress.Security.EscapeOutput ?><?php else : ?>pour <?php echo $price_html; // phpcs:ignore WordPress.Security.EscapeOutput ?><?php endif; ?><span class="pf-numerique-tip"><span class="pf-numerique-tip__trigger" tabindex="0" role="button" aria-label="Détails de l'offre numérique" aria-describedby="pf-numerique-tip-bubble"><svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor" aria-hidden="true"><path d="M11 7h2v2h-2V7zm0 4h2v6h-2v-6zm1-9C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/></svg></span><span class="pf-numerique-tip__bubble" id="pf-numerique-tip-bubble" role="tooltip"><?php echo esc_html( $tip_text ); ?></span></span></span>
+		<span class="pf-numerique-offer__text">Inclure le format numérique <?php if ( $is_free ) : ?>— <?php echo $price_html; // phpcs:ignore WordPress.Security.EscapeOutput ?><?php else : ?>pour <?php echo $price_html; // phpcs:ignore WordPress.Security.EscapeOutput ?><?php endif; ?><span class="pf-tooltip"><span class="pf-tooltip__trigger" tabindex="0" role="button" aria-label="Détails de l'offre numérique" aria-describedby="pf-numerique-tip-bubble"><svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor" aria-hidden="true"><path d="M11 7h2v2h-2V7zm0 4h2v6h-2v-6zm1-9C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/></svg></span><span class="pf-tooltip__bubble" id="pf-numerique-tip-bubble" role="tooltip"><?php echo esc_html( $tip_text ); ?></span></span></span>
 	</label>
 	<?php
 	$html = trim( (string) ob_get_clean() );
@@ -351,7 +351,7 @@ function pf_numerique_render_ebook_tip( int $id ): string {
 	$tip_id = 'pf-numerique-tip-bubble-ebook';
 	ob_start();
 	?>
-<span class="pf-numerique-tip"><span class="pf-numerique-tip__trigger" tabindex="0" role="button" aria-label="Précision sur le téléchargement" aria-describedby="<?php echo esc_attr( $tip_id ); ?>"><svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor" aria-hidden="true"><path d="M11 7h2v2h-2V7zm0 4h2v6h-2v-6zm1-9C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/></svg></span><span class="pf-numerique-tip__bubble" id="<?php echo esc_attr( $tip_id ); ?>" role="tooltip">Vous pourrez le télécharger en ePub une fois la commande effectuée.</span></span>
+<span class="pf-tooltip"><span class="pf-tooltip__trigger" tabindex="0" role="button" aria-label="Précision sur le téléchargement" aria-describedby="<?php echo esc_attr( $tip_id ); ?>"><svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor" aria-hidden="true"><path d="M11 7h2v2h-2V7zm0 4h2v6h-2v-6zm1-9C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/></svg></span><span class="pf-tooltip__bubble" id="<?php echo esc_attr( $tip_id ); ?>" role="tooltip">Vous pourrez le <strong>télécharger en ePub</strong> (sans DRM) une fois la commande effectuée. Si vous passez <strong>commande en étant connecté(e)</strong>, vous pourrez directement le <strong>lire depuis votre compte</strong>.</span></span>
 	<?php
 	return trim( (string) ob_get_clean() );
 }
@@ -449,8 +449,14 @@ function pf_numerique_cart_item_data( $data, $cart_item ) {
 		return $data;
 	}
 	$data[] = [
-		'key'   => __( 'Offre', 'kadence-child' ),
-		'value' => __( "Version numérique liée à l'achat du livre papier", 'kadence-child' ),
+		'key'       => __( 'Offre', 'kadence-child' ),
+		'value'     => __( "Version numérique liée à l'achat du livre papier", 'kadence-child' ),
+		// Cible précise pour cart.css (masquée dans le panier en blocs) sans
+		// toucher .wc-block-components-product-details : ce conteneur rend
+		// aussi les attributs de variation pour un produit variable, absents
+		// ici (catalogue 100% produits simples) mais qu'un display:none global
+		// masquerait aussi si ça changeait un jour.
+		'className' => 'pf-numerique-offer-line',
 	];
 	return $data;
 }
