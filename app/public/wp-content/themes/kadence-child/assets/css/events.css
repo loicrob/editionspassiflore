@@ -863,25 +863,22 @@
     scroll-snap-align: start;
 }
 
-.pf-event-auteurs-scroll .pf-card--compact .pf-card-content {
-    max-height: 130px;
-    overflow-y: auto;
-    scrollbar-width: thin;
-}
-
 /* Variante compacte de la tuile auteur */
-.pf-card--compact {
+.pf-event-auteurs-scroll .pf-card--compact {
     width: 170px;
 }
 
-.pf-card--compact .pf-card-title {
+.pf-event-auteurs-scroll .pf-card--compact .pf-card-title {
     font-size: var(--pf-text-sm);
 }
 
-.pf-card--compact .pf-card-content {
+.pf-event-auteurs-scroll .pf-card--compact .pf-card-content {
     margin: var(--pf-space-3);
     padding: 0;
     gap: var(--pf-space-1);
+    max-height: 130px;
+    overflow-y: auto;
+    scrollbar-width: thin;
 }
 
 .tribe-events-event-image img {

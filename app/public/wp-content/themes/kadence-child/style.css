@@ -551,7 +551,7 @@ h6 { font-family: var(--pf-font-body);    font-weight: var(--pf-weight-normal); 
 /* Sections séparées par un filet (cartes événement) : un filet au-dessus de chaque
    bloc sauf le premier ; l'espace vient du gap (au-dessus) + du padding-top (en dessous). */
 .pf-card-content--separated {
-    gap: var(--pf-space-3);
+    gap: var(--pf-space-3) !important;
 }
 .pf-card-content--separated > * + * {
     border-top: 1px solid var(--pf-border) !important;
