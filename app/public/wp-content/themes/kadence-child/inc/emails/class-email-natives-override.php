@@ -123,10 +123,10 @@ class Passiflore_Email_Customer_Refunded_Order extends WC_Email_Customer_Refunde
 }
 
 class Passiflore_Email_Customer_Invoice extends WC_Email_Customer_Invoice {
-	public function get_default_subject() {
+	public function get_default_subject( $paid = false ) {
 		return __( 'Détails de la commande Passiflore n°#{order_number}', 'kadence-child' );
 	}
-	public function get_default_heading() {
+	public function get_default_heading( $paid = false ) {
 		return __( 'Détails de la commande ci-dessous', 'kadence-child' );
 	}
 	public function get_default_additional_content() {
