@@ -602,9 +602,29 @@ add_action( 'admin_enqueue_scripts', function ( $hook ) {
  * ligne en double. La vérification préalable protège donc les 99% des
  * enregistrements du produit qui ne touchent aucun fichier (prix,
  * description…), pas seulement les remplacements d'ePub, rares.
+ *
+ * Deux ajouts par rapport à la version d'origine (statuts sur mesure,
+ * inc/order-statuses.php) :
+ *  - `has_status( wc_get_is_paid_statuses() )` au lieu d'un tableau figé
+ *    `['completed','processing']` : couvre désormais `pf-precommande` —
+ *    précisément le statut d'une commande qui ATTEND ce dépôt de fichier —
+ *    ainsi que `pf-retrait-att`/`expediee`/`livree`/`retiree`.
+ *  - un droit VRAIMENT nouveau (absent de `$already_granted`, donc pas un
+ *    remplacement de fichier où le hash est préservé) déclenche l'email
+ *    « Votre livre numérique est disponible » et tente de sortir la commande
+ *    de précommande (pf_order_release_from_precommande()).
  */
 add_action( 'woocommerce_process_product_meta', 'pf_epub_sync_permissions_for_product', 30 );
+add_action( 'woocommerce_update_product', 'pf_epub_sync_permissions_for_product', 30 );
 function pf_epub_sync_permissions_for_product( int $post_id ): void {
+	// Écran produit classique ET CRUD (`WC_Product::save()`) peuvent tous deux
+	// se déclencher pour le même enregistrement — une seule exécution utile.
+	static $done = [];
+	if ( isset( $done[ $post_id ] ) ) {
+		return;
+	}
+	$done[ $post_id ] = true;
+
 	$product = wc_get_product( $post_id );
 	if ( ! $product || ! $product->is_downloadable() ) {
 		return;
@@ -650,7 +670,7 @@ function pf_epub_sync_permissions_for_product( int $post_id ): void {
 
 	foreach ( $order_rows as $row ) {
 		$order = wc_get_order( (int) $row->order_id );
-		if ( ! $order || ! $order->has_status( [ 'completed', 'processing' ] ) ) {
+		if ( ! $order || ! $order->has_status( wc_get_is_paid_statuses() ) ) {
 			continue;
 		}
 		if ( $order->has_status( 'processing' ) && ! $grant_on_processing ) {
@@ -666,8 +686,42 @@ function pf_epub_sync_permissions_for_product( int $post_id ): void {
 			)
 		);
 
-		foreach ( array_diff( $current_download_ids, $already_granted ) as $download_id ) {
+		$newly_granted = array_diff( $current_download_ids, $already_granted );
+		foreach ( $newly_granted as $download_id ) {
 			wc_downloadable_file_permission( $download_id, $product, $order, max( 1, (int) $row->qty ) );
 		}
+
+		if ( $newly_granted ) {
+			pf_epub_notify_newly_available( $order, $post_id );
+		}
+
+		if ( function_exists( 'pf_order_release_from_precommande' ) ) {
+			pf_order_release_from_precommande( $order );
+		}
 	}
+}
+
+/**
+ * Envoie « Votre livre numérique est disponible » une seule fois par commande
+ * × produit — méta `_pf_ebook_notified` (tableau d'IDs produit) en garde
+ * complémentaire à celle des permissions ci-dessus : celle-ci protège
+ * l'ACCORDAGE des droits (par download_id), celle-ci protège l'EMAIL, un
+ * effet visible côté client qui ne doit jamais partir en double.
+ */
+function pf_epub_notify_newly_available( WC_Order $order, int $product_id ): void {
+	$notified = $order->get_meta( '_pf_ebook_notified' );
+	$notified = is_array( $notified ) ? $notified : [];
+
+	if ( in_array( $product_id, $notified, true ) ) {
+		return;
+	}
+
+	$mailer = WC()->mailer()->emails;
+	if ( isset( $mailer['Passiflore_Email_Ebook_Dispo'] ) ) {
+		$mailer['Passiflore_Email_Ebook_Dispo']->trigger_for_products( $order, [ $product_id ] );
+	}
+
+	$notified[] = $product_id;
+	$order->update_meta_data( '_pf_ebook_notified', $notified );
+	$order->save();
 }

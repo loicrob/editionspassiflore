@@ -324,7 +324,7 @@
    spécificité sinon (ordre de fichier non garanti). */
 .pf-hero-cat .pf-hero-cat-badge {
     position: absolute;
-    top: -0.7rem;
+    top: -1.1rem;
     left: 0.6rem;
     z-index: 2;
     background: var(--pf-accent);

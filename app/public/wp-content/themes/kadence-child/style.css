@@ -227,7 +227,7 @@ a.pf-value:hover, .pf-value-container a:hover, a.pf-value-highlight:hover, .pf-v
 .button,
 .wp-block-button__link,
 .wp-element-button {
-    padding: var(--pf-btn-pad);
+    padding: var(--pf-btn-pad) !important;
     border-radius: var(--pf-radius-md);
     font-size: var(--pf-btn-font-size);
     font-weight: var(--pf-btn-weight);
@@ -726,13 +726,10 @@ body .woocommerce form .form-row [placeholder]:focus::-webkit-input-placeholder 
    — et il CONTIENT les deux headers (ordinateur + mobile), donc un seul élément
    collant couvre toutes les tailles d'écran : plus de point de bascule.
    `top` = ce qui occupe déjà le haut du viewport :
-     --pf-adminbar  barre d'admin WP (fixed en desktop) ;
-     --pf-banner-h  bandeau bêta (sticky top:0), mesuré par son primer inline —
-                    TEMPORAIRE : le repli 0px rend cette ligne juste d'office le
-                    jour où le bandeau est retiré, sans rien à modifier ici. */
+     --pf-adminbar  barre d'admin WP (fixed en desktop). */
 #masthead {
     position: sticky;
-    top: calc(var(--pf-adminbar) + var(--pf-banner-h, 0px));
+    top: var(--pf-adminbar);
 }
 
 /* Logo du header ORDINATEUR — se réduit quand la rangée manque de place.

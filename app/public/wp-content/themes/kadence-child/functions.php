@@ -462,8 +462,10 @@ require_once get_stylesheet_directory() . '/inc/epub-storage.php';
 require_once get_stylesheet_directory() . '/inc/class-ebooks.php';
 require_once get_stylesheet_directory() . '/inc/checkout.php';
 require_once get_stylesheet_directory() . '/inc/checkout-consent.php';
+require_once get_stylesheet_directory() . '/inc/order-statuses.php';
+require_once get_stylesheet_directory() . '/inc/order-emails.php';
+require_once get_stylesheet_directory() . '/inc/site-relaunch-email.php';
 require_once get_stylesheet_directory() . '/inc/wc-notices-toast.php';
 require_once get_stylesheet_directory() . '/inc/mini-cart.php';
 require_once get_stylesheet_directory() . '/inc/shortcodes.php';
 require_once get_stylesheet_directory() . '/inc/privacy-cookies.php';
-require_once get_stylesheet_directory() . '/inc/beta-banner.php'; // TEMPORAIRE — bandeau phase bêta

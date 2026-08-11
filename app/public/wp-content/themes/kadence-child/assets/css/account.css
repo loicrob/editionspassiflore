@@ -125,6 +125,12 @@
 	background: var(--pf-surface-alt);
 }
 
+/* ─── Détail de commande (/voir-la-commande/) ─────────────────────── */
+
+body.woocommerce-view-order .order-status {
+	text-transform: lowercase;
+}
+
 /* ─── Boutons ────────────────────────────────────────────────────── */
 /* Les primaires .alt (WooCommerce) sont rougis par le câblage global Kadence ;
    les submits non-.alt (compte, connexion, inscription) sont alignés ici. */

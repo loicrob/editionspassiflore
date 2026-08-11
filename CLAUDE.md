@@ -251,7 +251,7 @@ WooCommerce affiche connexion et inscription côte à côte nativement. Remplac�
     - Le bouton « liste de lecture » invité ne navigue plus au clic : toast d'invitation (7s, une seule à la fois) avec action « Se connecter ».
 - Override de template justifié par des besoins markup-level (`<h1>`, placeholders, attributs clavier mobile) — libellés en placeholder mais `<label>` conservés en `.screen-reader-text`.
 - Claviers mobiles : `inputmode="email"` etc. sur l'identifiant de connexion, **pas `type="email"`** (accepte aussi l'identifiant WordPress généré).
-- Layout plein écran : `min-height: calc(100svh - var(--pf-auth-top))` — `svh` pour la stabilité face au repli de la barre iOS ; `--pf-auth-top` mesuré en JS (non exprimable en CSS pur, cf. bandeau bêta non-sticky + marges).
+- Layout plein écran : `min-height: calc(100svh - var(--pf-auth-top))` — `svh` pour la stabilité face au repli de la barre iOS ; `--pf-auth-top` mesuré en JS (non exprimable en CSS pur : marges variables au-dessus du panneau).
 - Fondu de placeholder au focus imposé par WooCommerce neutralisé **globalement dans `style.css`** (règle isolée — ne jamais grouper avec `::placeholder` standard, un pseudo-élément inconnu invalide toute la liste).
 
 ---
@@ -261,7 +261,7 @@ WooCommerce affiche connexion et inscription côte à côte nativement. Remplac�
 Kadence ne pose jamais `position: sticky` : deux headers rendus (desktop/mobile), bascule JS en `position: fixed` au scroll. Causait une bande morte à 1024px pile (JS/CSS breakpoints désaccordés) et un seuil empoisonné à chaque franchissement de point de bascule.
 
 **Correctif : `position: sticky` sur `#masthead`** (parent des deux headers, couvre toutes les largeurs) ; sticky JS de Kadence débranché (filtres `theme_mod_header_sticky`/`_mobile_` → `'no'`).
-- `top` = `calc(var(--pf-adminbar) + var(--pf-banner-h, 0px))` — hauteur du bandeau bêta mesurée par un primer inline (avant 1er paint) + `ResizeObserver`. Repli sans JS : `--pf-banner-h: 85px`.
+- `top` = `var(--pf-adminbar)` (barre d'admin WP, `fixed` en desktop).
 - Verre dépoli **toujours actif**, sans classe d'état (écart crème opaque/translucide ≈ 1-2/255 au repos — la bascule ne coûtait rien visuellement).
 - `#masthead` était déjà `position: relative` ; `#wrapper` en `overflow: clip` (ne casse pas sticky, contrairement à `hidden`).
 

@@ -43,7 +43,20 @@ add_filter( 'the_content', function ( $content ) {
 		return '<h1>Panier</h1>' . $content;
 	}
 	if ( is_checkout() ) {
+		if ( is_wc_endpoint_url( 'order-received' ) ) {
+			return '<h1>Commande confirmée</h1>' . $content;
+		}
+		if ( is_wc_endpoint_url( 'order-pay' ) ) {
+			return '<h1>Payer la commande</h1>' . $content;
+		}
 		return '<h1>Commander</h1>' . $content;
 	}
 	return $content;
 } );
+
+/**
+ * Texte sous le h1 de remerciement (page order-received).
+ */
+add_filter( 'woocommerce_thankyou_order_received_text', function ( $text, $order ) {
+	return 'Nous vous remercions pour votre commande, elle sera traitée dans les plus brefs délais.';
+}, 10, 2 );

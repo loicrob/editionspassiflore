@@ -205,6 +205,31 @@
 		for (var i = rows.length; i < shelves.length; i++) {
 			shelves[i].remove();
 		}
+
+		rearmLazyImages(bookshelf);
+	}
+
+	// PHP répartit les rangées pour une largeur de RÉFÉRENCE de 1100px ; sur un
+	// écran plus étroit, un livre né dans une rangée trop large pour l'écran
+	// réel démarre donc HORS viewport. Certains navigateurs n'observent le
+	// chargement natif `loading="lazy"` qu'à la position où l'image existait
+	// au moment de son insertion dans le document, et ne la ré-évaluent pas
+	// après le déplacement `appendChild` ci-dessus — hypothèse retenue pour
+	// une couverture qui reste vide tant qu'aucun autre événement ne force un
+	// recalcul de style sur son calque (un survol, qui anime .pf-book-inner,
+	// suffit à la faire apparaître). Réémettre `src` force le navigateur à
+	// ré-évaluer le chargement paresseux depuis la position FINALE du livre —
+	// sans forcer de chargement immédiat, `loading="lazy"` étant relu tel quel.
+	function rearmLazyImages(bookshelf) {
+		var imgs = bookshelf.querySelectorAll('img[loading="lazy"]');
+		for (var i = 0; i < imgs.length; i++) {
+			var img = imgs[i];
+			if (img.complete) continue;
+			var src = img.getAttribute('src');
+			if (!src) continue;
+			img.removeAttribute('src');
+			img.setAttribute('src', src);
+		}
 	}
 
 	/* ─── Ajustement à la largeur visible (anti-débordement mobile) ───

@@ -379,7 +379,7 @@ add_filter( 'woocommerce_terms_and_conditions_page_id', function ( $id ) {
  * impose que l'information soit accessible, pas qu'une case en affirme la
  * lecture — le lien déjà présent dans le footer (`inc/newsletter.php`) suffit.
  */
-function pf_consent_cgv_texte(): string {
+function pf_consent_cgv_texte( string $suite = 'à l’achat' ): string {
 	$cgv_id  = wc_terms_and_conditions_page_id();
 	$cgv_url = $cgv_id ? get_permalink( $cgv_id ) : '';
 
@@ -387,8 +387,19 @@ function pf_consent_cgv_texte(): string {
 		? '<a href="' . esc_url( $cgv_url ) . '" target="_blank" rel="noopener">Conditions Générales de Vente' . pf_new_window_note() . '</a>'
 		: 'Conditions Générales de Vente';
 
-	return 'J’accepte les ' . $lien_cgv . ' pour procéder à l’achat.';
+	return 'J’accepte les ' . $lien_cgv . ' pour procéder ' . $suite . '.';
 }
+
+/**
+ * Même case, gabarit CLASSIQUE — seule la page « Payer la commande »
+ * (order-pay) y recourt encore : c'est le seul endroit du tunnel où le bloc
+ * Checkout s'efface au profit du shortcode `[woocommerce_checkout]` (cf.
+ * inc/wc-notices-toast.php). Le bloc, lui, ignore entièrement ce filtre — sa
+ * case est réglée plus bas via `render_block_data`.
+ */
+add_filter( 'woocommerce_get_terms_and_conditions_checkbox_text', function () {
+	return pf_consent_cgv_texte( 'au paiement' );
+} );
 
 /**
  * Force la case à cocher du bloc « Conditions générales » et son libellé, et

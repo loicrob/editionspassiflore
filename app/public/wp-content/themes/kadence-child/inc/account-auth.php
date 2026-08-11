@@ -267,3 +267,45 @@ function pf_auth_enqueue_assets() {
 		true
 	);
 }
+
+/**
+ * Textes de la page « Mot de passe oublié » (gettext ciblé, pas d'édition du
+ * plugin, survit aux MAJ WooCommerce).
+ *
+ * Filtre global : les deux msgid ci-dessous n'apparaissent qu'à cet endroit
+ * dans WooCommerce/WP core (vérifié dans les .po), donc aucun risque de
+ * collision ailleurs.
+ */
+add_filter( 'gettext', 'pf_auth_lost_password_strings', 10, 3 );
+function pf_auth_lost_password_strings( $translated, $text, $domain ) {
+	if ( 'woocommerce' !== $domain ) {
+		return $translated;
+	}
+	if ( 'Lost your password? Please enter your username or email address. You will receive a link to create a new password via email.' === $text ) {
+		return __( 'Mot de passe oublié ? Veuillez saisir votre identifiant ou votre adresse e-mail. Vous recevrez un lien par e-mail pour créer un nouveau mot de passe.', 'kadence-child' );
+	}
+	if ( 'Invalid username or email.' === $text ) {
+		return __( 'Identifiant ou e-mail inconnu.', 'kadence-child' );
+	}
+	return $translated;
+}
+
+/**
+ * Bouton « Réinitialiser le mot de passe » : scopé au rendu du formulaire
+ * (woocommerce_before/after_lost_password_form), contrairement aux deux
+ * chaînes ci-dessus. Le msgid « Reset password » est partagé avec le libellé
+ * admin de l'e-mail de réinitialisation (class-wc-email-customer-reset-password.php),
+ * qu'un filtre global renommerait aussi par effet de bord.
+ */
+add_action( 'woocommerce_before_lost_password_form', function () {
+	add_filter( 'gettext', 'pf_auth_reset_password_button', 10, 3 );
+} );
+add_action( 'woocommerce_after_lost_password_form', function () {
+	remove_filter( 'gettext', 'pf_auth_reset_password_button', 10 );
+} );
+function pf_auth_reset_password_button( $translated, $text, $domain ) {
+	if ( 'woocommerce' === $domain && 'Reset password' === $text ) {
+		return __( 'Réinitialiser le mot de passe', 'kadence-child' );
+	}
+	return $translated;
+}

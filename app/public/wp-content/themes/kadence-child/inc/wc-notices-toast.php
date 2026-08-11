@@ -7,9 +7,8 @@
  * blocs Panier/Commande). Ici : le chargement des contrôleurs, le primer inline
  * qui voile les conteneurs AVANT le premier paint — les scripts vivant en pied de
  * page, sans ce voile la notice serait peinte à sa place d'origine puis retirée
- * (flash + saut de layout), même idiome que `.pf-beta-collapsed` (bandeau bêta) et
- * `.pf-cat-js` (catalogue) — et le rendu du wrapper classique sur les pages en
- * blocs, qui n'en produisent aucun par défaut.
+ * (flash + saut de layout), même idiome que `.pf-cat-js` (catalogue) — et le rendu
+ * du wrapper classique sur les pages en blocs, qui n'en produisent aucun par défaut.
  */
 
 if ( ! defined( 'ABSPATH' ) ) {

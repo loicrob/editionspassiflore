@@ -13,6 +13,7 @@ logs/
 # Secrets locaux (identifiants SFTP, etc. — jamais versionnés)
 # ==============================================================
 .netrc
+.my.cnf
 
 # ==============================================================
 # WordPress core

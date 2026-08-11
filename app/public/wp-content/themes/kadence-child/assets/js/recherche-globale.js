@@ -40,13 +40,6 @@
 	}
 	window.addEventListener('resize', updateStickyOffset, { passive: true });
 	window.addEventListener('orientationchange', updateStickyOffset);
-	// Exposée pour qui déplace la ligne de collage du header APRÈS le resize.
-	// Cas actuel unique : le bandeau bêta, dont la hauteur (donc --pf-banner-h, donc
-	// le `top` du header) est mesurée par un ResizeObserver — or ceux-ci sont livrés
-	// après l'événement `resize`. Sans ce rappel, une rotation de téléphone laissait
-	// l'offset une mesure en retard (17px d'écart entre 390 et 500px de large), et
-	// les barres collantes calées dessus autant à côté. TEMPORAIRE avec le bandeau.
-	window.pfRefreshStickyOffset = updateStickyOffset;
 	// Filet : header définitif une fois tout chargé (utile après un reload avec scroll
 	// restauré, où le sticky JS de Kadence n'a pas encore re-fixé le header au DOMContentLoaded).
 	window.addEventListener('load', updateStickyOffset);
