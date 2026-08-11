@@ -25,3 +25,11 @@ add_action( 'admin_init', 'passiflore_redirect_dashboard_to_analytics' );
 // Catégories) n'est utilisée nulle part sur ce site (pas de %category% dans
 // les permaliens, breadcrumbs Rank Math désactivés) → on masque le contrôle.
 add_filter( 'rank_math/admin/disable_primary_term', '__return_true' );
+
+// Rank Math ajoute une metabox (redirections liées) sur l'écran d'édition
+// d'un utilisateur — sans objet ici, le SEO ne concerne pas les fiches
+// profil. Masquée uniquement sur cet écran.
+add_action( 'admin_head-user-edit.php', 'passiflore_hide_rank_math_user_metabox' );
+function passiflore_hide_rank_math_user_metabox() {
+    echo '<style>.rank-math-metabox-wrap { display: none !important; }</style>';
+}
