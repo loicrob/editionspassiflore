@@ -125,7 +125,7 @@ Hors échelle assumés : `999px` (pilules/chips), `50%` (boutons ronds), `5px` (
 **Composants :**
 - `.pf-panel` (+ `--alt`, `--danger`) — panneau encadré (bordure claire, radius-lg, fond blanc/crème). Panneaux WooCommerce : sélecteurs conservés, mêmes tokens.
 - `.pf-quote` (+ `--accent`) — encart à filet gauche (avis, réponse éditeur).
-- `.pf-notice` (+ `--error`, `--success`) — bandeau de statut.
+- `.pf-notice` (+ `--error`, `--success`, `--warning`) — bandeau de statut.
 - `.pf-empty` — message « aucun résultat », voix commune aux 4 recherches du site (auteurs, catalogue/étagère, recherche globale, événements). Centré, `--pf-muted`, italique (état, pas contenu). ⚠️ Shim `(0,2,0)` obligatoire dans `events.css` (`.pf-empty.pf-empty`) : le reset `.tribe-common …, p, …` pose `padding:0` en `(0,1,1)` et bat la classe seule. Réservé à l'absence de résultat ; les repères de défilement infini événements gardent `.pf-ev-msg`, plus discret.
 - `.pf-roundbtn` — bouton rond rouge à icône crème (scroll infini événements, fermeture recherche globale).
 - `.pf-spinner` + `@keyframes pf-spin` — anneau de chargement unifié.

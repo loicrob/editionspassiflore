@@ -1823,6 +1823,7 @@ html.pf-notices-js .wc-block-components-notices__snackbar {
 }
 .pf-notice--error   { background: var(--pf-danger-bg);  color: var(--pf-danger); }
 .pf-notice--success { background: var(--pf-success-bg); color: var(--pf-success); }
+.pf-notice--warning { background: var(--pf-warning-bg); color: var(--pf-warning); border-left-color: var(--pf-warning); }
 
 /* =========================================================
    Message « aucun résultat » — voix commune à TOUTES les recherches du site

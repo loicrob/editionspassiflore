@@ -49,10 +49,19 @@ add_filter( 'the_content', function ( $content ) {
 		if ( is_wc_endpoint_url( 'order-pay' ) ) {
 			return '<h1>Payer la commande</h1>' . $content;
 		}
-		return '<h1>Commander</h1>' . $content;
+		return '<h1>Commander</h1>' . pf_checkout_email_notice() . $content;
 	}
 	return $content;
 } );
+
+/**
+ * Avertissement temporaire : les e-mails de commande ne sont pas encore
+ * totalement finalisés (doublons possibles, formulations à corriger). À
+ * retirer une fois le sujet réglé.
+ */
+function pf_checkout_email_notice(): string {
+	return '<div class="pf-notice pf-notice--warning">Les e-mails de commande ne sont pas finalisés : il se peut que vous en receviez en double ou que certains textes soient un peu étranges, veuillez nous excuser pour la gêne occasionnée (le processus de commande est totalement fonctionnel).</div>';
+}
 
 /**
  * Texte sous le h1 de remerciement (page order-received).
