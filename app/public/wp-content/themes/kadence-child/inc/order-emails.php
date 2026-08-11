@@ -65,35 +65,31 @@ function pf_register_order_emails( array $email_classes ): array {
 	 * l'option enregistrée (Réglages → Emails) et ne retombent sur le défaut
 	 * que si elle est vide. Filtrer la sortie écraserait donc une vraie
 	 * personnalisation admin ; surcharger seulement le défaut la laisse
-	 * intacte. unset() + ré-instanciation avec le MÊME id : les hooks de
-	 * déclenchement (posés dans le constructeur hérité) et les réglages déjà
-	 * enregistrés continuent de s'appliquer normalement.
+	 * intacte.
+	 *
+	 * ⚠️ Ré-affectées sous la MÊME clé de tableau (nom de classe natif), pas
+	 * sous un nom Passiflore_* : le cœur WooCommerce lit certains emails par
+	 * clé littérale en dur, hors de toute boucle — `WC_Meta_Box_Order_Actions::save()`
+	 * (« Renvoyer la notification de nouvelle commande ») fait
+	 * `WC()->mailer()->emails['WC_Email_New_Order']->trigger(...)`,
+	 * `WC_Emails::customer_invoice()` (« Envoyer les détails de la commande »)
+	 * fait `$this->emails['WC_Email_Customer_Invoice']`. Une clé renommée
+	 * laisse ces accès retomber sur `null` → fatale
+	 * « Call to a member function trigger() on null » (bug vécu le 2026-08-11).
+	 * `$this->id` (utilisé pour les réglages enregistrés) reste hérité du
+	 * constructeur parent, inchangé par ce renommage de clé.
 	 */
-	unset(
-		$email_classes['WC_Email_New_Order'],
-		$email_classes['WC_Email_Cancelled_Order'],
-		$email_classes['WC_Email_Customer_Cancelled_Order'],
-		$email_classes['WC_Email_Failed_Order'],
-		$email_classes['WC_Email_Customer_Failed_Order'],
-		$email_classes['WC_Email_Customer_On_Hold_Order'],
-		$email_classes['WC_Email_Customer_Processing_Order'],
-		$email_classes['WC_Email_Customer_Completed_Order'],
-		$email_classes['WC_Email_Customer_Refunded_Order'],
-		$email_classes['WC_Email_Customer_Invoice'],
-		$email_classes['WC_Email_Customer_Note']
-	);
-
-	$email_classes['Passiflore_Email_New_Order']               = new Passiflore_Email_New_Order();
-	$email_classes['Passiflore_Email_Cancelled_Order']         = new Passiflore_Email_Cancelled_Order();
-	$email_classes['Passiflore_Email_Customer_Cancelled_Order'] = new Passiflore_Email_Customer_Cancelled_Order();
-	$email_classes['Passiflore_Email_Failed_Order']             = new Passiflore_Email_Failed_Order();
-	$email_classes['Passiflore_Email_Customer_Failed_Order']    = new Passiflore_Email_Customer_Failed_Order();
-	$email_classes['Passiflore_Email_Customer_On_Hold_Order']   = new Passiflore_Email_Customer_On_Hold_Order();
-	$email_classes['Passiflore_Email_Customer_Processing_Order'] = new Passiflore_Email_Customer_Processing_Order();
-	$email_classes['Passiflore_Email_Customer_Completed_Order']  = new Passiflore_Email_Customer_Completed_Order();
-	$email_classes['Passiflore_Email_Customer_Refunded_Order']   = new Passiflore_Email_Customer_Refunded_Order();
-	$email_classes['Passiflore_Email_Customer_Invoice']          = new Passiflore_Email_Customer_Invoice();
-	$email_classes['Passiflore_Email_Customer_Note']             = new Passiflore_Email_Customer_Note();
+	$email_classes['WC_Email_New_Order']               = new Passiflore_Email_New_Order();
+	$email_classes['WC_Email_Cancelled_Order']         = new Passiflore_Email_Cancelled_Order();
+	$email_classes['WC_Email_Customer_Cancelled_Order'] = new Passiflore_Email_Customer_Cancelled_Order();
+	$email_classes['WC_Email_Failed_Order']             = new Passiflore_Email_Failed_Order();
+	$email_classes['WC_Email_Customer_Failed_Order']    = new Passiflore_Email_Customer_Failed_Order();
+	$email_classes['WC_Email_Customer_On_Hold_Order']   = new Passiflore_Email_Customer_On_Hold_Order();
+	$email_classes['WC_Email_Customer_Processing_Order'] = new Passiflore_Email_Customer_Processing_Order();
+	$email_classes['WC_Email_Customer_Completed_Order']  = new Passiflore_Email_Customer_Completed_Order();
+	$email_classes['WC_Email_Customer_Refunded_Order']   = new Passiflore_Email_Customer_Refunded_Order();
+	$email_classes['WC_Email_Customer_Invoice']          = new Passiflore_Email_Customer_Invoice();
+	$email_classes['WC_Email_Customer_Note']             = new Passiflore_Email_Customer_Note();
 
 	return $email_classes;
 }
