@@ -19,7 +19,7 @@ WordPress + WooCommerce migration of [www.editions-passiflore.com](https://www.e
 - **Custom fields:** Secure Custom Fields (SCF) — **not ACF**, even though `advanced-custom-fields` is also installed (ignore it)
 - **Custom post types / taxonomies:** registered via CPT UI plugin
 - **Local environment:** Local by Flywheel (PHP 8.2, Nginx, MySQL)
-- **Production hosting:** Ionos (en usage actuel — email quotidien + autres sites ; voir mémoire `hosting_decision`)
+- **Production hosting:** Ionos — `www.editions-passiflore.com` est en production depuis le 2026-08-11 (même compte que l'email quotidien + les autres sites du client ; voir mémoire `hosting_decision`)
 - **Kadence Blocks plugin:** not installed; layouts built in PHP templates
 
 ---
@@ -643,10 +643,8 @@ Page en brouillon : Politique en matière de remboursements et de retours.
 
 ## Migration status
 
-**⚠️ Stratégie de bascule en production (actée 2026-07-31) : PAS de migration de données séparée.** `v2.editions-passiflore.com` (Ionos, Apache) est le site de développement/relecture en ligne, alimenté par les données réelles reçues de la maison d'édition — **c'est cette même installation qui devient la production**, par bascule du domaine (et non par export/import vers une installation fraîche). Conséquences pratiques :
-- Tout code déployé sur v2 (git-ftp) est déployé **de fait en pré-production réelle** : traiter les correctifs de sécurité et les migrations one-shot (fichiers, meta) avec la même rigueur que sur un site déjà public — ce qu'est déjà v2, son URL n'étant simplement pas encore communiquée.
-- Avant la bascule finale, réappliquer les réglages listés dans la mémoire `prod_cutover_checklist` (désindexation à lever, WooCommerce Payments à repasser en mode réel, CSV de redirections à charger) — cf. aussi `hosting_decision` pour le contexte Ionos/o2switch.
-- Les scripts d'import ci-dessous ont servi à peupler v2 ; ils ne seront **pas** rejoués pour un hypothétique passage en production — il n'y a qu'un seul jeu de données, déjà en ligne sur v2.
+**Bascule en production effectuée le 2026-08-11.** `www.editions-passiflore.com` est la production réelle — même installation que l'ex-`v2.editions-passiflore.com` (bascule de domaine, pas de migration de données séparée). Déroulé, gotchas rencontrés (version PHP par domaine côté Ionos, case NS à ne pas cocher, `.htaccess` WPFC à re-régénérer après purge) et points encore à traiter (webhooks Stripe, CSV redirections, comptes clients) : mémoire `prod_cutover_checklist`.
+- Les scripts d'import ci-dessous ont servi à peupler l'installation ; ils ne seront **pas** rejoués — il n'y a qu'un seul jeu de données, désormais en production.
 
 - **Books:** imported once; updated data received from publishing house — re-import pending
 - **Authors:** previously imported then deleted; updated data received — re-import pending
@@ -756,7 +754,7 @@ Use **OOP classes** for complex, stateful features (e.g. `Passiflore_Bookshelf`,
 ### Phase 6 — Launch preparation
 15. ⬜ **SEO** — configure Rank Math: meta descriptions, sitemaps, schema for books/authors (partial: events + authors noindex/sitemap logic already in place)
 16. ⬜ **Performance** — image optimization, caching strategy (baseline established, see mémoire `performance_optimization`)
-17. ⬜ **Production deployment** — finalize hosting on Ionos (or alternative)
+17. ✅ **Production deployment** — live on Ionos at `www.editions-passiflore.com` (2026-08-11)
 18. ⬜ **PDF catalog** — link the catalog page PDF once ready
 
 ## Karpathy Skills - Build Commands
