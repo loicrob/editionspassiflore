@@ -23,18 +23,29 @@ add_action( 'admin_init', function () {
 	}
 } );
 
-// Contenu géré depuis l'admin (Pages), pas en dur ici — voir la page
-// "Vidéo QR — Enquête autour du ruedo" (brouillon, jamais publiée ni liée :
-// wp_insert_post() la récupère directement par ID, sans passer par une
-// requête publique, donc son statut brouillon ne bloque pas son affichage).
-const PF_QR_VIDEO_PAGE_ID = 8152;
+// Contenu géré depuis l'admin (Pages), pas en dur ici — voir la page de slug
+// PF_QR_VIDEO_PAGE_SLUG (brouillon, jamais publiée ni liée : récupérée
+// directement par slug, sans passer par une requête publique, donc son
+// statut brouillon ne bloque pas son affichage). Slug plutôt qu'ID : l'ID
+// numérique d'un post n'a aucune raison de coïncider entre le local et la
+// production, le slug si (à créer identique dans les deux environnements).
+const PF_QR_VIDEO_PAGE_SLUG = 'qr-video-enquete-ruedo';
 
 add_action( 'template_redirect', function () {
 	if ( ! get_query_var( 'pf_qr_video' ) ) {
 		return;
 	}
 
-	$page = get_post( PF_QR_VIDEO_PAGE_ID );
+	// 'any' n'inclut PAS les brouillons (WP_Query le résout comme "tout statut
+	// visible en recherche", ce qui exclut draft/pending/private) — lister les
+	// statuts explicitement pour retrouver la page quel que soit son état.
+	$pages = get_posts( [
+		'name'        => PF_QR_VIDEO_PAGE_SLUG,
+		'post_type'   => 'page',
+		'post_status' => [ 'publish', 'draft', 'pending', 'private', 'future' ],
+		'numberposts' => 1,
+	] );
+	$page = $pages ? $pages[0] : null;
 
 	header( 'X-Robots-Tag: noindex' );
 	?>
