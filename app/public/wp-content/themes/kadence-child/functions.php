@@ -443,7 +443,7 @@ require_once get_stylesheet_directory() . '/inc/book-groups-admin.php';
 require_once get_stylesheet_directory() . '/inc/event-hours.php';
 require_once get_stylesheet_directory() . '/inc/seo-events.php';
 require_once get_stylesheet_directory() . '/inc/pageflip.php';
-require_once get_stylesheet_directory() . '/inc/qr-video-enquete-ruedo.php';
+require_once get_stylesheet_directory() . '/inc/enquete-autour-du-ruedo-video-h7kq9s.php';
 require_once get_stylesheet_directory() . '/inc/section-nav.php';
 require_once get_stylesheet_directory() . '/inc/book-single-tabs.php';
 require_once get_stylesheet_directory() . '/inc/class-bookshelf.php';
