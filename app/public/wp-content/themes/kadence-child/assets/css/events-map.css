@@ -114,6 +114,13 @@
 	background: var(--pf-accent-dark);
 }
 
+/* Tiges de spiderfy (lieux co-localisés) : couleur de marque. Ne pas déclarer
+ * stroke-opacity ici — la lib l'anime de 0 à 0.5 via l'attribut de présentation
+ * (fondu d'apparition), une règle CSS figerait cette transition. */
+.leaflet-cluster-spider-leg {
+	stroke: var(--pf-accent);
+}
+
 /* ─── Infobulle : « carton » extérieur (chrome propre à Leaflet) ─────
  * Le SHELL de contenu (.pf-map-pop et ses sous-éléments : en-tête, zone de scroll,
  * rangée de tuiles) est un COMPOSANT PARTAGÉ défini dans style.css (réutilisé par la
@@ -142,6 +149,54 @@
 	   propre, supprime le padding visuel du wrapper (largeur indéterminée). */
 	margin: 0;
 	line-height: var(--pf-leading-snug, 1.3);
+}
+
+/* Infobulle à un seul événement (affiché) : la tuile pré-rendue (.pf-event-tile,
+   composant partagé avec l'accueil) EST l'infobulle — carton extérieur neutralisé,
+   pas de croisement avec .pf-map-pop* (style.css), composant partagé avec la vue
+   Mois mobile. Spécificité (0,3,0) : bat le doublage (0,2,0) du wrapper ci-dessus. */
+.leaflet-popup.pf-map-pop-solo .leaflet-popup-content-wrapper {
+	padding: 0;
+	background: transparent;
+	box-shadow: none;
+}
+
+/* Deux resets TEC frappent .pf-event-tile une fois le fond du wrapper retiré :
+   .tribe-common a la rend transparente (c'est un <a>) et .tribe-common h*
+   allège son titre — mêmes shims que .pf-map-pop__events .pf-card-title. */
+.pf-map-pop-solo .pf-event-tile {
+	width: 250px; /* flex-basis inerte hors conteneur flex : taille naturelle de l'accueil */
+	background: var(--pf-surface);
+	box-shadow: var(--pf-shadow-hover); /* reprend l'ombre que portait le wrapper */
+}
+.pf-map-pop-solo .pf-card-title {
+	font-weight: var(--pf-weight-semibold);
+}
+
+/* Croix de fermeture Leaflet : frère de .leaflet-popup-content-wrapper (donc hors
+   de .pf-card et de son overflow:hidden), repositionnée sur l'image 16/9 de la
+   tuile où le gris natif serait illisible. Langage visuel de .pf-roundbtn sans en
+   dépendre (accrocher la classe imposerait un classList.add impératif). Sélecteur
+   natif = .leaflet-container a.leaflet-popup-close-button (0,2,1) : (0,3,1) requis. */
+.leaflet-popup.pf-map-pop-solo a.leaflet-popup-close-button {
+	top: var(--pf-space-2);
+	right: var(--pf-space-2);
+	width: 24px;
+	height: 24px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	border-radius: 50%;
+	background: color-mix(in srgb, var(--pf-surface) 88%, transparent);
+	color: var(--pf-heading);
+	font: inherit;
+	line-height: 1;
+	box-shadow: var(--pf-shadow);
+}
+.leaflet-popup.pf-map-pop-solo a.leaflet-popup-close-button:hover,
+.leaflet-popup.pf-map-pop-solo a.leaflet-popup-close-button:focus {
+	background: var(--pf-accent);
+	color: var(--pf-cream);
 }
 
 /* Lien « attribution » OSM discret */

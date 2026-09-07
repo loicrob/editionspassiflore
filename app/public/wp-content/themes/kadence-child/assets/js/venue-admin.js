@@ -86,6 +86,11 @@
 
 			combos[ field ] = { confirm: confirm };
 
+			// Poignée stable inter-fichiers (venue-geo-picker.js) : `combos` est local à
+			// chaque passe de pfVenueAdminRun(), cette référence-ci leur survit.
+			window.pfVenueCombos = window.pfVenueCombos || {};
+			window.pfVenueCombos[ field ] = combos[ field ];
+
 			$input.on( 'focus input', function () { render( filtered( $input.val() ) ); } );
 
 			// mousedown + preventDefault : évite que le blur de l'input ne ferme
@@ -159,6 +164,8 @@
 		var $regRow     = $( 'tr.tribe-linked-type-venue-region' );
 		var $nameRow    = $( 'tr.tribe-linked-type-venue-name-is-address' );
 		var $addressRow = $( 'tr.tribe-linked-type-venue-address' );
+		var $countryRow = $( 'tr.tribe-linked-type-venue-country' );
+		var $geoRow     = $( 'tr.tribe-linked-type-venue-geo' );
 
 		if ( $cityRow.length && $deptRow.length ) {
 			$cityRow.after( $zipRow, $deptRow, $regRow );
@@ -166,18 +173,29 @@
 		if ( $addressRow.length && $nameRow.length ) {
 			$addressRow.before( $nameRow );
 		}
+		// Adresse → Ville → CP → Département → Région → Pays → Carte → Téléphone.
+		if ( $countryRow.length && $geoRow.length ) {
+			$countryRow.after( $geoRow );
+		}
 	}
 
 	// Case « Ce lieu n'a pas de nom, remplacer par l'adresse » : coché, le
 	// champ nom devient lecture seule et se remplit à la volée depuis
-	// l'Adresse. readonly (pas disabled) pour que la valeur soit bien soumise
-	// au submit — un champ disabled est exclu du POST par le navigateur.
-	// Partagée entre les deux contextes (fiche lieu autonome : #title :
-	// mini-formulaire événement : champ « Nom du lieu »), qui passent chacun
-	// leurs propres éléments.
-	function wireNameIsAddress( $checkbox, $title, $address ) {
+	// Adresse (Rue sinon Ville, cf. pf_venue_composed_name() dans
+	// inc/venue-admin.php qui fait foi côté serveur — ceci n'en est qu'un
+	// aperçu live). readonly (pas disabled) pour que la valeur soit bien
+	// soumise au submit — un champ disabled est exclu du POST par le
+	// navigateur. Partagée entre les deux contextes (fiche lieu autonome :
+	// #title ; mini-formulaire événement : champ « Nom du lieu »), qui
+	// passent chacun leurs propres éléments.
+	function wireNameIsAddress( $checkbox, $title, $street, $city ) {
 		if ( ! $checkbox.length || ! $title.length || $checkbox.data( 'pfInited' ) ) return;
 		$checkbox.data( 'pfInited', true );
+
+		function composed() {
+			var street = $street.val() || '';
+			return street !== '' ? street : ( $city.val() || '' );
+		}
 
 		var applyState = function () {
 			$title.prop( 'readonly', $checkbox.is( ':checked' ) )
@@ -186,25 +204,33 @@
 		applyState();
 		$checkbox.on( 'change', function () {
 			applyState();
-			if ( $checkbox.is( ':checked' ) ) $title.val( $address.val() );
+			if ( $checkbox.is( ':checked' ) ) $title.val( composed() );
 		} );
-		$address.on( 'input', function () {
-			if ( $checkbox.is( ':checked' ) ) $title.val( $address.val() );
+		$street.on( 'input', function () {
+			if ( $checkbox.is( ':checked' ) ) $title.val( composed() );
+		} );
+		$city.on( 'input', function () {
+			if ( $checkbox.is( ':checked' ) ) $title.val( composed() );
 		} );
 
 		// Rempart, fiche événement uniquement : le JS natif TEC (events-admin.js,
 		// fonction déclenchée sur le change du sélecteur de lieu — y compris une
 		// fois automatiquement au chargement via .trigger('change')) réinitialise
-		// value="" sur TOUS les <input>/<select> des lignes .linked-post. Cocher
-		// la case plus tard ne restaure PAS cet attribut (cocher/décocher ne
-		// change que `checked`, jamais `value`) : elle reste visuellement cochée
-		// et remplit bien le Nom depuis l'Adresse, mais se soumet vide — d'où
+		// value="" sur TOUS les <input>/<select> des lignes .linked-post — y
+		// compris le champ Nom lui-même une fois déjà composé, d'où la
+		// réimposition de composed() ici en plus de la case. Cocher la case plus
+		// tard ne restaure PAS cet attribut (cocher/décocher ne change que
+		// `checked`, jamais `value`) : elle reste visuellement cochée et remplit
+		// bien le Nom depuis l'Adresse, mais se soumet vide — d'où
 		// _VenueNameIsAddress enregistré à 0 malgré une case cochée à l'écran. On
 		// réimpose value="1" juste avant l'envoi du formulaire, dernier moment
 		// possible, sans dépendre de savoir quand la corruption a eu lieu.
 		var $form = $checkbox.closest( 'form' );
 		if ( $form.length ) {
-			$form.on( 'submit', function () { $checkbox.val( '1' ); } );
+			$form.on( 'submit', function () {
+				$checkbox.val( '1' );
+				if ( $checkbox.is( ':checked' ) ) $title.val( composed() );
+			} );
 		}
 	}
 
@@ -333,14 +359,15 @@
 		hookDynamicRows();
 
 		// Fiche lieu autonome.
-		wireNameIsAddress( $( '#pf-venue-name-is-address' ), $( '#title' ), $( '#venueAddress' ) );
+		wireNameIsAddress( $( '#pf-venue-name-is-address' ), $( '#title' ), $( '#venueAddress' ), $( '#venueCity' ) );
 
 		// Mini-formulaire « Créer un nouveau lieu » de la fiche événement —
 		// pas de champ Titre séparé ici, juste un champ « Nom du lieu ».
 		wireNameIsAddress(
 			$( '#pf-venue-name-is-address-inline' ),
 			$( 'input[name="venue[Venue][]"]' ),
-			$( 'input[name="venue[Address][]"]' )
+			$( 'input[name="venue[Address][]"]' ),
+			$( 'input[name="venue[City][]"]' )
 		);
 	}
 

@@ -2084,7 +2084,7 @@ html.pf-notices-js .wc-block-components-notices__snackbar {
    -----------------------------------------------------------------------------
    Contenu d'infobulle « en-tête + rangée de tuiles d'événement » réutilisé par :
      - la vue Carte (events-map.js/.css) : rendu dans un popup Leaflet, en-tête =
-       lieu (simple) ou dénominateur commun (cluster) ;
+       nom du lieu (une infobulle n'affiche jamais qu'un seul lieu) ;
      - la vue Mois sur mobile (events-month-mobile-pop.js, override mobile-day.php) :
        rendu dans un « carton » flottant .pf-month-pop-layer au-dessus du jour tapé,
        en-tête = le jour.
@@ -2112,9 +2112,8 @@ html.pf-notices-js .wc-block-components-notices__snackbar {
     border-bottom: 1px solid var(--pf-border);
 }
 
-/* Zone de scroll : rangée d'événements (infobulle simple / jour) ou pile de blocs
-   par lieu (cluster). Hauteur bornée (une tuile tient sans scroll vertical) ; au-delà
-   le scroll vertical prend le relais. */
+/* Zone de scroll : rangée d'événements (infobulle simple / jour). Hauteur bornée
+   (une tuile tient sans scroll vertical) ; au-delà le scroll vertical prend le relais. */
 .pf-map-pop__scroll.pf-map-pop__scroll {
     display: flex;
     flex-direction: column;
@@ -2123,12 +2122,6 @@ html.pf-notices-js .wc-block-components-notices__snackbar {
     min-height: 0;
     max-height: min(340px, 46vh);
     overflow-y: auto;
-}
-
-/* Dégagement de la barre de scroll VERTICALE : réservé aux clusters (plusieurs
-   rangées empilées) — une infobulle simple / un jour n'a qu'une rangée. */
-.pf-map-pop--cluster .pf-map-pop__scroll {
-    padding-right: var(--pf-space-2);
 }
 
 .pf-map-pop__area-label {
@@ -2145,15 +2138,6 @@ html.pf-notices-js .wc-block-components-notices__snackbar {
     font-size: var(--pf-text-xs);
 }
 
-/* Bloc d'un lieu (en-tête + cartes) — flex-shrink:0 : enfant de la zone de scroll,
-   sans quoi il se comprimerait au lieu de déborder et déclencher le scroll. */
-.pf-map-pop__group {
-    display: flex;
-    flex-direction: column;
-    flex-shrink: 0;
-    gap: var(--pf-space-2);
-}
-
 .pf-map-pop__venue-name {
     display: block;
     font-weight: var(--pf-weight-semibold);
@@ -2166,17 +2150,6 @@ html.pf-notices-js .wc-block-components-notices__snackbar {
     display: block;
     color: var(--pf-muted);
     font-size: var(--pf-text-xs);
-}
-
-/* Dans un cluster, l'en-tête donne déjà la zone → le nom de lieu passe en sous-titre. */
-.pf-map-pop--cluster .pf-map-pop__venue-name {
-    font-size: var(--pf-text-sm);
-}
-
-/* Séparateur entre lieux d'un même cluster. */
-.pf-map-pop--cluster .pf-map-pop__group + .pf-map-pop__group {
-    border-top: 1px solid var(--pf-border-light);
-    padding-top: var(--pf-space-4);
 }
 
 /* Enveloppe scroll-fade de la rangée : porte le fondu de bord gauche/droite.

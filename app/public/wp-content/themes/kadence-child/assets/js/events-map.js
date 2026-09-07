@@ -6,9 +6,11 @@
  * l'infobulle liste le ou les événements qui s'y déroulent.
  *
  * Regroupement (Leaflet.markercluster) : quand on dézoome, les lieux proches
- * fusionnent en un cluster. Le pin de cluster affiche le nombre d'ÉVÉNEMENTS
- * (pas de lieux) ; un clic ouvre une infobulle combinée dont l'en-tête est le
- * dénominateur commun des lieux (ville, sinon département, sinon région).
+ * fusionnent en un cluster. Le pin de cluster affiche le nombre de LIEUX
+ * (un marqueur = un lieu, pas un événement) ; un clic zoome jusqu'à ce que le groupe se scinde. Quand il
+ * est irréductible (lieux aux coordonnées identiques), le clic zoome quand même
+ * au niveau ville puis les pins s'écartent en éventail (spiderfy) — une infobulle
+ * n'affiche donc jamais qu'un seul lieu.
  *
  * Navigation vers/depuis la carte = rechargement complet (le switch pose un lien
  * simple pour cet onglet), donc une init sur DOMContentLoaded suffit ; l'idempotence
@@ -21,10 +23,6 @@
 		var d = document.createElement( 'div' );
 		d.textContent = ( s == null ) ? '' : String( s );
 		return d.innerHTML;
-	}
-
-	function uniq( arr ) {
-		return arr.filter( function ( v, i ) { return v && arr.indexOf( v ) === i; } );
 	}
 
 	// Recentre l'infobulle entièrement dans le conteneur carte, avec une marge `pad`
@@ -113,18 +111,6 @@
 		} );
 	}
 
-	// Bloc d'un lieu : en-tête (nom + ville) + sa rangée de cards d'événement.
-	// `areaLabel` (contexte cluster) : si la ville est identique au dénominateur
-	// commun déjà affiché en en-tête, on masque la ville (évite « Dax » répété).
-	function venueBlock( m, areaLabel ) {
-		var showCity = m.city && ( ! areaLabel || m.city.toLowerCase() !== String( areaLabel ).toLowerCase() );
-		var venue = '<div class="pf-map-pop__venue">' +
-			'<span class="pf-map-pop__venue-name">' + esc( m.venue || '' ) + '</span>' +
-			( showCity ? '<span class="pf-map-pop__venue-city">' + esc( m.city ) + '</span>' : '' ) +
-		'</div>';
-		return '<div class="pf-map-pop__group">' + venue + eventsRow( m ) + '</div>';
-	}
-
 	// Infobulle d'un lieu unique : titre (nom + ville) hors zone de scroll,
 	// seule la rangée d'événements défile (cf. .pf-map-pop__header / __scroll).
 	function singlePopup( m ) {
@@ -135,45 +121,23 @@
 		return '<div class="pf-map-pop">' + header + '<div class="pf-map-pop__scroll">' + eventsRow( m ) + '</div></div>';
 	}
 
-	// Dénominateur commun d'un ensemble de lieux : ville si toutes identiques,
-	// sinon département, sinon région, sinon null (lieux disparates).
-	function commonLabel( ms ) {
-		var cities = uniq( ms.map( function ( m ) { return m.city; } ) );
-		if ( cities.length === 1 ) { return cities[ 0 ]; }
-		var depts = uniq( ms.map( function ( m ) { return m.dept; } ) );
-		if ( depts.length === 1 ) { return depts[ 0 ]; }
-		var regions = uniq( ms.map( function ( m ) { return m.region; } ) );
-		if ( regions.length === 1 ) { return regions[ 0 ]; }
-		return null;
+	// Infobulle d'un lieu à un seul événement (affiché) : pas d'en-tête commun,
+	// la tuile pré-rendue EST l'infobulle — la ligne « Lieu » (lieuRow) y est
+	// ré-injectée sous la date, comme les tuiles « Événements à venir » de l'accueil.
+	function soloPopup( m ) {
+		var tpl = document.createElement( 'template' );
+		tpl.innerHTML = m.events[ 0 ].html;
+		var tile = tpl.content.firstElementChild;
+		var meta = tile && tile.querySelector( '.pf-event-card-meta' );
+		if ( meta && m.lieuRow ) { meta.insertAdjacentHTML( 'beforeend', m.lieuRow ); }
+		return tile || m.events[ 0 ].html;
 	}
 
-	// Infobulle combinée d'un cluster : en-tête = dénominateur commun + nombre
-	// total d'événements, puis un bloc par lieu.
-	function clusterPopup( childMarkers ) {
-		var ms = childMarkers.map( function ( c ) { return c.options.pfData; } );
-
-		var total = ms.reduce( function ( s, m ) {
-			return s + ( ( m.events || [] ).length || 0 );
-		}, 0 );
-
-		var label = commonLabel( ms ) || 'Plusieurs lieux';
-		var noun  = total > 1 ? 'événements' : 'événement';
-
-		var header = '<div class="pf-map-pop__header">' +
-			'<span class="pf-map-pop__area-label">' + esc( label ) + '</span>' +
-			'<span class="pf-map-pop__area-count">' + total + ' ' + noun + '</span>' +
-		'</div>';
-
-		var groups = ms.map( function ( m ) { return venueBlock( m, label ); } ).join( '' );
-
-		return '<div class="pf-map-pop pf-map-pop--cluster">' + header + '<div class="pf-map-pop__scroll">' + groups + '</div></div>';
-	}
-
-	// Pin d'un cluster : cercle rouge portant le nombre d'ÉVÉNEMENTS agrégés.
+	// Pin d'un cluster : cercle rouge portant le nombre de LIEUX agrégés
+	// (un marqueur = un lieu, cf. tête de fichier — pas le nombre d'événements
+	// qu'ils portent chacun).
 	function clusterIcon( cluster ) {
-		var count = cluster.getAllChildMarkers().reduce( function ( s, m ) {
-			return s + ( m.options.pfEventCount || 1 );
-		}, 0 );
+		var count = cluster.getAllChildMarkers().length;
 
 		var tier = count < 10 ? 'sm' : ( count < 100 ? 'md' : 'lg' );
 
@@ -190,6 +154,40 @@
 			iconAnchor:  [ 20, 20 ],
 			popupAnchor: [ 0, -34 ]
 		} );
+	}
+
+	// Vrai quand tous les lieux d'un cluster partagent EXACTEMENT les mêmes coordonnées
+	// (précision de géocodage « ville » : plusieurs lieux sans adresse précise retombent
+	// sur le même centroïde, cf. CLAUDE.md) — aucun zoom ne le scindera jamais.
+	function isColocated( cluster ) {
+		var kids  = cluster.getAllChildMarkers();
+		var first = kids[ 0 ].getLatLng();
+		return kids.every( function ( k ) {
+			var ll = k.getLatLng();
+			return ll.lat === first.lat && ll.lng === first.lng;
+		} );
+	}
+
+	// Marge réservée aux bords lors du recadrage d'un cluster réductible (zoomToCluster) —
+	// sans elle, Leaflet retient le zoom maximal où les bornes remplissent EXACTEMENT le
+	// viewport, collant les repères extrêmes aux bords (pins rognés). Asymétrique : le pin
+	// est dessiné 37px au-dessus de son point d'ancrage (iconAnchor, ligne 210) — une marge
+	// symétrique laisserait optiquement plus de vide en bas qu'en haut.
+	var EDGE_PAD_TL  = [ 44, 48 ]; // marge haut/gauche (px)
+	var EDGE_PAD_BR  = [ 44, 16 ]; // marge bas/droite (px)
+	var EDGE_PAD_SUM = [ 88, 64 ]; // padding TOTAL (TL+BR) attendu par getBoundsZoom()
+
+	// Relais de cluster.zoomToBounds() réservant la marge ci-dessus. ⚠️ Le garde-fou
+	// n'est pas décoratif : la lib n'atteint fitBounds() que si boundsZoom > mapZoom, donc
+	// boundsZoom peut valoir mapZoom + 1 — sur un cluster large, retirer 88×64px du viewport
+	// peut faire retomber le zoom paddé sur mapZoom, et fitBounds ne zoomerait alors plus du
+	// tout (clic mort, le groupe ne se scinde jamais). Dans ce cas on repasse au cadrage
+	// serré d'origine, qui garantit au moins un cran.
+	function zoomToCluster( map, cluster ) {
+		var padded = map.getBoundsZoom( cluster.getBounds(), false, EDGE_PAD_SUM );
+		cluster.zoomToBounds( padded > map.getZoom()
+			? { paddingTopLeft: EDGE_PAD_TL, paddingBottomRight: EDGE_PAD_BR }
+			: undefined );
 	}
 
 	function init() {
@@ -218,7 +216,6 @@
 		// interne, connaît la vraie position de l'infobulle et la repositionne
 		// correctement (un override CSS lui reste invisible → il sous-descendait).
 		var GAP_PIN     = pxVar( '--pf-space-2' ); // infobulle ↔ pin simple
-		var GAP_CLUSTER = pxVar( '--pf-space-6' ); // infobulle ↔ rond de cluster (plus haut)
 		var AUTOPAN_PAD = pxVar( '--pf-space-2' ); // marge conservée par l'auto-pan (haut de carte ↔ haut d'infobulle)
 
 		// Molette : n'active le zoom qu'après un clic sur la carte (ne détourne
@@ -270,11 +267,16 @@
 			}
 			if ( emptyEl ) { emptyEl.hidden = true; }
 
-			// Couche de regroupement : un clic sur cluster ouvre une infobulle combinée
-			// (pas de zoom auto ni de spiderfy). Repli sur des marqueurs simples si le
-			// plugin n'est pas chargé.
-			var useCluster = typeof L.markerClusterGroup === 'function';
-			var layer = useCluster
+			// Couche de regroupement : un clic sur cluster zoome jusqu'à ce qu'il se
+			// scinde ; spiderfy si les lieux sont co-localisés. Repli sur des marqueurs
+			// simples si le plugin n'est pas chargé.
+			// zoomToBoundsOnClick/spiderfyOnMaxZoom désactivés : le clic est géré entièrement
+			// à la main (cf. handler plus bas). Les deux tournaient sinon en parallèle du
+			// handler maison — la lib zoomant de son côté vers son maxZoom pendant qu'on
+			// zoomait nous-mêmes vers le niveau ville — et la double transition qui en
+			// résultait laissait le spiderfy s'ouvrir puis se refermer aussitôt tout seul.
+			var isCluster = typeof L.markerClusterGroup === 'function';
+			var layer = isCluster
 				? L.markerClusterGroup( {
 					maxClusterRadius:    60,
 					showCoverageOnHover: false,
@@ -287,17 +289,18 @@
 			var latlngs = [];
 			list.forEach( function ( m ) {
 				var mk = L.marker( [ m.lat, m.lng ], {
-					icon:         icon,
-					title:        m.venue || '',
-					pfData:       m,
-					pfEventCount: ( m.events || [] ).length || 1
+					icon:   icon,
+					title:  m.venue || '',
+					pfData: m
 				} );
-				mk.bindPopup( singlePopup( m ), {
+				var solo = ( m.events || [] ).length === 1;
+				mk.bindPopup( solo ? soloPopup( m ) : singlePopup( m ), {
 					// autoPan désactivé → recentrage maison au popupopen (panPopupIntoView).
 					// minWidth:0 → Leaflet dimensionne à la largeur naturelle du contenu,
-					// bornée par maxWidth : un lieu à 1 seul événement (rangée sans scroll
-					// horizontal) rétrécit à la largeur d'une tuile + ses marges ; à ≥2
-					// événements la rangée déborde et l'infobulle est plafonnée à maxWidth.
+					// bornée par maxWidth : à ≥2 événements la rangée déborde et l'infobulle
+					// est plafonnée à maxWidth ; à 1 événement la tuile solo impose sa propre
+					// largeur (250px, cf. events-map.css) via pf-map-pop-solo.
+					className: solo ? 'pf-map-pop-solo' : '',
 					minWidth: 0, maxWidth: 300, closeButton: true, autoPan: false,
 					offset: [ 0, -GAP_PIN ]
 				} );
@@ -305,26 +308,62 @@
 				latlngs.push( [ m.lat, m.lng ] );
 			} );
 
-			if ( useCluster ) {
-				layer.on( 'clusterclick', function ( a ) {
-					var cluster = a.layer;
-					// Lier + ouvrir seulement au 1er clic. Aux clics suivants, le handler
-					// de clic natif posé par bindPopup bascule l'infobulle (ouverte↔fermée)
-					// tout seul — on ne rappelle donc PAS openPopup, sinon la fermeture
-					// native (re-clic) serait aussitôt ré-ouverte par nous (fade-out/-in au
-					// lieu d'une fermeture, comme pour un marqueur simple).
-					if ( cluster.getPopup() ) {
+			// Clic sur un cluster : trois cas, gérés entièrement à la main (options
+			// natives désactivées, cf. commentaire ci-dessus).
+			// - Déjà spiderfié (reclic) : referme sans zoomer, cf. ⚠️ juste en dessous.
+			// - Réductible (les lieux se sépareront à un zoom suffisant) : zoomToBounds(),
+			//   exactement ce que la lib aurait fait nativement — simple relais.
+			// - Co-localisé (isColocated, coordonnées identiques) : zoome au niveau ville
+			//   (+2 crans, cf. discussion) puis spiderfie, plutôt que de spiderfier sur
+			//   place à la vue courante (souvent la France entière — sans contexte utile).
+			//   `getVisibleParent()` est relu APRÈS le zoom (le `cluster` capturé au clic
+			//   est périmé dès que la lib reconstruit son arbre pour le nouveau zoom) —
+			//   même mécanisme que celui qu'utilise en interne `zoomToShowLayer`.
+			//   ⚠️ Ne pas repasser à `cluster.zoomToBounds()` sans options : la lib calcule
+			//   son zoom sans marge et colle les repères scindés aux bords (cf. zoomToCluster).
+			//   ⚠️ `moveend` seul ne suffit pas : il peut se déclencher AVANT la fin du
+			//   décompte interne `_inZoomAnimation` de la lib, auquel cas `spiderfy()`
+			//   s'auto-annule silencieusement (son garde-fou interne) — d'où le double
+			//   abonnement `moveend`/`animationend` avec re-vérification du drapeau à
+			//   chaque déclenchement (l'un des deux finit par tomber sur `_inZoomAnimation`
+			//   réellement à 0).
+			// ⚠️ Le cas « déjà spiderfié » doit être vérifié EN PREMIER, avant isColocated() :
+			// spiderfy() déplace réellement les marqueurs enfants vers leurs positions en
+			// éventail (`setLatLng`), donc un reclic sur un cluster spiderfié les verrait
+			// comme non co-localisés et tomberait dans zoomToBounds() — fitBounds sur des
+			// points désormais artificiellement écartés, zoomant jusqu'au maxZoom réel de la
+			// carte (19) au lieu de refermer sans bouger.
+			// Garde clavier alignée sur celle de la lib (_zoomOrSpiderfy) : une touche non-
+			// Entrée sur `clusterkeypress` ne doit rien déclencher (un clic souris n'a pas
+			// de keyCode, la garde ne le concerne donc pas).
+			if ( isCluster ) {
+				layer.on( 'clusterclick clusterkeypress', function ( e ) {
+					if ( e.originalEvent && 'keyCode' in e.originalEvent && 13 !== e.originalEvent.keyCode ) {
 						return;
 					}
-					cluster.bindPopup( clusterPopup( cluster.getAllChildMarkers() ), {
-						// autoPan désactivé → recentrage maison au popupopen (panPopupIntoView).
-						// minWidth:0 : rétrécit à la largeur d'une tuile si AUCUN lieu du cluster
-						// n'a d'événements côte à côte ; sinon la rangée la plus large déborde et
-						// plafonne l'infobulle à maxWidth (même mécanisme que le marqueur simple).
-						minWidth: 0, maxWidth: 320, closeButton: true, autoPan: false,
-						// Dégagement accru : le repère de cluster est un rond, plus haut qu'un pin.
-						offset: [ 0, -GAP_CLUSTER ]
-					} ).openPopup();
+					var cluster = e.layer;
+					if ( layer._spiderfied === cluster ) {
+						cluster.unspiderfy();
+					} else if ( ! isColocated( cluster ) ) {
+						zoomToCluster( map, cluster );
+					} else {
+						var ready = function () {
+							if ( layer._inZoomAnimation ) { return; }
+							map.off( 'moveend', ready );
+							layer.off( 'animationend', ready );
+							var kid = cluster.getAllChildMarkers()[ 0 ];
+							var visible = kid && layer.getVisibleParent( kid );
+							if ( visible && visible !== kid ) {
+								visible.spiderfy();
+							}
+						};
+						map.on( 'moveend', ready );
+						layer.on( 'animationend', ready );
+						map.setView( cluster.getLatLng(), 15, { animate: true } );
+					}
+					if ( e.originalEvent && 13 === e.originalEvent.keyCode ) {
+						map.getContainer().focus();
+					}
 				} );
 			}
 
@@ -334,7 +373,11 @@
 			if ( latlngs.length === 1 ) {
 				map.setView( latlngs[ 0 ], 13 );
 			} else {
-				map.fitBounds( latlngs, { padding: [ 44, 44 ], maxZoom: 13 } );
+				// Même marge que zoomToCluster (EDGE_PAD_*) : une seule définition de
+				// « marge de bord » dans ce fichier. Effet de bord assumé et minime : la
+				// vue d'ouverture décale de 16px vers le bas (et est de toute façon
+				// plafonnée par maxZoom:13 le plus souvent).
+				map.fitBounds( latlngs, { paddingTopLeft: EDGE_PAD_TL, paddingBottomRight: EDGE_PAD_BR, maxZoom: 13 } );
 			}
 		}
 

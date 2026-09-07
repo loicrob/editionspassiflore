@@ -66,8 +66,14 @@ class Passiflore_Events_Map {
 	const GEO_META_LAT         = '_pf_venue_lat';
 	const GEO_META_LNG         = '_pf_venue_lng';
 	const GEO_META_SRC         = '_pf_venue_geo_src'; // adresse tentée (fraîcheur + anti-boucle backfill)
+	const GEO_META_PRECISION   = '_pf_venue_geo_precision'; // 'street' | 'city' | 'manual' ; absente = jamais géocodé/échec
+	const GEO_PRECISION_STREET = 'street';
+	const GEO_PRECISION_CITY   = 'city';
+	const GEO_PRECISION_MANUAL = 'manual';
 	const GEO_BACKFILL_HOOK    = 'pf_geocode_backfill';
 	const GEO_MAX_PER_BACKFILL = 5;                  // lieux géocodés par passe de backfill (WP-Cron)
+	const GEO_REPAIR_OPTION    = 'pf_venue_geo_repair_version'; // bump → rejoue la réparation ci-dessous
+	const GEO_REPAIR_VERSION   = '1';
 
 	/** @var float microtime du dernier appel Nominatim (throttle >= 1,1 s). */
 	private static $last_nominatim = 0.0;
@@ -94,12 +100,18 @@ class Passiflore_Events_Map {
 		add_action( 'save_post_tribe_venue', [ $this, 'geocode_on_save' ], 25 );
 		add_action( 'tribe_events_venue_created', [ $this, 'geocode_on_save' ], 25 );
 		add_action( 'admin_init',            [ $this, 'maybe_schedule_backfill' ] );
+		add_action( 'admin_init',            [ $this, 'maybe_repair_empty_geo_src' ] );
 		add_action( self::GEO_BACKFILL_HOOK, [ $this, 'run_backfill' ] );
 
 		// Recherche sur la carte : renvoie des IDs d'événements classés (le front
 		// filtre ses marqueurs). Même moteur que la recherche liste/globale.
 		add_action( 'wp_ajax_pf_events_map_search',        [ $this, 'ajax_search' ] );
 		add_action( 'wp_ajax_nopriv_pf_events_map_search', [ $this, 'ajax_search' ] );
+
+		// Aperçu de géocodage pour l'admin (statut affiché à la frappe de
+		// l'adresse, avant tout enregistrement) — cf. venue-geo-picker.js.
+		// wp_ajax_ uniquement : appel réseau sortant, jamais nopriv.
+		add_action( 'wp_ajax_pf_venue_geocode_preview', [ $this, 'ajax_geocode_preview' ] );
 	}
 
 	/* ─── Enregistrement de la vue ─────────────────────────────────── */
@@ -426,29 +438,38 @@ class Passiflore_Events_Map {
 				continue;
 			}
 
-			$evs = [];
+			$evs      = [];
+			$lieu_row = '';
 			foreach ( $venue_events as $event ) {
+				$norm = Passiflore_Event_Tiles::normalize_event( (int) $event->ID );
+				if ( '' === $lieu_row ) {
+					// Ligne « Lieu » du marqueur (un seul événement affiché → pas d'en-tête
+					// commun) : recalculée ici plutôt que dérivée de tribe_get_venue()/city()
+					// ci-dessous, qui n'incluent ni le département ni la même forme
+					// d'échappement que le rendu accueil (cf. pf_get_event_venue_parts()).
+					$lieu_row = pf_render_lieu_meta_row(
+						(string) ( $norm['venue_name'] ?? '' ),
+						(string) ( $norm['venue_city'] ?? '' )
+					);
+				}
 				$evs[] = [
 					'id'   => (int) $event->ID, // pour le filtrage par la recherche carte
 					// Card d'événement pré-rendue côté serveur : composant global partagé
 					// avec l'accueil/fiche auteur (Passiflore_Event_Tiles::render_tile).
-					// Ligne « Lieu » omise (show_lieu=false) : le lieu est déjà le titre
-					// de l'infobulle. HTML déjà échappé par render_tile → injecté tel quel.
-					'html' => Passiflore_Event_Tiles::render_tile(
-						Passiflore_Event_Tiles::normalize_event( (int) $event->ID ),
-						false
-					),
+					// Ligne « Lieu » omise (show_lieu=false) : le lieu est porté par l'en-tête
+					// de l'infobulle à plusieurs événements, ou ré-injectée par le JS
+					// (lieuRow) quand un seul événement est affiché et que l'en-tête disparaît.
+					'html' => Passiflore_Event_Tiles::render_tile( $norm, false ),
 				];
 			}
 
 			$markers[] = [
-				'lat'    => $coords['lat'],
-				'lng'    => $coords['lng'],
-				'venue'  => html_entity_decode( tribe_get_venue( $venue_id ), ENT_QUOTES ),
-				'city'   => html_entity_decode( tribe_get_city( $venue_id ), ENT_QUOTES ),
-				'dept'   => get_post_meta( $venue_id, '_VenueDepartement', true ),
-				'region' => get_post_meta( $venue_id, '_VenueRegion', true ),
-				'events' => $evs,
+				'lat'     => $coords['lat'],
+				'lng'     => $coords['lng'],
+				'venue'   => html_entity_decode( tribe_get_venue( $venue_id ), ENT_QUOTES ),
+				'city'    => html_entity_decode( tribe_get_city( $venue_id ), ENT_QUOTES ),
+				'events'  => $evs,
+				'lieuRow' => $lieu_row,
 			];
 		}
 
@@ -484,14 +505,40 @@ class Passiflore_Events_Map {
 		if ( wp_is_post_revision( $venue_id ) || wp_is_post_autosave( $venue_id ) ) {
 			return;
 		}
-		// save_post peut se déclencher plusieurs fois par requête : une seule passe.
+		// save_post peut se déclencher plusieurs fois par requête : une seule passe
+		// par (lieu, adresse vue à cet instant) — PAS juste par lieu. Un lieu créé
+		// en ligne depuis la fiche événement (Tribe__Events__Venue::create())
+		// déclenche save_post_tribe_venue AVANT que save_meta() n'écrive
+		// _VenueAddress/_VenueZip/_VenueCity, puis tribe_events_venue_created
+		// juste après : sans l'adresse dans la clé, la 1re passe (sans adresse)
+		// poserait déjà $done[$venue_id] et la 2e (avec la vraie adresse) serait
+		// annulée à tort — exactement le rattrapage qu'on veut ici.
 		static $done = [];
-		if ( isset( $done[ $venue_id ] ) ) {
+		$key = $venue_id . '|' . self::venue_address_string( $venue_id );
+		if ( isset( $done[ $key ] ) ) {
 			return;
 		}
-		$done[ $venue_id ] = true;
+		$done[ $key ] = true;
 
 		$this->geocode_venue( (int) $venue_id );
+	}
+
+	/**
+	 * Réparation unique : avant le correctif ci-dessus, les lieux créés en ligne
+	 * depuis la fiche événement se voyaient stamper GEO_META_SRC à '' (adresse
+	 * vue avant save_meta()) sans jamais être repris — ungeocoded_venue_ids()
+	 * cherche NOT EXISTS, or la clé existe (valeur ''). On supprime toutes les
+	 * valeurs '' : les lieux réellement sans adresse re-stampent '' en une passe
+	 * de backfill et ressortent du lot (terminaison garantie) ; les autres sont
+	 * enfin géocodés. Auto-cicatrisant, même motif que pf_carte_rw_version.
+	 */
+	public function maybe_repair_empty_geo_src() {
+		if ( get_option( self::GEO_REPAIR_OPTION ) === self::GEO_REPAIR_VERSION ) {
+			return;
+		}
+		global $wpdb;
+		$wpdb->delete( $wpdb->postmeta, [ 'meta_key' => self::GEO_META_SRC, 'meta_value' => '' ] );
+		update_option( self::GEO_REPAIR_OPTION, self::GEO_REPAIR_VERSION );
 	}
 
 	/**
@@ -502,9 +549,20 @@ class Passiflore_Events_Map {
 	 * @return array{lat:float,lng:float}|null
 	 */
 	private function geocode_venue( $venue_id ) {
-		$addr = $this->venue_address_string( $venue_id );
-		$src  = get_post_meta( $venue_id, self::GEO_META_SRC, true );
-		$lat  = get_post_meta( $venue_id, self::GEO_META_LAT, true );
+		$addr = self::venue_address_string( $venue_id );
+
+		// Coordonnées ajustées à la main (carte admin) : on ne les retouche
+		// jamais tant que le drapeau tient, mais on stampe quand même l'adresse
+		// courante pour que le backfill ne considère pas ce lieu comme non géocodé.
+		if ( self::GEO_PRECISION_MANUAL === get_post_meta( $venue_id, self::GEO_META_PRECISION, true ) ) {
+			update_post_meta( $venue_id, self::GEO_META_SRC, $addr );
+			$lat = get_post_meta( $venue_id, self::GEO_META_LAT, true );
+			$lng = get_post_meta( $venue_id, self::GEO_META_LNG, true );
+			return ( '' !== $lat && '' !== $lng ) ? [ 'lat' => (float) $lat, 'lng' => (float) $lng ] : null;
+		}
+
+		$src = get_post_meta( $venue_id, self::GEO_META_SRC, true );
+		$lat = get_post_meta( $venue_id, self::GEO_META_LAT, true );
 
 		// Déjà géocodé avec succès pour cette adresse → rien à faire.
 		if ( $src === $addr && '' !== $lat ) {
@@ -516,24 +574,80 @@ class Passiflore_Events_Map {
 			update_post_meta( $venue_id, self::GEO_META_SRC, '' );
 			delete_post_meta( $venue_id, self::GEO_META_LAT );
 			delete_post_meta( $venue_id, self::GEO_META_LNG );
+			delete_post_meta( $venue_id, self::GEO_META_PRECISION );
 			return null;
 		}
 
-		$coords = $this->geocode( $venue_id );
+		$result = $this->geocode( $venue_id );
 
 		// Adresse tentée mémorisée dans tous les cas (anti-boucle du backfill).
 		update_post_meta( $venue_id, self::GEO_META_SRC, $addr );
 
-		if ( ! $coords ) {
+		if ( ! $result ) {
 			delete_post_meta( $venue_id, self::GEO_META_LAT );
 			delete_post_meta( $venue_id, self::GEO_META_LNG );
+			delete_post_meta( $venue_id, self::GEO_META_PRECISION );
 			return null;
 		}
 
-		update_post_meta( $venue_id, self::GEO_META_LAT, $coords['lat'] );
-		update_post_meta( $venue_id, self::GEO_META_LNG, $coords['lng'] );
+		update_post_meta( $venue_id, self::GEO_META_LAT, $result['lat'] );
+		update_post_meta( $venue_id, self::GEO_META_LNG, $result['lng'] );
+		update_post_meta( $venue_id, self::GEO_META_PRECISION, $result['precision'] );
 
-		return $coords;
+		return $result;
+	}
+
+	/**
+	 * Fixe des coordonnées manuelles pour un lieu (repère déplacé sur la carte
+	 * admin) : precision passe à 'manual', geocode_venue() ne les retouche plus
+	 * tant que ce drapeau tient (cf. son garde en tête de fonction).
+	 */
+	public static function set_manual_coords( $venue_id, $lat, $lng ) {
+		$lat = (float) $lat;
+		$lng = (float) $lng;
+		if ( $lat < -90 || $lat > 90 || $lng < -180 || $lng > 180 ) {
+			return;
+		}
+		update_post_meta( $venue_id, self::GEO_META_LAT, $lat );
+		update_post_meta( $venue_id, self::GEO_META_LNG, $lng );
+		update_post_meta( $venue_id, self::GEO_META_PRECISION, self::GEO_PRECISION_MANUAL );
+	}
+
+	/**
+	 * Persiste les coordonnées affichées par l'aperçu admin (venue-geo-picker.js)
+	 * quand elles correspondent encore à l'adresse enregistrée (cf.
+	 * pf_venue_geo_key(), inc/venue-admin.php) : l'aperçu à la frappe et le
+	 * géocodage à l'enregistrement peuvent interroger des variantes différentes
+	 * de la même adresse (ex. avec/sans CP déduit) et donc retomber sur des
+	 * coordonnées différentes — cf. CLAUDE.md. En stampant GEO_META_SRC à
+	 * l'adresse courante, geocode_on_save() @25 (qui suit dans la même requête)
+	 * voit un cache hit et ne relance aucun appel réseau.
+	 */
+	public static function set_geocoded_coords( $venue_id, $lat, $lng, $precision ) {
+		$lat = (float) $lat;
+		$lng = (float) $lng;
+		if ( $lat < -90 || $lat > 90 || $lng < -180 || $lng > 180 ) {
+			return;
+		}
+		if ( ! in_array( $precision, [ self::GEO_PRECISION_STREET, self::GEO_PRECISION_CITY ], true ) ) {
+			return;
+		}
+		update_post_meta( $venue_id, self::GEO_META_LAT, $lat );
+		update_post_meta( $venue_id, self::GEO_META_LNG, $lng );
+		update_post_meta( $venue_id, self::GEO_META_PRECISION, $precision );
+		update_post_meta( $venue_id, self::GEO_META_SRC, self::venue_address_string( $venue_id ) );
+	}
+
+	/**
+	 * Rend la main au géocodage automatique : la passe @25 qui suit dans la même
+	 * requête (geocode_on_save) regéocode alors l'adresse courante normalement.
+	 */
+	public static function clear_manual_coords( $venue_id ) {
+		if ( self::GEO_PRECISION_MANUAL !== get_post_meta( $venue_id, self::GEO_META_PRECISION, true ) ) {
+			return;
+		}
+		delete_post_meta( $venue_id, self::GEO_META_PRECISION );
+		delete_post_meta( $venue_id, self::GEO_META_SRC );
 	}
 
 	/* ─── Backfill des lieux existants (WP-Cron, auto-drainant) ────── */
@@ -588,7 +702,7 @@ class Passiflore_Events_Map {
 	 * composante : un lieu réduit au seul pays n'est pas une adresse géocodable
 	 * (et ne doit pas produire une clé « France » bidon).
 	 */
-	private function venue_address_string( $venue_id ) {
+	public static function venue_address_string( $venue_id ) {
 		$parts = array_filter(
 			[
 				get_post_meta( $venue_id, '_VenueAddress', true ),
@@ -608,13 +722,9 @@ class Passiflore_Events_Map {
 	}
 
 	/**
-	 * Géocode un lieu en cascade, du plus précis au plus large, pour rester robuste
-	 * aux adresses imparfaites (rue mal orthographiée, etc.) :
-	 *   1. requête structurée (n° + rue + ville + CP + pays) → précision « rue »
-	 *   2. « CP ville, pays » (repli centroïde de la commune)
-	 *   3. « ville, pays »
+	 * Géocode un lieu (lit ses post meta) en délégant à geocode_parts().
 	 *
-	 * @return array{lat:float,lng:float}|null
+	 * @return array{lat:float,lng:float,precision:string,label:string}|null
 	 */
 	private function geocode( $venue_id ) {
 		$street  = get_post_meta( $venue_id, '_VenueAddress', true );
@@ -622,35 +732,157 @@ class Passiflore_Events_Map {
 		$zip     = get_post_meta( $venue_id, '_VenueZip', true );
 		$country = get_post_meta( $venue_id, '_VenueCountry', true ) ?: 'France';
 
+		return self::geocode_parts( $street, $city, $zip, $country );
+	}
+
+	/**
+	 * Géocode une adresse en cascade, du plus précis au plus large, pour rester
+	 * robuste aux adresses imparfaites (rue mal orthographiée, etc.) :
+	 *   1. requête structurée (n° + rue + ville + CP + pays)
+	 *   2. arrondissement (Paris/Lyon/Marseille) si le CP en désigne un —
+	 *      requête structurée city="{Ville} {N}e Arrondissement", garde
+	 *      d'acceptation sur le CP de la réponse (cf. CLAUDE.md : "75011 Paris"
+	 *      en texte libre déraille sur un hameau du Gers)
+	 *   3. commune, par sélection de candidats — city=/country=/limit=25,
+	 *      désambiguïsation des homonymes via pf_venue_pick_commune_candidate()
+	 *      (inc/venue-admin.php), qui filtre par type d'entité puis par
+	 *      département/région déduits du CP saisi
+	 *   4. « ville, pays » en texte libre (filet : graphie non résolue par la
+	 *      requête structurée, ou aucun candidat de type commune)
+	 *
+	 * Le CP n'est JAMAIS injecté tel quel dans une requête en texte libre
+	 * (Nominatim déraille dessus, ex. "40200 Mimizan" → un artisan plutôt que
+	 * le centre-ville) — il ne sert plus qu'à choisir/désambiguïser un résultat
+	 * structuré déjà obtenu.
+	 *
+	 * Statique et indépendante de tout lieu enregistré : réutilisée par l'aperçu
+	 * AJAX admin (ajax_geocode_preview), qui géocode une adresse en cours de
+	 * saisie, pas encore persistée.
+	 *
+	 * Précision : 'street' seulement si la 1re tentative (adresse structurée)
+	 * aboutit sur une entité de rang suffisant (place_rank Nominatim >= 26, rue
+	 * ou bâtiment) ; 'city' sinon — repli sur le centroïde de la commune, que ce
+	 * soit via les tentatives 2/3/4 ou une 1re tentative retombée sur une entité
+	 * administrative plus large.
+	 *
+	 * @return array{lat:float,lng:float,precision:string,label:string,address:array,commune_unique:bool}|null
+	 */
+	public static function geocode_parts( $street, $city, $zip, $country ) {
+		$country = $country ?: 'France';
+
 		$attempts = [];
-		if ( $street && $city ) {
+		// Rue + (ville OU CP) : élargi par rapport à une simple rue+ville pour
+		// couvrir la saisie « rue + CP, ville pas encore renseignée » — sans quoi
+		// aucune requête structurée ne part tant que la ville est vide, et la
+		// ville ne pourrait jamais être déduite par pf_venue_admin_fields_from_geocode().
+		if ( $street && ( $city || $zip ) ) {
 			$attempts[] = [ 'street' => $street, 'city' => $city, 'postalcode' => $zip, 'country' => $country ];
 		}
-		if ( $zip && $city ) {
-			$attempts[] = [ 'q' => trim( "$zip $city, $country" ) ];
+		// Arrondissement : clé pf_arrond retirée avant l'appel réseau (cf. boucle
+		// ci-dessous), sert seulement à distinguer cette tentative de la commune
+		// générique qui suit (les deux portent 'city').
+		$arrond_city = function_exists( 'pf_venue_arrondissement_city' ) ? pf_venue_arrondissement_city( (string) $city, (string) $zip ) : '';
+		if ( $arrond_city ) {
+			$attempts[] = [ 'pf_arrond' => 1, 'city' => $arrond_city, 'country' => $country ];
+		}
+		if ( $city ) {
+			$attempts[] = [ 'city' => $city, 'country' => $country, 'limit' => 25 ];
 		}
 		if ( $city ) {
 			$attempts[] = [ 'q' => trim( "$city, $country" ) ];
 		}
 
 		foreach ( $attempts as $params ) {
-			$coords = $this->nominatim( array_filter( $params ) );
-			if ( $coords ) {
-				return $coords;
+			// Drapeaux dérivés de la FORME de la requête (jamais de sa position
+			// dans $attempts, cf. commentaire ci-dessus) : selon l'adresse en
+			// base, certaines tentatives sont absentes de la liste.
+			$is_street_attempt  = isset( $params['street'] );
+			$is_arrond_attempt  = ! empty( $params['pf_arrond'] );
+			$is_commune_attempt = ! $is_street_attempt && ! $is_arrond_attempt && isset( $params['city'] );
+
+			$call_params = $params;
+			unset( $call_params['pf_arrond'] );
+
+			$results = self::nominatim( array_filter( $call_params ) );
+			if ( ! $results ) {
+				continue;
 			}
+
+			$picked         = null;
+			$commune_unique = false;
+
+			if ( $is_arrond_attempt ) {
+				// Garde d'acceptation auto-vérifiante : le CP de la réponse doit
+				// correspondre exactement au CP saisi (cf. CLAUDE.md, ordinal
+				// "1e" mal formé → hameau du Gers, attrapé ici).
+				foreach ( $results as $r ) {
+					if ( ( $r['address']['postcode'] ?? '' ) === $zip ) {
+						$picked = $r;
+						break;
+					}
+				}
+			} elseif ( $is_commune_attempt && function_exists( 'pf_venue_pick_commune_candidate' ) ) {
+				$picked = pf_venue_pick_commune_candidate( $results, (string) $city, (string) $zip );
+				if ( $picked ) {
+					$commune_unique = ! empty( $picked['pf_commune_unique'] );
+				}
+			} else {
+				$picked = $results[0];
+			}
+
+			if ( ! $picked ) {
+				continue;
+			}
+
+			$precision = ( $is_street_attempt && $picked['place_rank'] >= 26 ) ? self::GEO_PRECISION_STREET : self::GEO_PRECISION_CITY;
+
+			return [
+				'lat'            => $picked['lat'],
+				'lng'            => $picked['lng'],
+				'precision'      => $precision,
+				'label'          => $picked['display_name'] ?: trim( implode( ', ', array_filter( [ $street, $zip, $city ] ) ) ),
+				'address'        => $picked['address'] ?? [],
+				'commune_unique' => $commune_unique,
+			];
 		}
 
 		return null;
 	}
 
 	/**
-	 * Un appel Nominatim. Respecte la politique d'usage OSM : User-Agent identifiant
-	 * + espacement >= 1,1 s entre deux appels (throttle auto sur microtime).
+	 * Un appel Nominatim, mis en cache 1 h (clé = paramètres) : l'aperçu à la
+	 * frappe (admin) et le géocodage à l'enregistrement portent souvent la même
+	 * adresse dans la même minute — sans cache on double les appels OSM et on
+	 * rallonge la sauvegarde du throttle cumulé. Un échec est mis en cache aussi
+	 * (sentinelle '' ≠ false de get_transient) pour ne pas re-frapper l'API en
+	 * boucle sur une adresse invalide.
 	 *
 	 * @param array $params Paramètres de recherche (structurés ou `q`).
-	 * @return array{lat:float,lng:float}|null
+	 * @return array[] Liste de résultats normalisés (vide si échec/aucun résultat).
 	 */
-	private function nominatim( array $params ) {
+	private static function nominatim( array $params ): array {
+		$cache_key = 'pf_nomi_' . md5( wp_json_encode( $params ) );
+		$cached    = get_transient( $cache_key );
+		if ( false !== $cached ) {
+			return $cached ?: [];
+		}
+
+		$result = self::nominatim_request( $params );
+
+		set_transient( $cache_key, $result ?: '', HOUR_IN_SECONDS );
+
+		return $result;
+	}
+
+	/**
+	 * Respecte la politique d'usage OSM : User-Agent identifiant + espacement
+	 * >= 1,1 s entre deux appels (throttle auto sur microtime).
+	 *
+	 * @return array[] Résultats normalisés (lat/lng/place_rank/display_name/
+	 *                 addresstype/address), dans l'ordre de classement de
+	 *                 Nominatim. Vide si l'appel échoue ou ne renvoie rien.
+	 */
+	private static function nominatim_request( array $params ): array {
 		$elapsed = microtime( true ) - self::$last_nominatim;
 		if ( self::$last_nominatim > 0.0 && $elapsed < 1.1 ) {
 			usleep( (int) ( ( 1.1 - $elapsed ) * 1000000 ) );
@@ -658,7 +890,7 @@ class Passiflore_Events_Map {
 		self::$last_nominatim = microtime( true );
 
 		$url = add_query_arg(
-			array_map( 'rawurlencode', $params ) + [ 'format' => 'jsonv2', 'limit' => '1' ],
+			array_map( 'rawurlencode', $params ) + [ 'format' => 'jsonv2', 'limit' => '1', 'addressdetails' => '1', 'accept-language' => 'fr' ],
 			'https://nominatim.openstreetmap.org/search'
 		);
 
@@ -671,18 +903,62 @@ class Passiflore_Events_Map {
 		] );
 
 		if ( is_wp_error( $resp ) || 200 !== wp_remote_retrieve_response_code( $resp ) ) {
-			return null;
+			return [];
 		}
 
 		$body = json_decode( wp_remote_retrieve_body( $resp ), true );
-		if ( empty( $body[0]['lat'] ) || empty( $body[0]['lon'] ) ) {
-			return null;
+		if ( ! is_array( $body ) ) {
+			return [];
 		}
 
-		return [
-			'lat' => round( (float) $body[0]['lat'], 6 ),
-			'lng' => round( (float) $body[0]['lon'], 6 ),
-		];
+		$results = [];
+		foreach ( $body as $entry ) {
+			if ( empty( $entry['lat'] ) || empty( $entry['lon'] ) ) {
+				continue;
+			}
+			$results[] = [
+				'lat'          => round( (float) $entry['lat'], 6 ),
+				'lng'          => round( (float) $entry['lon'], 6 ),
+				'place_rank'   => isset( $entry['place_rank'] ) ? (int) $entry['place_rank'] : 0,
+				'display_name' => isset( $entry['display_name'] ) ? (string) $entry['display_name'] : '',
+				'addresstype'  => isset( $entry['addresstype'] ) ? (string) $entry['addresstype'] : '',
+				'address'      => is_array( $entry['address'] ?? null ) ? $entry['address'] : [],
+			];
+		}
+
+		return $results;
+	}
+
+	/**
+	 * Aperçu de géocodage pour l'admin (statut affiché à la frappe de l'adresse,
+	 * avant tout enregistrement) — cf. assets/js/venue-geo-picker.js. N'écrit
+	 * aucune meta, se contente d'interroger geocode_parts().
+	 */
+	public function ajax_geocode_preview() {
+		check_ajax_referer( 'pf_venue_geo', 'nonce' );
+		if ( ! current_user_can( 'edit_posts' ) ) {
+			wp_send_json_error( [], 403 );
+		}
+
+		$street  = isset( $_POST['street'] )  ? sanitize_text_field( wp_unslash( $_POST['street'] ) )  : '';
+		$city    = isset( $_POST['city'] )    ? sanitize_text_field( wp_unslash( $_POST['city'] ) )    : '';
+		$zip     = isset( $_POST['zip'] )     ? sanitize_text_field( wp_unslash( $_POST['zip'] ) )     : '';
+		$country = isset( $_POST['country'] ) ? sanitize_text_field( wp_unslash( $_POST['country'] ) ) : '';
+
+		$result = self::geocode_parts( $street, $city, $zip, $country );
+
+		if ( ! $result ) {
+			wp_send_json_success( [ 'found' => false ] );
+		}
+
+		wp_send_json_success( [
+			'found'     => true,
+			'precision' => $result['precision'],
+			'lat'       => $result['lat'],
+			'lng'       => $result['lng'],
+			'label'     => $result['label'],
+			'fields'    => pf_venue_admin_fields_from_geocode( $result['address'] ?? [], $result['precision'], $zip, ! empty( $result['commune_unique'] ) ),
+		] );
 	}
 }
 

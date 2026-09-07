@@ -23,6 +23,19 @@
  * schema.org JSON-LD (addressRegion, Tribe__Events__JSON_LD__Venue) —
  * continuent de fonctionner avec la valeur validée au lieu du texte libre
  * d'origine.
+ *
+ * Ce fichier porte aussi le champ « Position sur la carte » : statut de
+ * géocodage affiché à la frappe (aperçu AJAX, Passiflore_Events_Map::
+ * ajax_geocode_preview()) + carte Leaflet avec repère déplaçable. Déplacer le
+ * repère fixe des coordonnées manuelles (venue[GeoLat/GeoLng/GeoManual],
+ * Passiflore_Events_Map::set_manual_coords()/clear_manual_coords()) : le
+ * géocodage automatique (class-events-map.php, geocode_on_save() @25, après
+ * les deux passes de sauvegarde ci-dessous) ne les retouche plus tant que ce
+ * drapeau tient. Sans déplacement, les coordonnées affichées par l'aperçu
+ * sont elles-mêmes persistées si l'adresse postée (venue[GeoKey]) correspond
+ * encore aux metas enregistrées (pf_venue_geo_key(), Passiflore_Events_Map::
+ * set_geocoded_coords()) — le géocodage automatique ne sert plus alors que de
+ * repli (sans-JS, Quick Edit, clé périmée).
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -142,6 +155,18 @@ const PF_VENUE_DEPARTEMENTS = [
 function pf_venue_departement_code( string $name ): string {
 	foreach ( PF_VENUE_DEPARTEMENTS as $d ) {
 		if ( $d['name'] === $name ) return $d['code'];
+	}
+	return '';
+}
+
+/**
+ * Miroir de pf_venue_departement_code() : nom du département (ex. "Landes")
+ * à partir de son code (ex. "40"). Utilisé pour résoudre le département
+ * depuis l'ISO3166-2-lvl6 de Nominatim (cf. pf_venue_admin_fields_from_geocode()).
+ */
+function pf_venue_departement_name( string $code ): string {
+	foreach ( PF_VENUE_DEPARTEMENTS as $d ) {
+		if ( $d['code'] === $code ) return $d['name'];
 	}
 	return '';
 }
@@ -343,6 +368,73 @@ function pf_render_venue_departement_region_fields( $post ) {
 }
 
 /**
+ * Champ « Position sur la carte » — fiche lieu autonome.
+ */
+add_action( 'tribe_events_after_venue_metabox', 'pf_render_venue_geo_map_field' );
+
+function pf_render_venue_geo_map_field( $post ) {
+	$lat = $lng = $precision = $key = '';
+	if ( $post && $post->post_type === 'tribe_venue' ) {
+		$lat       = get_post_meta( $post->ID, Passiflore_Events_Map::GEO_META_LAT, true );
+		$lng       = get_post_meta( $post->ID, Passiflore_Events_Map::GEO_META_LNG, true );
+		$precision = get_post_meta( $post->ID, Passiflore_Events_Map::GEO_META_PRECISION, true );
+		$key       = pf_venue_geo_key( $post->ID );
+	}
+	?>
+	<tr class="venue tribe-linked-type-venue-geo">
+		<td class="tribe-table-field-label">
+			<label><?php esc_html_e( 'Position sur la carte :', 'kadence-child' ); ?></label>
+		</td>
+		<td><?php pf_render_venue_geo_map_widget( $lat, $lng, $precision, $key, '' ); ?></td>
+	</tr>
+	<?php
+}
+
+/**
+ * Même champ, mini-formulaire « Créer un nouveau lieu » de la fiche événement.
+ */
+add_action( 'tribe_events_linked_post_new_form', 'pf_render_venue_geo_map_field_inline', 20 );
+
+function pf_render_venue_geo_map_field_inline( $post_type ) {
+	if ( 'tribe_venue' !== $post_type ) return;
+	?>
+	<tr class="linked-post venue tribe-linked-type-venue-geo">
+		<td class="tribe-table-field-label">
+			<label><?php esc_html_e( 'Position sur la carte :', 'kadence-child' ); ?></label>
+		</td>
+		<td><?php pf_render_venue_geo_map_widget( '', '', '', '', '[]' ); ?></td>
+	</tr>
+	<?php
+}
+
+/**
+ * Markup partagé par les deux rendus ci-dessus. Lat/lng/precision initiales
+ * portées en data-attributes sur le conteneur de carte (même convention que
+ * #pf-event-venue-map côté public, cf. class-events-map.php) — lues par
+ * venue-geo-picker.js, pas dupliquées dans les données localisées globales.
+ * $key = pf_venue_geo_key() courante (fraîcheur de l'adresse à l'ouverture du
+ * formulaire, cf. pf_save_venue_geo_fields()). $suffix = '' (fiche lieu
+ * autonome) ou '[]' (lignes venue[Champ][] clonées de la fiche événement).
+ */
+function pf_render_venue_geo_map_widget( $lat, $lng, $precision, $key, $suffix ) {
+	?>
+	<p class="pf-venue-geo-status"></p>
+	<div
+		class="pf-venue-geo-map"
+		data-lat="<?php echo esc_attr( $lat ); ?>"
+		data-lng="<?php echo esc_attr( $lng ); ?>"
+		data-precision="<?php echo esc_attr( $precision ); ?>"
+	></div>
+	<button type="button" class="button pf-venue-geo-reset" hidden><?php esc_html_e( 'Revenir au repérage automatique', 'kadence-child' ); ?></button>
+	<input type="hidden" class="pf-venue-geo-lat"       name="<?php echo esc_attr( 'venue[GeoLat]' . $suffix ); ?>"       value="<?php echo esc_attr( $lat ); ?>" />
+	<input type="hidden" class="pf-venue-geo-lng"       name="<?php echo esc_attr( 'venue[GeoLng]' . $suffix ); ?>"       value="<?php echo esc_attr( $lng ); ?>" />
+	<input type="hidden" class="pf-venue-geo-manual"    name="<?php echo esc_attr( 'venue[GeoManual]' . $suffix ); ?>"    value="<?php echo 'manual' === $precision ? '1' : ''; ?>" />
+	<input type="hidden" class="pf-venue-geo-key"       name="<?php echo esc_attr( 'venue[GeoKey]' . $suffix ); ?>"       value="<?php echo esc_attr( $key ); ?>" />
+	<input type="hidden" class="pf-venue-geo-precision" name="<?php echo esc_attr( 'venue[GeoPrecision]' . $suffix ); ?>" value="<?php echo esc_attr( $precision ); ?>" />
+	<?php
+}
+
+/**
  * Case « Ce lieu n'a pas de nom » — juste sous le champ Titre natif de
  * l'écran d'édition (celui-ci n'appartient pas au tableau « Informations du
  * lieu » de tribe_events_after_venue_metabox, d'où un hook WP distinct).
@@ -385,6 +477,55 @@ function pf_venue_clamp_region( $value ) {
 	return in_array( $value, PF_VENUE_REGIONS, true ) ? $value : '';
 }
 
+/**
+ * Verrou de ré-entrance : wp_update_post() dans pf_venue_apply_composed_title()
+ * redéclenche save_post_tribe_venue, même motif que pf_fmt_busy()
+ * (product-format-admin.php) — sans lui, la recomposition se rappellerait
+ * elle-même indéfiniment.
+ */
+function pf_venue_title_busy( ?bool $set = null ): bool {
+	static $busy = false;
+	if ( $set !== null ) $busy = $set;
+	return $busy;
+}
+
+/**
+ * Titre composé pour un lieu « nom = adresse » (case cochée, cf.
+ * pf_render_venue_name_is_address_checkbox()) : la rue si elle est
+ * renseignée, sinon la ville — un lieu réduit à sa seule commune (salle des
+ * fêtes, marché, salon du livre) reste ainsi titré au lieu de se retrouver
+ * vide. Miroir documenté de wireNameIsAddress() (assets/js/venue-admin.js),
+ * qui n'en reste qu'un aperçu live ; cette fonction fait foi côté serveur.
+ */
+function pf_venue_composed_name( string $street, string $city ): string {
+	$street = trim( $street );
+	return '' !== $street ? $street : trim( $city );
+}
+
+/**
+ * Recompose le titre du lieu depuis Adresse/Ville quand « nom = adresse »
+ * est actif. Appelée après l'écriture des metas correspondantes, aux deux
+ * points de sauvegarde (fiche autonome + création en ligne) — jamais de
+ * titre vide (aucune adresse exploitable → on ne touche à rien).
+ */
+function pf_venue_apply_composed_title( $venue_id ) {
+	if ( pf_venue_title_busy() ) return;
+	if ( ! get_post_meta( $venue_id, '_VenueNameIsAddress', true ) ) return;
+
+	$name = pf_venue_composed_name(
+		(string) get_post_meta( $venue_id, '_VenueAddress', true ),
+		(string) get_post_meta( $venue_id, '_VenueCity', true )
+	);
+	if ( '' === $name ) return;
+
+	$current = get_post( $venue_id );
+	if ( ! $current || $current->post_title === $name ) return;
+
+	pf_venue_title_busy( true );
+	wp_update_post( [ 'ID' => $venue_id, 'post_title' => $name, 'post_name' => '' ] );
+	pf_venue_title_busy( false );
+}
+
 add_action( 'save_post_tribe_venue', 'pf_validate_venue_departement_region', 20 );
 
 function pf_validate_venue_departement_region( $post_id ) {
@@ -420,6 +561,68 @@ function pf_validate_venue_departement_region( $post_id ) {
 	// une checkbox décochée n'est pas soumise en POST, d'où le isset() plutôt
 	// qu'un simple ternaire — sans ça, la décocher ne l'effacerait jamais.
 	update_post_meta( $post_id, '_VenueNameIsAddress', isset( $_POST['venue']['NameIsAddress'] ) ? 1 : 0 );
+
+	// Champs géo traités AVANT la composition du titre : celle-ci peut
+	// déclencher un wp_update_post() imbriqué (cf. pf_venue_apply_composed_title())
+	// qui redéclenche geocode_on_save() @25 — sans les coordonnées de l'aperçu
+	// déjà en place, cette passe imbriquée regéocoderait pour rien avant que
+	// l'appel ci-dessous n'ait eu la main.
+	pf_save_venue_geo_fields( $post_id, $_POST['venue'] );
+	pf_venue_apply_composed_title( $post_id );
+}
+
+/**
+ * Position sur la carte (pf_render_venue_geo_map_widget) : trois cas, dans
+ * l'ordre —
+ *   1. Repère déplacé (mode manuel) → coordonnées manuelles retenues.
+ *   2. Sinon, si l'adresse postée (GeoKey) correspond encore aux metas
+ *      qu'on vient d'enregistrer (pf_venue_geo_key()) → les coordonnées
+ *      affichées par l'aperçu sont persistées telles quelles (cf. CLAUDE.md :
+ *      l'aperçu et le géocodage à l'enregistrement peuvent interroger des
+ *      variantes différentes de la même adresse et donc diverger).
+ *   3. Sinon (sans-JS, Quick Edit, clé périmée) → on rend la main au
+ *      géocodage automatique, qui suit dans la même requête (geocode_on_save
+ *      @25, après les deux passes de sauvegarde qui appellent cette fonction).
+ * Le mécanisme générique TEC écrit aussi des metas
+ * _VenueGeoLat/_VenueGeoLng/_VenueGeoManual/_VenueGeoKey/_VenueGeoPrecision
+ * brutes (non validées) pour tout champ venue[X] soumis — on les efface,
+ * notre propre lecture ci-dessus fait foi.
+ *
+ * @param array $venue_data $_POST['venue'] (fiche autonome) ou $data
+ *              (tribe_events_venue_created, valeurs déjà aplaties par TEC).
+ */
+function pf_save_venue_geo_fields( $venue_id, array $venue_data ) {
+	// '' !== avant le cast : (float) '' vaut 0.0, une coordonnée dans la
+	// plage valide (golfe de Guinée) — un champ non soumis ou vide doit
+	// rester null, jamais devenir « 0,0 ».
+	$lat_raw = $venue_data['GeoLat'] ?? '';
+	$lng_raw = $venue_data['GeoLng'] ?? '';
+	$lat     = '' !== $lat_raw ? (float) $lat_raw : null;
+	$lng     = '' !== $lng_raw ? (float) $lng_raw : null;
+	$manual  = ! empty( $venue_data['GeoManual'] );
+
+	if ( $manual && null !== $lat && null !== $lng ) {
+		Passiflore_Events_Map::set_manual_coords( $venue_id, $lat, $lng );
+	} elseif (
+		null !== $lat && null !== $lng
+		&& isset( $venue_data['GeoKey'] )
+		&& $venue_data['GeoKey'] === pf_venue_geo_key( $venue_id )
+	) {
+		Passiflore_Events_Map::set_geocoded_coords(
+			$venue_id,
+			$lat,
+			$lng,
+			sanitize_text_field( (string) ( $venue_data['GeoPrecision'] ?? '' ) )
+		);
+	} else {
+		Passiflore_Events_Map::clear_manual_coords( $venue_id );
+	}
+
+	delete_post_meta( $venue_id, '_VenueGeoLat' );
+	delete_post_meta( $venue_id, '_VenueGeoLng' );
+	delete_post_meta( $venue_id, '_VenueGeoManual' );
+	delete_post_meta( $venue_id, '_VenueGeoKey' );
+	delete_post_meta( $venue_id, '_VenueGeoPrecision' );
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -542,6 +745,16 @@ function pf_sync_venue_fields_on_create( $venue_id, $data ) {
 	update_post_meta( $venue_id, '_VenueProvince', $dept );
 
 	update_post_meta( $venue_id, '_VenueNameIsAddress', ! empty( $data['NameIsAddress'] ) ? 1 : 0 );
+
+	// Ordre important : cf. le même commentaire dans
+	// pf_validate_venue_departement_region() — ici en particulier, le garde
+	// de post_ID de pf_validate_venue_departement_region bloque toute
+	// ré-entrée dans CETTE fonction depuis le wp_update_post() imbriqué (elle
+	// n'écoute que tribe_events_venue_created, pas save_post_tribe_venue),
+	// donc rien d'autre ne traiterait les champs géo avant que le
+	// géocodage imbriqué ne parte pour de vrai.
+	pf_save_venue_geo_fields( $venue_id, $data );
+	pf_venue_apply_composed_title( $venue_id );
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -584,6 +797,250 @@ function pf_venue_postal_prefix_to_departement(): array {
 	return $map;
 }
 
+/**
+ * Clé de fraîcheur de l'adresse d'un lieu, pour la persistance des
+ * coordonnées prévisualisées (cf. pf_save_venue_geo_fields()). Même ordre
+ * exact que currentKey() côté JS (assets/js/venue-geo-picker.js) — valeurs
+ * BRUTES des metas enregistrées, pas le texte de venue_address_string() (qui
+ * sert à la requête Nominatim, pas à cette comparaison).
+ */
+function pf_venue_geo_key( $venue_id ): string {
+	return implode( '|', [
+		trim( (string) get_post_meta( $venue_id, '_VenueAddress', true ) ),
+		trim( (string) get_post_meta( $venue_id, '_VenueCity', true ) ),
+		trim( (string) get_post_meta( $venue_id, '_VenueZip', true ) ),
+		trim( (string) get_post_meta( $venue_id, '_VenueCountry', true ) ),
+	] );
+}
+
+/**
+ * Résout Ville/CP/Département/Région/Pays depuis le bloc `address` d'une
+ * réponse Nominatim (cf. Passiflore_Events_Map::nominatim_request(), appelé
+ * avec addressdetails=1) — auto-remplissage à la frappe côté JS
+ * (assets/js/venue-geo-picker.js, applyFields()).
+ *
+ * Cascade de résolution du département, aucune source seule ne couvrant tout :
+ *   1. `ISO3166-2-lvl6` (ex. "FR-40", "FR-75C", "FR-2A") — seule source qui
+ *      résout Paris/Lyon (arrondissement/métropole, pas un vrai département)
+ *      et la Corse (2A/2B, non déductible d'un préfixe postal).
+ *   2. `county` (ex. "Landes") — filet si l'ISO manque mais pas le nom.
+ *   3. Préfixe du CP de la RÉPONSE (`address.postcode`) — rattrape l'outre-mer,
+ *      où les deux sources précédentes sont nulles.
+ *   4. Préfixe du CP SAISI ($entered_zip) — repli quand la réponse elle-même
+ *      ne porte aucun `postcode` (nœuds commune des DOM, ex. Saint-Denis/La
+ *      Réunion : ni county, ni ISO3166-2-lvl6, ni postcode).
+ *
+ * @param array  $address        Bloc `address` de Nominatim (addressdetails=1).
+ * @param string $precision      'street'|'city' — la ville n'est retenue qu'à
+ *                                précision rue (cf. note ci-dessous).
+ * @param string $entered_zip    CP saisi par l'éditeur (repli département,
+ *                                cf. étape 4 de la cascade ci-dessous — utile
+ *                                aux nœuds commune des DOM, qui ne portent
+ *                                souvent aucun `postcode` dans la réponse).
+ * @param bool   $commune_unique Un seul candidat de type commune portait le
+ *                                nom saisi (cf. pf_venue_pick_commune_candidate()) :
+ *                                élargit le verrou du CP à la précision 'city'.
+ * @return array{city:string,zip:string,departement:string,region:string,country:string}
+ */
+function pf_venue_admin_fields_from_geocode( array $address, string $precision, string $entered_zip = '', bool $commune_unique = false ): array {
+	$fields = [ 'city' => '', 'zip' => '', 'departement' => '', 'region' => '', 'country' => '' ];
+
+	$country_code = strtoupper( $address['country_code'] ?? '' );
+	$is_france    = 'FR' === $country_code;
+
+	if ( $country_code && class_exists( 'Tribe__View_Helpers' ) ) {
+		$countries = Tribe__View_Helpers::constructCountries();
+		if ( isset( $countries[ $country_code ] ) ) {
+			$fields['country'] = $countries[ $country_code ];
+		}
+	}
+
+	// Ville : seulement à précision rue (cf. CLAUDE.md — un CP seul couvre
+	// souvent plusieurs communes, ex. 40200 = Aureilhan ET Mimizan). Jamais
+	// `municipality` : en France c'est l'arrondissement, pas la commune
+	// (Mimizan a `town: Mimizan` ET `municipality: Mont-de-Marsan`).
+	if ( 'street' === $precision ) {
+		foreach ( [ 'city', 'town', 'village', 'hamlet' ] as $key ) {
+			if ( ! empty( $address[ $key ] ) ) {
+				$fields['city'] = sanitize_text_field( $address[ $key ] );
+				break;
+			}
+		}
+	}
+
+	// CP affiché dans le formulaire : à précision rue (le CP d'un résultat
+	// commune est en général le CP principal, arbitraire pour une commune qui
+	// en compte plusieurs, ex. Bordeaux → 33000 alors que le lieu est en
+	// 33800) — OU quand un seul candidat commune portait le nom saisi
+	// ($commune_unique) : l'ambiguïté qui justifiait la retenue est alors
+	// levée pour de bon. $postcode reste en revanche disponible pour la
+	// résolution du département ci-dessous (elle n'a jamais eu besoin d'une
+	// précision rue).
+	$postcode = isset( $address['postcode'] ) ? sanitize_text_field( $address['postcode'] ) : '';
+	if ( ( 'street' === $precision || $commune_unique ) && $postcode ) {
+		$fields['zip'] = ( $is_france && ! preg_match( '/^\d{5}$/', $postcode ) ) ? '' : $postcode;
+	}
+
+	if ( $is_france ) {
+		$dept = '';
+
+		if ( ! empty( $address['ISO3166-2-lvl6'] ) && 0 === strpos( $address['ISO3166-2-lvl6'], 'FR-' ) ) {
+			$sub = substr( $address['ISO3166-2-lvl6'], 3 ); // "40", "75C", "69M", "2A"
+			if ( in_array( $sub, [ '2A', '2B' ], true ) ) {
+				$dept = pf_venue_departement_name( $sub );
+			} else {
+				$digits = preg_replace( '/\D/', '', $sub );
+				if ( $digits ) {
+					$dept = pf_venue_departement_name( $digits );
+				}
+			}
+		}
+
+		if ( ! $dept && ! empty( $address['county'] ) ) {
+			$dept = pf_venue_clamp_departement( sanitize_text_field( $address['county'] ) );
+		}
+
+		if ( ! $dept && $postcode ) {
+			$dept = pf_venue_departement_from_postal( $postcode );
+		}
+
+		if ( ! $dept && $entered_zip ) {
+			$dept = pf_venue_departement_from_postal( $entered_zip );
+		}
+
+		$fields['departement'] = $dept;
+		$fields['region']      = $dept
+			? ( PF_VENUE_DEPARTEMENT_TO_REGION[ $dept ] ?? '' )
+			: pf_venue_clamp_region( sanitize_text_field( $address['state'] ?? '' ) );
+	}
+
+	return $fields;
+}
+
+/**
+ * Département attendu à partir d'un code postal (cascade préfixe 3 puis 2
+ * chiffres — couvre l'outre-mer). Factorisé : utilisé à la fois par
+ * pf_venue_admin_fields_from_geocode() (étapes 3/4 de sa cascade) et par
+ * pf_venue_pick_commune_candidate() (désambiguïsation des homonymes). Corse
+ * (2A/2B) volontairement absente, cf. pf_venue_postal_prefix_to_departement() —
+ * un CP 20xxx ne désigne aucun département par préfixe, la sélection retombe
+ * simplement sur l'ordre d'importance de Nominatim.
+ */
+function pf_venue_departement_from_postal( string $zip ): string {
+	if ( ! preg_match( '/^\d{5}$/', $zip ) ) return '';
+	$map = pf_venue_postal_prefix_to_departement();
+	return $map[ substr( $zip, 0, 3 ) ] ?? ( $map[ substr( $zip, 0, 2 ) ] ?? '' );
+}
+
+/**
+ * "Paris 11e Arrondissement" / "Lyon 3e Arrondissement" / "Marseille 6e
+ * Arrondissement" — seule forme qui fait résoudre Nominatim sur l'objet
+ * `suburb` de l'arrondissement plutôt que sur l'objet code postal ou un POI
+ * (cf. CLAUDE.md, matrice de requêtes mesurées). '' si $city/$zip ne
+ * désignent pas l'une des trois villes françaises à arrondissements, ou si
+ * $zip n'est pas un CP à 5 chiffres dans leur plage.
+ *
+ * ⚠️ Ordinal : "1er" pour le 1er arrondissement, "{n}e" sinon — mesuré,
+ * "1e" fait dérailler Nominatim sur un hameau du Gers.
+ */
+function pf_venue_arrondissement_city( string $city, string $zip ): string {
+	if ( ! preg_match( '/^\d{5}$/', $zip ) ) return '';
+
+	$norm  = pf_search_normalize( $city );
+	$names = [ 'paris' => 'Paris', 'lyon' => 'Lyon', 'marseille' => 'Marseille' ];
+	if ( ! isset( $names[ $norm ] ) ) return '';
+
+	// Plages de CP par ville. Paris 75116 (16e) est hors la plage régulière
+	// 75001-75020 — deuxième sous-plage dédiée.
+	$ranges = [
+		'paris'     => [ [ 75001, 75020 ], [ 75116, 75116 ] ],
+		'lyon'      => [ [ 69001, 69009 ] ],
+		'marseille' => [ [ 13001, 13016 ] ],
+	];
+
+	$n   = (int) $zip;
+	$num = null;
+	foreach ( $ranges[ $norm ] as $range ) {
+		if ( $n >= $range[0] && $n <= $range[1] ) {
+			$num = $n % 100;
+			break;
+		}
+	}
+	if ( ! $num ) return '';
+
+	$ordinal = ( 1 === $num ) ? '1er' : $num . 'e';
+
+	return $names[ $norm ] . ' ' . $ordinal . ' Arrondissement';
+}
+
+/**
+ * Désambiguïse les homonymes d'une requête city=<ville>&country=<pays>
+ * (limit=25, cf. Passiflore_Events_Map::geocode_parts()) que Nominatim ne
+ * sait pas trier par lui-même (ex. "Sainte-Colombe" × 12, "Saint-Denis" × 3).
+ * Trois filtres en cascade, cf. CLAUDE.md pour la matrice de validation :
+ *   1. Type d'entité — écarte l'objet "code postal", les POI, les suburbs et
+ *      les municipality (= arrondissement en France, pas la commune).
+ *   2. Nom exact — écarte les communes dont le nom ne correspond pas
+ *      strictement à la saisie (ex. "Sainte-Colombe-en-Auxois").
+ *   3. Département/région attendus, déduits du CP saisi.
+ *   4. Repli : premier candidat dans l'ordre d'importance de Nominatim.
+ *
+ * @param array  $results Liste normalisée renvoyée par Passiflore_Events_Map::nominatim().
+ * @param string $city    Ville saisie.
+ * @param string $zip     CP saisi (peut être vide).
+ * @return array|null Résultat retenu, enrichi de `pf_commune_unique` (bool —
+ *                     un seul candidat après le filtre de nom).
+ */
+function pf_venue_pick_commune_candidate( array $results, string $city, string $zip ): ?array {
+	$communes = array_values( array_filter( $results, function ( $r ) {
+		return in_array( $r['addresstype'] ?? '', [ 'city', 'town', 'village', 'hamlet' ], true );
+	} ) );
+	if ( empty( $communes ) ) return null;
+
+	$city_norm = pf_search_normalize( $city );
+	$named     = array_values( array_filter( $communes, function ( $r ) use ( $city_norm ) {
+		$name = '';
+		foreach ( [ 'city', 'town', 'village', 'hamlet' ] as $key ) {
+			if ( ! empty( $r['address'][ $key ] ) ) { $name = $r['address'][ $key ]; break; }
+		}
+		return pf_search_normalize( $name ) === $city_norm;
+	} ) );
+
+	$unique = 1 === count( $named );
+	$pool   = $named ?: $communes;
+
+	$expected_dept = $zip ? pf_venue_departement_from_postal( $zip ) : '';
+	if ( $expected_dept ) {
+		foreach ( $pool as $r ) {
+			// ⚠️ Ne JAMAIS passer $zip à cet appel (3e argument, entered_zip) :
+			// chaque candidat se résoudrait alors au département attendu, tous
+			// correspondraient, et la désambiguïsation dégénérerait
+			// silencieusement en « premier candidat » — sans erreur ni test
+			// rouge. Les deux arguments optionnels restent à leur défaut.
+			$candidate = pf_venue_admin_fields_from_geocode( $r['address'] ?? [], 'city' );
+			if ( $candidate['departement'] === $expected_dept ) {
+				$r['pf_commune_unique'] = $unique;
+				return $r;
+			}
+		}
+
+		$expected_region = PF_VENUE_DEPARTEMENT_TO_REGION[ $expected_dept ] ?? '';
+		if ( $expected_region ) {
+			foreach ( $pool as $r ) {
+				$candidate = pf_venue_admin_fields_from_geocode( $r['address'] ?? [], 'city' );
+				if ( $candidate['region'] === $expected_region ) {
+					$r['pf_commune_unique'] = $unique;
+					return $r;
+				}
+			}
+		}
+	}
+
+	$pick                       = $pool[0];
+	$pick['pf_commune_unique']  = $unique;
+	return $pick;
+}
+
 function pf_enqueue_venue_admin_assets( $hook ) {
 	global $post;
 	if ( ! in_array( $hook, [ 'post.php', 'post-new.php' ], true ) ) return;
@@ -595,6 +1052,46 @@ function pf_enqueue_venue_admin_assets( $hook ) {
 		[ 'jquery' ],
 		filemtime( get_stylesheet_directory() . '/assets/js/venue-admin.js' ),
 		true
+	);
+
+	// Carte de repositionnement (champ « Position sur la carte ») : mêmes
+	// handles/versions Leaflet que le front (class-events-map.php), aucun
+	// Leaflet chargé en admin avant ce point.
+	$uri = get_stylesheet_directory_uri();
+	$dir = get_stylesheet_directory();
+
+	wp_enqueue_style( 'leaflet', $uri . '/assets/vendor/leaflet/leaflet.css', [], '1.9.4' );
+	wp_enqueue_script( 'leaflet', $uri . '/assets/vendor/leaflet/leaflet.js', [], '1.9.4', true );
+
+	wp_enqueue_script(
+		'pf-venue-geo-picker',
+		$uri . '/assets/js/venue-geo-picker.js',
+		[ 'jquery', 'leaflet', 'pf-venue-admin' ],
+		filemtime( $dir . '/assets/js/venue-geo-picker.js' ),
+		true
+	);
+
+	// wp_add_inline_script + wp_json_encode, pas wp_localize_script : même
+	// règle que product-format-admin.php (transtyperait tout scalaire de
+	// premier niveau en chaîne).
+	wp_add_inline_script(
+		'pf-venue-geo-picker',
+		'var pfVenueGeo = ' . wp_json_encode( [
+			'ajaxUrl'     => admin_url( 'admin-ajax.php' ),
+			'nonce'       => wp_create_nonce( 'pf_venue_geo' ),
+			'tileUrl'     => 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+			'attribution' => '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+			'franceView'  => [ 46.6, 2.4, 5 ], // centre + zoom de repli (France entière)
+			'i18n'        => [
+				'loading'  => __( 'Recherche de l\'adresse…', 'kadence-child' ),
+				'street'   => __( 'Adresse localisée : %s', 'kadence-child' ),
+				'city'     => __( 'Centre de commune%s. Adresse non localisée précisément — déplacez le repère pour ajuster.', 'kadence-child' ),
+				'notfound' => __( 'Adresse introuvable. Placez le repère à la main sur la carte.', 'kadence-child' ),
+				'manual'   => __( 'Coordonnées ajustées à la main. L\'adresse ci-dessus ne sert plus qu\'au texte affiché.', 'kadence-child' ),
+				'error'    => __( 'Vérification impossible pour le moment.', 'kadence-child' ),
+			],
+		] ) . ';',
+		'before'
 	);
 
 	/**
@@ -687,6 +1184,21 @@ JS;
 		   WooCommerce, pas par un cout d entree a l evenement lui-meme.
 		   Jamais touche par events-admin.js (aucune reference a cet id). */
 		#event_cost { display:none; }
+		/* Champ « Position sur la carte » — style.css n\'est pas chargé en admin,
+		   hex littéraux plutôt que tokens --pf-* (cf. règle CSS du thème). */
+		.pf-venue-geo-map { height:260px; margin:6px 0; border:1px solid #c3c4c7; border-radius:4px; background:#f0f0f1; }
+		.pf-venue-geo-status { margin:4px 0; font-size:13px; min-height:1.4em; }
+		.pf-venue-geo-status[data-status="street"] { color:#1e7b34; }
+		.pf-venue-geo-status[data-status="city"] { color:#996800; }
+		.pf-venue-geo-status[data-status="notfound"],
+		.pf-venue-geo-status[data-status="error"] { color:#b32d2e; }
+		.pf-venue-geo-status[data-status="manual"] { color:#2271b1; }
+		.pf-venue-geo-status[data-status="loading"] { color:#666; }
+		.pf-venue-geo-reset { margin-bottom:6px; }
+		.pf-venue-geo-pin { background:none; border:0; color:#c62836; }
+		.pf-venue-geo-pin__svg { display:block; width:100%; height:100%; overflow:visible; filter:drop-shadow(0 1px 1.5px rgba(26,22,21,.3)); }
+		.pf-venue-geo-pin__svg path { fill:currentColor; stroke:#fff; stroke-width:2; }
+		.pf-venue-geo-pin__svg circle { fill:#fff; }
 	' );
 }
 
@@ -701,3 +1213,69 @@ add_filter( 'tribe_events_default_value_strategy', function ( $defaults ) {
 		}
 	};
 } );
+
+/* ═══════════════════════════════════════════════════════════════
+   Liste des lieux — colonne « Carte » (état de géocodage)
+   ═══════════════════════════════════════════════════════════════ */
+
+add_filter( 'manage_edit-tribe_venue_columns', 'pf_venue_geo_column' );
+
+function pf_venue_geo_column( $columns ) {
+	$columns['pf_venue_geo'] = __( 'Carte', 'kadence-child' );
+	return $columns;
+}
+
+add_action( 'manage_tribe_venue_posts_custom_column', 'pf_venue_geo_column_content', 10, 2 );
+
+function pf_venue_geo_column_content( $column, $post_id ) {
+	if ( 'pf_venue_geo' !== $column ) return;
+
+	$lat       = get_post_meta( $post_id, Passiflore_Events_Map::GEO_META_LAT, true );
+	$precision = get_post_meta( $post_id, Passiflore_Events_Map::GEO_META_PRECISION, true );
+
+	if ( '' === $lat ) {
+		echo '<span style="color:#b32d2e;">&#10007; ' . esc_html__( 'Non localisé', 'kadence-child' ) . '</span>';
+		return;
+	}
+
+	switch ( $precision ) {
+		case Passiflore_Events_Map::GEO_PRECISION_MANUAL:
+			echo '<span style="color:#2271b1;">&#10003; ' . esc_html__( 'Ajusté à la main', 'kadence-child' ) . '</span>';
+			break;
+		case Passiflore_Events_Map::GEO_PRECISION_STREET:
+			echo '<span style="color:#1e7b34;">&#10003; ' . esc_html__( 'Localisé', 'kadence-child' ) . '</span>';
+			break;
+		default:
+			echo '<span style="color:#996800;">&#9888; ' . esc_html__( 'Centre de commune', 'kadence-child' ) . '</span>';
+			break;
+	}
+}
+
+add_filter( 'manage_edit-tribe_venue_sortable_columns', 'pf_venue_geo_sortable_column' );
+
+function pf_venue_geo_sortable_column( $columns ) {
+	$columns['pf_venue_geo'] = 'pf_venue_geo';
+	return $columns;
+}
+
+/**
+ * meta_query relation OR (EXISTS + NOT EXISTS) plutôt qu'un simple orderby
+ * meta_value : un orderby meta standard EXCLUT les posts sans la meta (INNER
+ * JOIN), donc les lieux non localisés — précisément ceux que cette colonne
+ * sert à repérer — disparaîtraient de la liste triée.
+ */
+add_action( 'pre_get_posts', 'pf_venue_geo_column_orderby' );
+
+function pf_venue_geo_column_orderby( $query ) {
+	if ( ! is_admin() || ! $query->is_main_query() ) return;
+	if ( 'tribe_venue' !== $query->get( 'post_type' ) ) return;
+	if ( 'pf_venue_geo' !== $query->get( 'orderby' ) ) return;
+
+	$query->set( 'meta_query', [
+		'relation' => 'OR',
+		[ 'key' => Passiflore_Events_Map::GEO_META_PRECISION, 'compare' => 'EXISTS' ],
+		[ 'key' => Passiflore_Events_Map::GEO_META_PRECISION, 'compare' => 'NOT EXISTS' ],
+	] );
+	$query->set( 'meta_key', Passiflore_Events_Map::GEO_META_PRECISION );
+	$query->set( 'orderby', 'meta_value' );
+}
