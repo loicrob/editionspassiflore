@@ -150,7 +150,9 @@ if ( ! $product->is_in_stock() ) {
 		}
 	}
 	if ( empty( $other_labels ) ) {
-		$epuise_message = 'Ce livre est désormais épuisé.';
+		// Plus de message générique : le formulaire d'alerte (pf_stock_alert_render,
+		// inc/stock-alert.php) prend la place du bloc d'achat.
+		$epuise_message = '';
 	} else {
 		$plural = count( $other_labels ) > 1;
 		$epuise_message = sprintf(
@@ -264,7 +266,14 @@ $description     = $product->get_description(); // même source que la section �
 						?>
 					</div>
 					<?php else : ?>
-					<p class="bs-epuise-msg"><?= esc_html( $epuise_message ) ?></p>
+						<?php if ( $epuise_message ) : ?>
+						<p class="bs-epuise-msg"><?= esc_html( $epuise_message ) ?></p>
+						<?php endif; ?>
+						<?php
+						if ( function_exists( 'pf_stock_alert_render' ) ) {
+							echo pf_stock_alert_render( $id ); // phpcs:ignore WordPress.Security.EscapeOutput
+						}
+						?>
 					<?php endif; ?>
 					<?php if ( $product->is_purchasable() && $product->is_in_stock() ) : ?>
 					<a href="<?= esc_url( $product->add_to_cart_url() ) ?>"

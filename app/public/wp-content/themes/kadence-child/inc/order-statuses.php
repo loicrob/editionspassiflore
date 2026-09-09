@@ -159,6 +159,20 @@ function pf_add_download_permitted_statuses( bool $permitted, WC_Order $order ):
 	return $permitted || $order->has_status( pf_order_status_slugs_bare() );
 }
 
+/**
+ * « Commandes à traiter » du tableau de bord Analytics : la liste cœur est
+ * codée en dur sur `processing`/`on-hold` — nos deux statuts d'attente
+ * (une précommande à surveiller, un colis à remettre en boutique) sont
+ * exactement du travail en cours, et n'y figuraient pas.
+ *
+ * Rien à retirer en regard : les 5 statuts sont déjà « payés » (filtre
+ * ci-dessus), donc déjà comptés dans le chiffre d'affaires.
+ */
+add_filter( 'woocommerce_actionable_order_statuses', 'pf_add_actionable_order_statuses' );
+function pf_add_actionable_order_statuses( array $statuses ): array {
+	return array_values( array_unique( array_merge( $statuses, [ 'pf-precommande', 'pf-retrait-att' ] ) ) );
+}
+
 /** « Commander à nouveau » : sans ça, disparaît pour toute commande papier terminée (Livrée/Retirée). */
 add_filter( 'woocommerce_valid_order_statuses_for_order_again', 'pf_add_order_again_statuses' );
 function pf_add_order_again_statuses( array $statuses ): array {
@@ -207,7 +221,12 @@ function pf_add_order_status_email_actions( array $actions ): array {
 	foreach ( pf_order_status_slugs_bare() as $slug ) {
 		$actions[] = 'woocommerce_order_status_' . $slug;
 	}
-	return $actions;
+	// Même raison, pour les transitions croisées (inc/order-emails.php) : une
+	// transition absente de cette liste n'émet jamais son `_notification`.
+	foreach ( array_keys( pf_email_transitions() ) as $transition ) {
+		$actions[] = 'woocommerce_order_status_' . $transition;
+	}
+	return array_values( array_unique( $actions ) );
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -230,6 +249,27 @@ add_filter( 'woocommerce_cheque_process_payment_order_status', 'pf_reroute_manua
 add_filter( 'woocommerce_cod_process_payment_order_status', 'pf_reroute_manual_gateway_status', 10, 2 );
 function pf_reroute_manual_gateway_status( string $status, WC_Order $order ): string {
 	pf_send_manual_payment_confirmation( $order );
+	return 'pending';
+}
+
+/**
+ * Fait suivre l'IBAN / les instructions de chèque dans l'email client.
+ *
+ * `WC_Gateway_BACS::email_instructions()` et son équivalent chèque ne
+ * s'exécutent que si la commande est dans le statut donné par ces deux
+ * filtres — `on-hold` par défaut, statut que le tunnel n'atteint plus depuis
+ * qu'on rapatrie les trois passerelles sur `pending` (juste au-dessus). Le
+ * mail « prise en compte » partait donc SANS aucune coordonnée de règlement,
+ * demandant au client de payer sans lui dire comment.
+ *
+ * (COD/espèces n'a pas de garde de statut équivalente : ses instructions
+ * partent déjà.) ⚠️ Le texte lui-même reste un réglage de passerelle
+ * (`account_details` du virement, `instructions` des trois) : vide en base,
+ * le mail reste muet malgré ces filtres.
+ */
+add_filter( 'woocommerce_bacs_email_instructions_order_status', 'pf_manual_gateway_instructions_status' );
+add_filter( 'woocommerce_cheque_email_instructions_order_status', 'pf_manual_gateway_instructions_status' );
+function pf_manual_gateway_instructions_status(): string {
 	return 'pending';
 }
 
@@ -305,9 +345,28 @@ function pf_order_is_pickup( WC_Order $order ): bool {
 }
 
 /**
- * Redirige toute commande sur le point d'arriver en `processing` vers
- * `pf-precommande` (article indisponible) ou `pf-retrait-att` (retrait en
- * boutique), avant même que `processing` soit écrit en base.
+ * Statut réel d'une commande à l'instant où elle devient payée — LA règle,
+ * une seule fois, partagée par le routeur ci-dessous et par la sortie de
+ * précommande. Sans elle, les deux chemins divergeaient : la sortie de
+ * précommande comptait sur le routeur pour rattraper le cas retrait en
+ * boutique, ce qui n'est plus vrai depuis que le routeur ignore les
+ * transitions dont l'origine est déjà un statut payé.
+ */
+function pf_order_status_after_payment( WC_Order $order ): string {
+	if ( pf_order_needs_precommande( $order ) ) {
+		return 'pf-precommande';
+	}
+	if ( pf_order_is_pickup( $order ) ) {
+		return 'pf-retrait-att';
+	}
+	return $order->needs_processing() ? 'processing' : 'completed';
+}
+
+/**
+ * Redirige une commande sur le point d'ARRIVER en `processing` DEPUIS UN
+ * STATUT NON PAYÉ vers `pf-precommande` (article indisponible) ou
+ * `pf-retrait-att` (retrait en boutique), avant même que `processing` soit
+ * écrit en base.
  *
  * Pourquoi ICI et pas via `woocommerce_payment_complete_order_status` (le
  * filtre habituel pour ce genre de redirection) : ce filtre ne couvre que le
@@ -327,6 +386,29 @@ function pf_order_is_pickup( WC_Order $order ): bool {
  * (`$this->status_transition['from']` déjà posé sinon repris) — rediriger ici
  * fait que `processing` n'est JAMAIS persisté ni notifié : la commande passe
  * directement de `pending` (ou `on-hold`) à son statut réel.
+ *
+ * ⚠️ DEUX GARDES, sans lesquelles ce même mécanisme se retourne contre nous —
+ * `get_status()` seul décrit l'ÉTAT VOULU, jamais le MOUVEMENT :
+ *
+ *   a) `$changes['status']` absent = simple enregistrement (ajout d'une note,
+ *      écriture du suivi Boxtal, méta…) d'une commande déjà en `processing`.
+ *      Sans cette garde, un livre déjà commandé repassé plus tard en
+ *      « à paraître » faisait basculer la commande en précommande — et
+ *      envoyer le mail correspondant — au premier enregistrement venu.
+ *
+ *   b) origine déjà payée = choix explicite de l'admin (typiquement
+ *      `pf-precommande` → « En cours de préparation »), qu'on RESPECTE. Sans
+ *      cette garde, `set_status()` renvoyait la commande vers son statut
+ *      d'origine dans le même `save()` : le `from` étant conservé, la
+ *      transition devenait `pf-precommande → pf-precommande`, exécutée quand
+ *      même par `status_transition()` — second mail « En attente de
+ *      disponibilité » au client et note « Statut modifié de X à X », pendant
+ *      que l'admin voyait « rien ne bouge ».
+ *
+ * Restent couverts : paiement carte (`payment_complete()` depuis `pending`),
+ * encaissement manuel (`pending → processing`), action groupée depuis
+ * `pending`, litige WooPayments (`on-hold → processing`), et la création
+ * d'une commande directement en `processing` (statut persisté encore vide).
  */
 add_action( 'woocommerce_before_order_object_save', 'pf_route_processing_transition', 10, 1 );
 function pf_route_processing_transition( $order ): void {
@@ -337,20 +419,31 @@ function pf_route_processing_transition( $order ): void {
 		return;
 	}
 
-	if ( pf_order_needs_precommande( $order ) ) {
-		$order->set_status( 'pf-precommande', '', false );
-	} elseif ( pf_order_is_pickup( $order ) ) {
-		$order->set_status( 'pf-retrait-att', '', false );
+	$changes = $order->get_changes();
+	if ( ! array_key_exists( 'status', $changes ) ) {
+		return; // (a) Pas une transition, juste un enregistrement.
+	}
+
+	$persisted = $order->get_data()['status'] ?? ''; // Statut AVANT changement (`$this->data`, pas `$this->changes`).
+	$from      = \Automattic\WooCommerce\Utilities\OrderUtil::remove_status_prefix( (string) $persisted );
+	if ( in_array( $from, wc_get_is_paid_statuses(), true ) ) {
+		return; // (b) Choix explicite depuis un statut déjà payé : respecté.
+	}
+
+	$target = pf_order_status_after_payment( $order );
+	if ( 'processing' !== $target ) {
+		$order->set_status( $target, '', false );
 	}
 }
 
 /**
  * Fait sortir une commande de « En attente de disponibilité » dès qu'elle
- * n'a plus aucun article indisponible — vers `completed` si elle est 100%
- * numérique (`needs_processing()`, même critère que le cœur pour ce choix),
- * sinon vers `processing` : si la commande est aussi un retrait en boutique,
- * `pf_route_processing_transition()` ci-dessus la redirigera d'elle-même
- * vers `pf-retrait-att`, sans dupliquer ce test ici.
+ * n'a plus aucun article indisponible, vers le statut que
+ * `pf_order_status_after_payment()` lui donne : `completed` si elle est 100%
+ * numérique, `pf-retrait-att` si elle est à retirer en boutique, sinon
+ * `processing`. Ce calcul est fait ICI et non plus délégué au routeur — qui
+ * ne touche plus à une transition partant d'un statut payé, et
+ * `pf-precommande` en est un.
  *
  * Deux appelants : le dépôt d'un fichier ePub (inc/epub-storage.php) et la
  * disponibilité d'un livre papier qui quitte « à paraître » (plus bas).
@@ -359,7 +452,7 @@ function pf_order_release_from_precommande( WC_Order $order ): void {
 	if ( ! $order->has_status( 'pf-precommande' ) || pf_order_needs_precommande( $order ) ) {
 		return;
 	}
-	$order->update_status( $order->needs_processing() ? 'processing' : 'completed' );
+	$order->update_status( pf_order_status_after_payment( $order ) );
 }
 
 /**
@@ -567,10 +660,21 @@ function pf_relevant_order_statuses_for( WC_Order $order ): array {
 		return array_unique( [ $current, 'pending', 'cancelled' ] );
 	}
 
-	$relevant = array_slice( $branch, $rank );
-
-	if ( 'pf-precommande' !== $current && ! pf_order_needs_precommande( $order ) ) {
-		$relevant = array_diff( $relevant, [ 'pf-precommande' ] );
+	if ( pf_order_needs_precommande( $order ) ) {
+		// Un article n'est pas encore disponible : le seul mouvement en avant qui
+		// ait un sens est `pf-precommande`. Tout le reste de la branche
+		// (`processing`, `pf-retrait-att`, `completed`, expédition…) décrit un
+		// parcours que l'état réel de la commande contredit — le proposer par
+		// défaut, c'était offrir le choix qui produisait le doublon d'email.
+		// « Afficher tous les statuts » reste l'échappatoire, et ce choix
+		// explicite est désormais RESPECTÉ par le routeur (section 6) au lieu
+		// d'être annulé en silence.
+		$relevant = [ $current, 'pf-precommande' ];
+	} else {
+		$relevant = array_slice( $branch, $rank );
+		if ( 'pf-precommande' !== $current ) {
+			$relevant = array_diff( $relevant, [ 'pf-precommande' ] );
+		}
 	}
 
 	if ( $rank < count( $branch ) - 1 ) {

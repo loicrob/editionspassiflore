@@ -23,11 +23,11 @@ class Passiflore_Email_Precommande extends Passiflore_Email_Order_Status_Base {
 	}
 
 	public function get_default_subject() {
-		return __( 'Votre précommande chez Passiflore (n°{order_number}) a bien été prise en compte…', 'kadence-child' );
+		return __( 'Votre commande Passiflore (n°{order_number}) est en attente de disponibilité', 'kadence-child' );
 	}
 
 	public function get_default_heading() {
-		return __( '…et nous vous en remercions !', 'kadence-child' );
+		return __( 'Merci pour votre précommande !', 'kadence-child' );
 	}
 
 	protected function get_default_intro(): string {

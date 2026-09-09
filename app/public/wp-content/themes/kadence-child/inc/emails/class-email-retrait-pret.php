@@ -17,11 +17,11 @@ class Passiflore_Email_Retrait_Pret extends Passiflore_Email_Order_Status_Base {
 	}
 
 	public function get_default_subject() {
-		return __( 'Votre commande chez Passiflore (n°{order_number}) a bien été prise en compte…', 'kadence-child' );
+		return __( 'Votre commande Passiflore (n°{order_number}) vous attend en boutique', 'kadence-child' );
 	}
 
 	public function get_default_heading() {
-		return __( '…et nous vous en remercions !', 'kadence-child' );
+		return __( 'Votre commande vous attend en boutique', 'kadence-child' );
 	}
 
 	protected function get_default_intro(): string {

@@ -691,12 +691,23 @@ function pf_epub_sync_permissions_for_product( int $post_id ): void {
 			wc_downloadable_file_permission( $download_id, $product, $order, max( 1, (int) $row->qty ) );
 		}
 
-		if ( $newly_granted ) {
-			pf_epub_notify_newly_available( $order, $post_id );
-		}
-
+		// Libérer D'ABORD, notifier ensuite : une commande 100% numérique sort de
+		// précommande vers `completed`, dont le mail natif « Vos livres numériques
+		// sont prêts ! » porte DÉJÀ les liens de téléchargement. Dans l'ordre
+		// inverse, le client recevait deux mails à une seconde d'intervalle disant
+		// la même chose.
+		//
+		// Le test porte sur le MOUVEMENT, pas sur le statut final : une commande
+		// déjà `completed` avant ce passage (mail « prêts » parti sans le fichier,
+		// clôture manuelle par l'admin) a bien besoin, elle, d'être notifiée.
+		$was_completed = $order->has_status( 'completed' );
 		if ( function_exists( 'pf_order_release_from_precommande' ) ) {
 			pf_order_release_from_precommande( $order );
+		}
+		$released_to_completed = ! $was_completed && $order->has_status( 'completed' );
+
+		if ( $newly_granted && ! $released_to_completed ) {
+			pf_epub_notify_newly_available( $order, $post_id );
 		}
 	}
 }

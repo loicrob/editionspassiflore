@@ -147,6 +147,14 @@
 /* ─── Bouton « Commander » ───────────────────────────────────────── */
 /* #place_order est un bouton .alt → rougi par le câblage global ; ici, layout. */
 
+/* Note discrète au-dessus du bouton (cf. inc/checkout.php). */
+.pf-checkout-emails-note {
+	font-style: italic;
+	color: var(--pf-muted);
+	font-size: 0.9rem;
+	margin: 0 0 var(--pf-space-4);
+}
+
 .woocommerce-checkout #place_order {
 	display: block;
 	width: 100%;

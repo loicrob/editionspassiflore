@@ -149,6 +149,82 @@
 	font-style: italic;
 }
 
+/* ─── Alerte « m'avertir si à nouveau disponible » (livre épuisé) ─── */
+
+/* Colonne : bouton, puis (invité) champ e-mail + mention RGPD, puis message d'état.
+   Le bouton porte .pf-btn .pf-btn--primary .pf-btn--icon (forme + couleur héritées
+   de style.css) ; ici, seulement le layout et la mise en forme du champ. */
+.pf-stockalert {
+	display: flex;
+	flex-direction: column;
+	gap: var(--pf-space-2);
+}
+
+/* Bouton désactivé tant que l'e-mail (invité) n'est pas valide : le thème n'a pas
+   de dim générique sur .pf-btn:disabled, on le pose ici. */
+.pf-stockalert__btn:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
+
+/* Champ e-mail (invité) : bord + focus via la base formulaire globale (style.css) ;
+   ici, seulement les deltas (calqué sur .bs-avis-form input). */
+.pf-stockalert__email {
+	width: 100%;
+	padding: 0.6em 0.75em;
+	font-family: inherit;
+	font-size: var(--pf-text-base); /* >= 16px : sous ce seuil, iOS zoome au focus */
+	color: var(--pf-heading);
+}
+
+.pf-stockalert__rgpd {
+	margin: 0;
+	font-size: 0.8rem;
+	font-style: italic;
+	color: var(--pf-muted);
+}
+
+.pf-stockalert__rgpd a {
+	color: inherit;
+	font-style: normal;
+}
+
+.pf-stockalert__msg {
+	margin: 0;
+	font-size: 0.85rem;
+}
+
+.pf-stockalert__msg:empty {
+	display: none;
+}
+
+.pf-stockalert__msg.is-error {
+	color: var(--pf-danger);
+}
+
+.pf-stockalert.is-loading .pf-stockalert__btn {
+	opacity: 0.6;
+	cursor: progress;
+}
+
+/* État « c'est fait » : remplace le formulaire (après soumission, ou compte déjà inscrit). */
+.pf-stockalert__done-msg {
+	display: flex;
+	align-items: flex-start;
+	gap: 0.5em;
+	margin: 0;
+	font-size: 0.9rem;
+	color: var(--pf-text);
+}
+
+.pf-stockalert__done-icon {
+	flex: none;
+	width: 1.2em;
+	height: 1.2em;
+	margin-top: 0.1em;
+	color: var(--pf-success);
+}
+
 .bs-hero__price {
 	font-size: 1.3rem;
 	font-weight: 600;

@@ -49,23 +49,34 @@ add_filter( 'the_content', function ( $content ) {
 		if ( is_wc_endpoint_url( 'order-pay' ) ) {
 			return '<h1>Payer la commande</h1>' . $content;
 		}
-		return '<h1>Commander</h1>' . pf_checkout_email_notice() . $content;
+		return '<h1>Commander</h1>' . $content;
 	}
 	return $content;
 } );
-
-/**
- * Avertissement temporaire : les e-mails de commande ne sont pas encore
- * totalement finalisés (doublons possibles, formulations à corriger). À
- * retirer une fois le sujet réglé.
- */
-function pf_checkout_email_notice(): string {
-	return '<div class="pf-notice pf-notice--warning">Les e-mails de commande ne sont pas finalisés : il se peut que vous en receviez en double ou que certains textes soient un peu étranges, veuillez nous excuser pour la gêne occasionnée (le processus de commande est totalement fonctionnel).</div>';
-}
 
 /**
  * Texte sous le h1 de remerciement (page order-received).
  */
 add_filter( 'woocommerce_thankyou_order_received_text', function ( $text, $order ) {
 	return 'Nous vous remercions pour votre commande, elle sera traitée dans les plus brefs délais.';
+}, 10, 2 );
+
+/**
+ * Note en italique juste au-dessus du bouton « Commander » : les e-mails de
+ * commande ont été revus récemment, invitation à signaler un éventuel
+ * dysfonctionnement (mail en double, etc.).
+ *
+ * Injectée via `render_block` sur le bloc « Actions » (dernier enfant de
+ * checkout-fields-block, qui rend le bouton) plutôt qu'en insérant un paragraphe
+ * dans la page : le contenu des pages n'est pas versionné. Même parti que les
+ * forçages de inc/checkout-consent.php.
+ */
+add_filter( 'render_block', function ( $block_content, $block ) {
+	if ( 'woocommerce/checkout-actions-block' !== ( $block['blockName'] ?? '' ) ) {
+		return $block_content;
+	}
+
+	$note = '<p class="pf-checkout-emails-note">Les e-mails de commande ont été revus récemment. Si ceux-ci ne sont pas pleinement satisfaisants pour la vôtre (mail en double par exemple), veuillez nous excuser et nous le notifier par mail si vous le souhaitez.</p>';
+
+	return $note . $block_content;
 }, 10, 2 );

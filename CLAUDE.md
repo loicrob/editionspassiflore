@@ -216,6 +216,30 @@ Les « Suggestions de Passiflore » ont été **retirées** (moteur `pf_reco_*` 
 
 ---
 
+### Statuts de commande & emails (`inc/order-statuses.php`, `inc/order-emails.php`, `inc/emails/`)
+
+5 statuts neufs (`pf-precommande`, `pf-retrait-att`, `pf-expediee`, `pf-livree`, `pf-retiree`) au-dessus de `pending`/`processing` du cœur (relibellés). 6 emails maison sur un gabarit partagé + 11 classes natives sous-classées pour n'en changer que les **défauts** de texte — une personnalisation faite dans Réglages → E-mails reste prioritaire.
+
+**Routeur (`pf_route_processing_transition`, §6)** : n'agit que sur une **vraie transition entrante** (`get_changes()` contient `status`) dont l'**origine n'est pas un statut payé**. `get_status()` seul décrit l'état voulu, jamais le mouvement — sans ces deux gardes, (a) tout enregistrement ordinaire d'une commande `processing` (note, suivi Boxtal, méta) la rebasculait en précommande dès qu'un livre repassait « à paraître », (b) un choix admin `pf-precommande → processing` était renvoyé à son origine dans le même `save()` : transition X→X exécutée quand même, second email au client, note « Statut modifié de X à X ». Cible calculée par `pf_order_status_after_payment()` — source unique, partagée avec `pf_order_release_from_precommande()`.
+
+**Matrice des mails** : transitions croisées déclarées dans `pf_email_transitions()`, qui alimente **à la fois** `woocommerce_email_actions` et les `add_action()` (une transition absente de la première n'émet jamais son `_notification`).
+
+| Transition | Mail |
+|---|---|
+| arrivée sur un statut `pf-*` | mail maison du statut |
+| `pf-precommande → processing` | client « en cours de préparation » |
+| `pf-precommande → completed` | client « livres numériques prêts » (action native `…_completed`) |
+| `pf-precommande` / `pf-retrait-att` / `pf-expediee` → `cancelled` | boutique + client |
+| `pending → cancelled` | client seul (la boutique est à l'origine de l'annulation) |
+
+- ⚠️ **`pf_unhook_email_instance()` est obligatoire avant de remplacer une classe native** : `WC_Emails::init()` fait `$this->emails[$class] = include $path;` (chaque fichier `return new WC_Email_X()`), donc l'instance native a **déjà posé ses hooks** quand `woocommerce_email_classes` s'applique. Réaffecter la clé ne remplace que la référence — le client recevait chaque email natif **deux fois**, une fois avec les textes WooCommerce, une fois avec les nôtres. Détachement par **identité d'objet**, jamais par liste de hooks en dur (les déclencheurs natifs varient d'une version à l'autre).
+- ⚠️ `WC_Email_Customer_Cancelled_Order` est livré **désactivé** par WooCommerce (`'default' => 'no'`) : défaut forcé à `yes` dans la sous-classe, sinon aucune annulation n'est jamais notifiée au client, pas même `processing → cancelled`.
+- ⚠️ Ordre imposé à la livraison d'un ePub (`pf_epub_sync_permissions_for_product()`) : **libérer d'abord, notifier ensuite**, et n'envoyer « Livre numérique disponible » que si la commande n'a pas basculé en `completed` à cette occasion — le mail « Terminée » porte déjà les liens.
+- Instructions de règlement : `woocommerce_bacs_/cheque_email_instructions_order_status` → `pending` (les 3 passerelles manuelles y sont rapatriées, plus jamais `on-hold`). ⚠️ Le texte lui-même (`account_details` du virement, `instructions`) reste un **réglage de passerelle** : vide, le mail part sans coordonnées.
+- **Hors code, à contrôler en prod** : Boxtal `BW_ORDER_SHIPPED = wc-pf-expediee` / `BW_ORDER_DELIVERED = wc-pf-livree` (sinon les webhooks poussent vers `completed`, donc mail « livres numériques prêts » sur une commande papier) ; sa liste noire d'import n'exclut pas `pf-precommande`, une précommande y apparaît expédiable.
+
+---
+
 ### Consentements du tunnel de commande (`inc/checkout-consent.php`)
 
 Deux cases obligatoires, **sans JavaScript** (tunnel en blocs/Store API, hooks classiques morts) via l'API **Additional Checkout Fields**.
