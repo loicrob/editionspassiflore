@@ -31,7 +31,7 @@ function pf_email_shared_text( string $key ): string {
 	if ( null === $texts ) {
 		$texts = [
 			'cancelled_heading'  => __( 'Commande annulée : #{order_number}', 'kadence-child' ),
-			'additional_generic' => __( 'Nous la préparons dans les plus brefs délais et vous notifierons quand elle sera expédiée. Pour toute question concernant votre commande, vous pouvez directement répondre à cet e-mail.', 'kadence-child' ),
+			'additional_generic' => __( 'Nous la préparerons dans les plus brefs délais et vous notifierons quand elle sera expédiée. Pour toute question concernant votre commande, vous pouvez directement répondre à cet e-mail.', 'kadence-child' ),
 			'additional_support' => __( 'Pour toute question concernant votre commande, vous pouvez directement répondre à cet e-mail.', 'kadence-child' ),
 		];
 	}

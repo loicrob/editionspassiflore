@@ -25,6 +25,6 @@ class Passiflore_Email_Retrait_Pret extends Passiflore_Email_Order_Status_Base {
 	}
 
 	protected function get_default_intro(): string {
-		return __( 'Vous pouvez passer en boutique quand vous le souhaitez (durant nos horaires d’ouverture) pour la récupérer.', 'kadence-child' );
+		return __( 'Vous pouvez passer en boutique durant nos horaires d’ouverture (du lundi au vendredi de 9h à 12h30 et de 14h à 17h30) pour la récupérer.', 'kadence-child' );
 	}
 }

@@ -463,6 +463,7 @@ require_once get_stylesheet_directory() . '/inc/epub-storage.php';
 require_once get_stylesheet_directory() . '/inc/class-ebooks.php';
 require_once get_stylesheet_directory() . '/inc/checkout.php';
 require_once get_stylesheet_directory() . '/inc/checkout-consent.php';
+require_once get_stylesheet_directory() . '/inc/checkout-phone.php';
 require_once get_stylesheet_directory() . '/inc/order-statuses.php';
 require_once get_stylesheet_directory() . '/inc/order-emails.php';
 require_once get_stylesheet_directory() . '/inc/site-relaunch-email.php';

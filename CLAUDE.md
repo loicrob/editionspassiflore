@@ -465,6 +465,7 @@ kadence-child/
 │   ├── newsletter.php               — Bloc d'abonnement site-wide + endpoints AJAX (rendu via kadence_top_footer prio 5, dans <footer>)
 │   ├── wc-notices-toast.php         — Notices WooCommerce → toasts : primer inline + enqueue des deux contrôleurs
 │   ├── checkout-consent.php         — Consentements du tunnel (CGV + renonciation rétractation)
+│   ├── checkout-phone.php           — Téléphone obligatoire en point relais (SMS) : locale pays (libellé + required côté client) + garde serveur groupe-conscient. Relais détecté par la case « Téléphone obligatoire » de l'instance `flat_rate` OU par les réseaux Boxtal (auto). ⚠️ `phone` est un champ CŒUR : option globale unique, les règles conditionnelles JSON-Schema ne s'y appliquent PAS
 │   ├── account-auth.php             — Connexion/création de compte : URL dédiées /connexion et /creer-un-compte
 │   ├── pageflip.php                 — Enqueues pageflip assets on single product pages
 │   ├── epub-storage.php             — Stockage protégé des ePub (pf_epub_dir/stored_path/ensure_dir/is_protected_path)
