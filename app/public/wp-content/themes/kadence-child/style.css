@@ -1749,6 +1749,13 @@ body.admin-bar { --pf-adminbar: 32px; }
 .pf-toast__msg strong {
     font-weight: var(--pf-weight-semibold);
 }
+/* Liste dans un message : plusieurs erreurs de champ regroupées en un seul toast
+   (assets/js/wc-block-notices-toast.js, capteur 3). */
+.pf-toast__msg ul {
+    margin: 0.3em 0 0;
+    padding-left: 1.2em;
+    list-style: disc;
+}
 .pf-toast__actions {
     align-self: center; /* centré horizontalement par rapport au texte */
     display: flex;

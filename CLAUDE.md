@@ -331,7 +331,9 @@ Seuls les **conteneurs** de notices sont interceptés — jamais un message ancr
 
 **B. Notices React des blocs** (`wc-block-notices-toast.js`) : deux capteurs, aucun ne couvre l'autre.
 - **Store `core/notices`** : la notice est retirée (`removeNotice`) aussitôt lue — sinon une notice à ID fixe resterait bloquée et une 2e tentative n'afficherait plus rien ; certaines (contexte `wc/all-products`) n'ont **aucun conteneur** pour les rendre.
+  - ⚠️ Ce retrait immédiat trompe le repli natif du tunnel (aucune notice d'erreur trouvée → WooCommerce publie le message brut de la réponse, id `checkout`) : repli écarté s'il suit une erreur reprise du store (< 2s), sinon une erreur `rest_invalid_param` (garde serveur d'un champ) affiche en plus « Paramètre(s) non valide(s) : … ».
 - **DOM (`MutationObserver`)** : erreurs Store API passées en props (`additionalNotices`), jamais via le store. ⚠️ **Ne jamais retirer un nœud du DOM de React** (masqué en CSS, on recopie seulement). Anti-doublon 2s.
+- **Hors notices — validation des champs au clic sur « Commander »** (`onCheckoutValidation`) : les erreurs restent sous leurs champs, plus un seul toast récapitulatif par tentative (textes du store de validation, surcharges par clé d'erreur dans `window.pfFieldErrorMessages`). ⚠️ Sur ce chemin les blocs ignorent l'`errorMessage` d'un écouteur → émission directe, pas de notice.
 
 **Commun** : erreur = durée 0 (fermeture manuelle, `role="alert"`) ; succès/warning/info = défaut (5s). Sévérité → couleur d'icône, pas un aplat de fond. Amélioration progressive : conteneurs masqués uniquement par `html.pf-notices-js` (primer inline avant 1er paint) — sans JS, notices normales à leur place.
 
@@ -465,7 +467,7 @@ kadence-child/
 │   ├── newsletter.php               — Bloc d'abonnement site-wide + endpoints AJAX (rendu via kadence_top_footer prio 5, dans <footer>)
 │   ├── wc-notices-toast.php         — Notices WooCommerce → toasts : primer inline + enqueue des deux contrôleurs
 │   ├── checkout-consent.php         — Consentements du tunnel (CGV + renonciation rétractation)
-│   ├── checkout-phone.php           — Téléphone obligatoire en point relais (SMS) : locale pays (libellé + required côté client) + garde serveur groupe-conscient. Relais détecté par la case « Téléphone obligatoire » de l'instance `flat_rate` OU par les réseaux Boxtal (auto). ⚠️ `phone` est un champ CŒUR : option globale unique, les règles conditionnelles JSON-Schema ne s'y appliquent PAS
+│   ├── checkout-phone.php           — Téléphone obligatoire sur toute commande ; en point relais, mobile exigé (FR : 06/07 seulement, numéro étranger accepté tel quel). Locale pays (libellé + required côté client) + garde serveur (facturation = présence, livraison = mobile si relais) + texte du toast « téléphone manquant » (`window.pfFieldErrorMessages`, lu par le capteur 3 de `wc-block-notices-toast.js`). Relais détecté par la case « Point relais » de l'instance `flat_rate` (clé `pf_tel_obligatoire`) OU par les réseaux Boxtal (auto). ⚠️ `phone` est un champ CŒUR : option globale unique, les règles conditionnelles JSON-Schema ne s'y appliquent PAS
 │   ├── account-auth.php             — Connexion/création de compte : URL dédiées /connexion et /creer-un-compte
 │   ├── pageflip.php                 — Enqueues pageflip assets on single product pages
 │   ├── epub-storage.php             — Stockage protégé des ePub (pf_epub_dir/stored_path/ensure_dir/is_protected_path)

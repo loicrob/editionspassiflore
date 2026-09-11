@@ -8,7 +8,9 @@
  * la même classe `.wc-block-components-notice-banner` (+ `is-error` / `is-success`
  * / `is-warning` / `is-info`), d'où un seul sélecteur.
  *
- * **Deux capteurs, parce qu'il y a deux origines et qu'aucune ne couvre l'autre :**
+ * **Deux capteurs de notices, parce qu'il y a deux origines et qu'aucune ne couvre
+ * l'autre** (un troisième, en fin de fichier, couvre les erreurs de champ, qui ne
+ * produisent aucune notice) :
  *
  * 1. **Le store `core/notices`** — coupon retiré, erreur de paiement, échec de
  *    soumission de commande, échec d'ajout au panier depuis un bouton de bloc…
@@ -72,6 +74,7 @@
 
 	var seen   = [];               // clés présentes au dernier balayage du DOM
 	var recent = Object.create( null ); // clé → date du dernier toast
+	var lastErrorAt = 0; // dernière erreur reprise du store (cf. isRedundantFallback)
 
 	/** Texte nu d'un fragment de markup (clé de déduplication). */
 	function textOf( html ) {
@@ -110,6 +113,23 @@
 
 	/* ─── Capteur 1 : le store ──────────────────────────────────────── */
 
+	/**
+	 * Repli « aucune erreur affichée » du tunnel, que ce capteur rend faux. Après un
+	 * échec de commande, WooCommerce cherche une notice d'erreur dans les contextes
+	 * du tunnel et, s'il n'en trouve aucune, publie le message brut de la réponse
+	 * (id `checkout`, contexte `wc/checkout`). Or elles ont déjà été retirées du
+	 * store ci-dessous : le repli part donc à chaque échec. D'ordinaire il répète le
+	 * texte déjà montré et la déduplication l'absorbe ; mais sur une erreur de
+	 * paramètres (`rest_invalid_param` — garde serveur d'un champ d'adresse ou de
+	 * commande), le vrai message vit dans le détail et le repli ajoute le résumé
+	 * technique « Paramètre(s) non valide(s) : shipping_address ». On l'écarte donc
+	 * quand il suit de près une erreur déjà reprise — c'est la règle native.
+	 */
+	function isRedundantFallback( notice, context ) {
+		return 'wc/checkout' === context && 'checkout' === notice.id
+			&& Date.now() - lastErrorAt < DEDUPE_MS;
+	}
+
 	function drainStore() {
 		var select   = data.select( 'core/notices' );
 		var dispatch = data.dispatch( 'core/notices' );
@@ -122,6 +142,12 @@
 				// Retrait d'abord : le ré-appel de ce même écouteur qu'il provoque
 				// ne retrouve alors plus rien à traiter.
 				dispatch.removeNotice( notice.id, context );
+				if ( isRedundantFallback( notice, context ) ) {
+					return;
+				}
+				if ( 'error' === notice.status ) {
+					lastErrorAt = Date.now();
+				}
 				// `status` du store ('error', 'success'…) = classe de la bannière
 				// sans son préfixe ; 'default' n'y figure pas et retombe sur info.
 				emit( CLASS_STATUS[ 'is-' + notice.status ] || 'info', notice.content );
@@ -218,4 +244,59 @@
 
 	observer.observe( document.body, { childList: true, subtree: true, characterData: true } );
 	scan();
+
+	/* ─── Capteur 3 : la validation des champs ─────────────────────── */
+
+	/**
+	 * Un champ obligatoire vide ou invalide n'atteint jamais le serveur : au clic
+	 * sur « Commander », les blocs émettent l'événement de validation du tunnel,
+	 * constatent l'erreur, la montrent sous le champ et s'arrêtent là — sans
+	 * notice, donc sans rien pour les deux capteurs ci-dessus. On s'abonne à ce
+	 * même événement (API publique `wc.blocksCheckoutEvents`).
+	 *
+	 * ⚠️ Sur ce chemin, l'`errorMessage` renvoyé par un écouteur est ignoré (seules
+	 * ses `validationErrors` sont reprises) : impossible de passer par une notice,
+	 * on émet directement. Le blocage, lui, reste celui des blocs.
+	 *
+	 * Un seul toast par tentative, qui liste les erreurs : un toast d'erreur reste
+	 * jusqu'à fermeture manuelle, et un formulaire envoyé vide en empilerait sinon
+	 * une dizaine. Textes = ceux du store de validation (affichés sous les champs),
+	 * sauf surcharge par identifiant d'erreur dans `window.pfFieldErrorMessages`
+	 * (ex. le téléphone, inc/checkout-phone.php) — clé d'un champ d'adresse :
+	 * `<groupe>_<champ>`.
+	 */
+	function escapeHtml( text ) {
+		var tmp = document.createElement( 'div' );
+		tmp.textContent = text;
+		return tmp.innerHTML;
+	}
+
+	function toastFieldErrors() {
+		var validation = data.select( 'wc/store/validation' );
+		var errors     = ( validation && validation.getValidationErrors() ) || {};
+		var overrides  = window.pfFieldErrorMessages || {};
+		var messages   = [];
+
+		Object.keys( errors ).forEach( function ( id ) {
+			var message = overrides[ id ] || ( errors[ id ] && errors[ id ].message ) || '';
+
+			if ( message && -1 === messages.indexOf( message ) ) {
+				messages.push( message );
+			}
+		} );
+
+		if ( 1 === messages.length ) {
+			emit( 'error', escapeHtml( messages[ 0 ] ) );
+		} else if ( messages.length ) {
+			emit( 'error', 'Merci de corriger les points suivants :<ul><li>'
+				+ messages.map( escapeHtml ).join( '</li><li>' ) + '</li></ul>' );
+		}
+	}
+
+	var checkoutEvents = window.wc && window.wc.blocksCheckoutEvents
+		&& window.wc.blocksCheckoutEvents.checkoutEvents;
+
+	if ( checkoutEvents ) {
+		checkoutEvents.onCheckoutValidation( toastFieldErrors );
+	}
 } )();

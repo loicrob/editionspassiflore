@@ -67,11 +67,17 @@ function pf_wc_notices_toast_assets() {
 
 	// Dépend du contrôleur classique : il expose les icônes de statut partagées
 	// (`window.pfNoticeIcons`). `wp-data` pour retirer du store `core/notices` la
-	// notice qu'on vient de reprendre en toast.
+	// notice qu'on vient de reprendre en toast. Sur Commander, l'API d'événements
+	// du tunnel (validation des champs, capteur 3) : la déclarer garantit qu'elle
+	// est chargée avant ce script.
+	$deps = [ 'pf-wc-notices-toast', 'wp-data' ];
+	if ( is_checkout() && ! is_wc_endpoint_url() ) {
+		$deps[] = 'wc-blocks-checkout-events';
+	}
 	wp_enqueue_script(
 		'pf-wc-block-notices-toast',
 		get_stylesheet_directory_uri() . '/assets/js/wc-block-notices-toast.js',
-		[ 'pf-wc-notices-toast', 'wp-data' ],
+		$deps,
 		filemtime( get_stylesheet_directory() . '/assets/js/wc-block-notices-toast.js' ),
 		true
 	);

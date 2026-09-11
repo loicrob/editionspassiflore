@@ -1,21 +1,30 @@
 <?php
 /**
- * Téléphone obligatoire pour une livraison en point relais.
+ * Téléphone obligatoire sur toute commande ; numéro de mobile exigé en point
+ * relais.
  *
- * Les réseaux relais préviennent le client par SMS de la mise à disposition du
- * colis : sans numéro, il n'est averti que par l'e-mail Boxtal. On rend donc la
- * saisie obligatoire — mais SEULEMENT quand la commande part en point relais,
- * pour ne pas réclamer un numéro sur une commande 100 % numérique, qui n'en a
- * aucun besoin (minimisation RGPD).
+ * Le transporteur reçoit le téléphone de l'adresse de livraison (Boxtal le transmet
+ * avec le contact du destinataire) et s'en sert en cas de souci ; pour un retrait en
+ * boutique ou une commande numérique, il sert à joindre le client au sujet de sa
+ * commande. En point relais, le réseau prévient en plus le client par SMS de la
+ * mise à disposition du colis : un fixe n'y suffit pas.
+ *
+ * Seuls les numéros français sont vérifiés comme mobiles (06/07) : distinguer un
+ * mobile d'un fixe à l'étranger demanderait une base de numérotation par pays
+ * (libphonenumber). Un numéro étranger est donc accepté tel quel plutôt que de
+ * risquer de refuser une vraie commande. Hors point relais, tout numéro convient
+ * (certains lecteurs n'ont qu'un fixe).
  *
  * Deux couches, parce que WooCommerce n'offre pas de « champ cœur conditionnel » :
  *
  *  1. AFFICHAGE (libellé + astérisque + validation côté client) — filtre sur la
  *     locale pays. `phone` est un champ CŒUR du tunnel en blocs, piloté par une
- *     option unique et globale (`woocommerce_checkout_phone_field`), ni
- *     conditionnable par mode d'expédition ni par groupe d'adresse. Le seul levier
- *     qui redescende jusqu'au client est `countryData[<pays>].locale`, alimenté par
- *     cette locale — le client y lit `required`, `label` et `optionalLabel`.
+ *     option unique et globale (`woocommerce_checkout_phone_field`) : réglée sur
+ *     « requis », elle s'imposerait aussi au formulaire « Adresses » du compte
+ *     client, resterait un réglage en base à reporter en prod et ne saurait pas
+ *     adapter le libellé au panier. Le seul levier qui redescende jusqu'au client
+ *     est `countryData[<pays>].locale`, alimenté par cette locale — le client y lit
+ *     `required` et `label`.
  *     ⚠️ Le mécanisme de règles JSON-Schema utilisé dans inc/checkout-consent.php
  *     ne s'applique QU'aux champs additionnels — `CheckoutFields::get_fields_for_location()`
  *     ne retourne que ceux-là, jamais les champs cœur. Inutilisable ici, ne pas
@@ -24,14 +33,9 @@
  *  2. AUTORITÉ (refus de la commande) — garde serveur sur la validation d'adresse,
  *     qui elle connaît le groupe (livraison vs facturation).
  *
- * Deux limites assumées :
- *  - la couche 1 est figée au rendu de la page : un client qui bascule vers le
- *    point relais sans recharger ne verra pas l'astérisque apparaître. C'est
- *    exactement le trou que couvre la couche 2.
- *  - la locale pays ne distingue pas livraison et facturation : quand la commande
- *    part en relais ET que le client décoche « utiliser la même adresse pour la
- *    facturation », le téléphone est réclamé sur les deux formulaires. Seule la
- *    livraison est réellement exigée côté serveur.
+ * Limite assumée : la couche 1 est figée au rendu de la page et ne peut donc pas
+ * suivre le mode de livraison choisi. D'où un libellé unique qui annonce l'exigence
+ * du mobile en relais — exigence que seule la couche 2 fait respecter.
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -39,23 +43,26 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /**
- * Case « Téléphone obligatoire » dans la popup « Configurer forfait » de chaque
- * méthode « Forfait », à côté des champs de seuil de inc/shipping.php.
+ * Case « Point relais » dans la popup « Configurer forfait » de chaque méthode
+ * « Forfait », à côté des champs de seuil de inc/shipping.php.
  *
  * Nécessaire parce que la détection automatique ci-dessous ne peut rien voir tant
  * que Boxtal n'est pas appairé : hors production, « En point relais » n'est qu'un
  * `flat_rate` ordinaire, que rien ne distingue d'une livraison à domicile. Ce
  * réglage rend le mode relais déclarable à la main, donc testable, et couvre aussi
  * un futur transporteur relais qui ne passerait pas par Boxtal.
+ *
+ * La clé `pf_tel_obligatoire` date de l'époque où le téléphone n'était exigé qu'en
+ * relais : conservée telle quelle, puisqu'elle est déjà enregistrée en base.
  */
 add_filter( 'woocommerce_shipping_instance_form_fields_flat_rate', 'pf_relay_phone_instance_field' );
 function pf_relay_phone_instance_field( $fields ) {
 	$fields['pf_tel_obligatoire'] = array(
-		'title'       => __( 'Téléphone obligatoire', 'kadence-child' ),
+		'title'       => __( 'Point relais', 'kadence-child' ),
 		'type'        => 'checkbox',
-		'label'       => __( 'Exiger un numéro de téléphone pour ce mode de livraison', 'kadence-child' ),
+		'label'       => __( 'Exiger un numéro de mobile (SMS du point relais)', 'kadence-child' ),
 		'default'     => 'no',
-		'description' => __( 'À cocher pour une livraison en point relais : le réseau prévient le client par SMS de la mise à disposition du colis. Inutile sur un tarif que Boxtal gère déjà en point relais — la détection est alors automatique.', 'kadence-child' ),
+		'description' => __( 'À cocher pour une livraison en point relais : le réseau prévient le client par SMS de la mise à disposition du colis, un numéro de mobile est donc exigé. Inutile sur un tarif que Boxtal gère déjà en point relais — la détection est alors automatique.', 'kadence-child' ),
 		'desc_tip'    => true,
 	);
 
@@ -107,8 +114,37 @@ function pf_relay_shipping_selected(): bool {
 }
 
 /**
- * Couche 1 — libellé du champ, et `required` dès que le relais est retenu, dans la
- * locale de CHAQUE pays.
+ * Ce numéro peut-il recevoir le SMS du point relais ?
+ *
+ * Seul un numéro français se laisse vérifier : mobile = 06 ou 07 (les mobiles des
+ * DROM au format national — 0690, 0692, 0694, 0696… — en font partie) ; le 09 (box
+ * internet) ne reçoit pas les SMS. `+33`/`0033` est ramené au format national, y
+ * compris avec le 0 superflu (« +33 (0)6… », « +33 06… »). Tout autre numéro
+ * international est accepté tel quel, et un format national n'est lu comme
+ * français que si le colis part en France.
+ */
+function pf_phone_accepts_sms( string $phone, string $country ): bool {
+	$number = preg_replace( '/[^\d+]/', '', str_replace( '(0)', '', $phone ) );
+
+	if ( preg_match( '/^(?:\+|00)33/', $number ) ) {
+		$number = preg_replace( '/^(?:\+|00)330?/', '0', $number );
+	} elseif ( preg_match( '/^(?:\+|00)/', $number ) || 'FR' !== $country ) {
+		return true;
+	}
+
+	return (bool) preg_match( '/^0[67]\d{8}$/', $number );
+}
+
+/**
+ * Message « téléphone manquant », partagé par la garde serveur et le toast client.
+ */
+function pf_checkout_phone_missing_message(): string {
+	return __( 'Merci d’indiquer un numéro de téléphone : il sert à vous joindre au sujet de votre commande.', 'kadence-child' );
+}
+
+/**
+ * Couche 1 — `required` et libellé sur toute commande, dans la locale de CHAQUE
+ * pays.
  *
  * Il faut passer par les pays et non par la locale « default » : `get_country_data()`
  * n'exporte au client que les entrées par pays, jamais `default`. Ajouter une
@@ -116,10 +152,10 @@ function pf_relay_shipping_selected(): bool {
  * PAR-DESSUS les champs par défaut (`wc_array_overlay()` côté PHP, étalement de
  * `defaultFields` côté JS), jamais substituée à eux.
  *
- * Le client affiche `label` quand le champ est requis et `optionalLabel` sinon :
- * la mention « requis pour une commande en point relais » n'a donc de sens que
- * dans le second, où elle annonce ce qui va se passer. Elle est réservée aux
- * paniers à expédier — sur une commande 100 % numérique, elle n'aurait aucun sens.
+ * La mention du point relais n'a de sens que si quelque chose est expédié : elle
+ * disparaît sur une commande 100 % numérique. La locale ne distingue pas livraison
+ * et facturation : le champ est requis sur chaque formulaire affiché, ce qui est
+ * voulu (la couche 2 exige la facturation).
  *
  * Restreint au rendu de la page Commander. Ailleurs — écran d'administration,
  * formulaire « Adresses » du compte client, Store API — la locale ne doit rien
@@ -127,26 +163,21 @@ function pf_relay_shipping_selected(): bool {
  * groupe d'adresse il parle. `did_action( 'wp' )` évite d'interroger les balises
  * conditionnelles avant que la requête principale ne soit jouée.
  */
-add_filter( 'woocommerce_get_country_locale', 'pf_relay_phone_locale', 20 );
-function pf_relay_phone_locale( $locale ) {
+add_filter( 'woocommerce_get_country_locale', 'pf_checkout_phone_locale', 20 );
+function pf_checkout_phone_locale( $locale ) {
 	if ( is_admin() || wp_doing_ajax() || ! did_action( 'wp' ) ) {
 		return $locale;
 	}
 	if ( ! function_exists( 'is_checkout' ) || ! is_checkout() ) {
 		return $locale;
 	}
-	if ( ! WC()->cart || ! WC()->cart->needs_shipping() ) {
-		return $locale;
-	}
 
 	$phone = array(
-		'label'         => __( 'Téléphone (requis pour une commande en point relais)', 'kadence-child' ),
-		'optionalLabel' => __( 'Téléphone (requis pour une commande en point relais)', 'kadence-child' ),
+		'label'    => WC()->cart && WC()->cart->needs_shipping()
+			? __( 'Téléphone (mobile pour un point relais)', 'kadence-child' )
+			: __( 'Téléphone', 'kadence-child' ),
+		'required' => true,
 	);
-
-	if ( pf_relay_shipping_selected() ) {
-		$phone['required'] = true;
-	}
 
 	$countries = array_merge(
 		WC()->countries->get_allowed_countries(),
@@ -161,7 +192,44 @@ function pf_relay_phone_locale( $locale ) {
 }
 
 /**
- * Couche 2 — refuse la commande si le colis part en point relais sans téléphone.
+ * Texte du toast quand la commande est bloquée côté client faute de téléphone : le
+ * même que la garde serveur, au lieu du générique des blocs (« Veuillez saisir
+ * un(e) téléphone … valide »). Le toast est celui du contrôleur des notices
+ * (assets/js/wc-block-notices-toast.js, validation des champs), qui accepte des
+ * surcharges par identifiant d'erreur. Priorité 20 : après son enregistrement.
+ */
+add_action( 'wp_enqueue_scripts', 'pf_checkout_phone_toast_message', 20 );
+function pf_checkout_phone_toast_message() {
+	if ( ! wp_script_is( 'pf-wc-block-notices-toast' ) || ! is_checkout() ) {
+		return;
+	}
+
+	$message = pf_checkout_phone_missing_message();
+	wp_add_inline_script(
+		'pf-wc-block-notices-toast',
+		'window.pfFieldErrorMessages = Object.assign( window.pfFieldErrorMessages || {}, '
+			. wp_json_encode( array( 'shipping_phone' => $message, 'billing_phone' => $message ) ) . ' );',
+		'before'
+	);
+}
+
+/**
+ * Couche 2 — refuse toute commande sans téléphone, et le point relais sans mobile.
+ *
+ *  - FACTURATION : présence. Ce groupe est validé à chaque commande et reçoit la
+ *    copie du téléphone de livraison quand « utiliser la même adresse » est coché ;
+ *    c'est aussi le seul formulaire affiché en retrait en boutique et pour une
+ *    commande numérique. Il couvre donc tous les cas.
+ *  - LIVRAISON, en point relais seulement : mobile. C'est ce numéro que Boxtal
+ *    transmet au transporteur.
+ *
+ * Les deux contrôles sont indépendants et tournent dès la validation de la requête,
+ * avant toute mise à jour de la commande : un téléphone vide en relais fait donc
+ * remonter les deux messages — cas théorique, la couche 1 bloque le champ vide
+ * avant l'envoi.
+ *
+ * Panier vide = hors tunnel (paiement d'une commande existante par la Store API) :
+ * on ne réclame rien à une commande déjà passée.
  *
  * ⚠️ Ce hook sert aussi au formulaire « Adresses » du compte client
  * (`CheckoutFieldsFrontend::validate_and_persist_fields_for_customer()`), qui ne
@@ -169,17 +237,26 @@ function pf_relay_phone_locale( $locale ) {
  * les deux appels — sans ce test, enregistrer une adresse depuis le compte
  * échouerait sur un téléphone qui n'a jamais été soumis.
  */
-add_action( 'woocommerce_blocks_validate_location_address_fields', 'pf_relay_phone_validate', 10, 3 );
-function pf_relay_phone_validate( $errors, $fields, $group ) {
-	if ( 'shipping' !== $group || ! array_key_exists( 'phone', (array) $fields ) ) {
+add_action( 'woocommerce_blocks_validate_location_address_fields', 'pf_checkout_phone_validate', 10, 3 );
+function pf_checkout_phone_validate( $errors, $fields, $group ) {
+	if ( ! array_key_exists( 'phone', (array) $fields ) ) {
 		return;
 	}
-	if ( '' !== trim( (string) $fields['phone'] ) || ! pf_relay_shipping_selected() ) {
+	if ( ! WC()->cart || WC()->cart->is_empty() ) {
 		return;
 	}
 
-	$errors->add(
-		'pf_relay_phone_requis',
-		__( 'Merci d’indiquer un numéro de téléphone mobile : le point relais vous prévient par SMS de la mise à disposition de votre colis.', 'kadence-child' )
-	);
+	$phone = trim( (string) $fields['phone'] );
+
+	if ( 'billing' === $group && '' === $phone ) {
+		$errors->add( 'pf_phone_requis', pf_checkout_phone_missing_message() );
+	}
+
+	if ( 'shipping' === $group && pf_relay_shipping_selected()
+		&& ( '' === $phone || ! pf_phone_accepts_sms( $phone, (string) ( $fields['country'] ?? '' ) ) ) ) {
+		$errors->add(
+			'pf_relay_mobile_requis',
+			__( 'Pour un retrait en point relais, indiquez un numéro de mobile (06 ou 07) : le point relais vous prévient par SMS de l’arrivée de votre colis. Sans mobile, choisissez la livraison à domicile.', 'kadence-child' )
+		);
+	}
 }
