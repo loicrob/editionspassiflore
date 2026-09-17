@@ -472,3 +472,4 @@ require_once get_stylesheet_directory() . '/inc/mini-cart.php';
 require_once get_stylesheet_directory() . '/inc/shortcodes.php';
 require_once get_stylesheet_directory() . '/inc/privacy-cookies.php';
 require_once get_stylesheet_directory() . '/inc/stock-alert.php';
+require_once get_stylesheet_directory() . '/inc/product-export.php';

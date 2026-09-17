@@ -472,7 +472,8 @@ kadence-child/
 │   ├── pageflip.php                 — Enqueues pageflip assets on single product pages
 │   ├── epub-storage.php             — Stockage protégé des ePub (pf_epub_dir/stored_path/ensure_dir/is_protected_path)
 │   ├── class-ebooks.php             — Passiflore_Ebooks — page /mon-compte/livres-numeriques, entitled_downloads(), endpoint ?pf_epub=<id>
-│   └── account-hub.php              — Accueil du compte : grille de tuiles, nav latérale masquée sur le seul hub
+│   ├── account-hub.php              — Accueil du compte : grille de tuiles, nav latérale masquée sur le seul hub
+│   └── product-export.php           — Écran d'export CSV produits refondu : colonnes livre, filtres catalogue, regroupement par œuvre
 │
 ├── assets/
 │   ├── css/                         — account.css, epub-reader.css, auteur-single.css, auteurs.css, book-single.css, bookshelf.css, cart.css, catalogue.css, checkout.css, events*.css, event-single.css, pageflip.css, reading-list.css, recherche-auteurs.css, recherche-globale.css
@@ -639,6 +640,16 @@ Réduit le forfait d'expédition d'une méthode `flat_rate` une fois un montant 
 - Application : `woocommerce_package_rates` (prio 100) — si `pf_seuil > 0` et sous-total TTC affiché ≥ seuil → `set_cost(pf_cout_reduit)`.
 
 **Recalcul de la livraison au changement de pays — checkout en blocs** (`assets/js/checkout-shipping-country.js`) : contourne un bug WooCommerce Blocks (changer le `<select>` pays ne déclenche pas le push Store API qui recalcule les tarifs, contrairement aux champs texte). Écoute le `change`, debounce 300ms, rappelle `wp.data.dispatch('wc/store/cart').updateCustomerData(...)`.
+
+---
+
+### Export CSV des produits (`inc/product-export.php`)
+
+Refonte de l'écran natif WooCommerce (`edit.php?post_type=product&page=product_exporter`) : colonnes livre (SCF), filtres catalogue, regroupement d'une œuvre multi-formats sur une seule ligne (représentant via `pf_group_representative()`). Trois hooks natifs uniquement, aucun fichier WooCommerce modifié.
+
+- ⚠️ `wc_get_products()` ignore silencieusement `meta_query` (`WC_Data_Store_WP::get_wp_query_args()` fait `continue` dessus) — les filtres sont résolus en amont via un `WP_Query` classique, injecté dans `$args['include']`.
+- ⚠️ Un jeu de résultats vide doit devenir `[0]`, jamais `[]` : `prepare_data_to_export()` teste `! empty( $args['include'] )` et exporterait sinon tout le catalogue.
+- ⚠️ Le menu des colonnes est regroupé en `<optgroup>` (« Livre » / « Autres ») et le jeu essentiel pré-coché via un `<script>` **inline**, émis sur `woocommerce_product_export_row` — doit s'exécuter avant l'init de select2 au `DOMContentLoaded` (même principe que les primers inline du thème).
 
 ---
 
