@@ -384,11 +384,11 @@ class Passiflore_Product_Export {
 
 			case 'description':
 				$p = wc_get_product( $rep_id );
-				return $p ? self::filter_description( (string) $p->get_description( 'edit' ) ) : '';
+				return $p ? self::strip_description( (string) $p->get_description( 'edit' ) ) : '';
 
 			case 'short_description':
 				$p = wc_get_product( $rep_id );
-				return $p ? self::filter_description( (string) $p->get_short_description( 'edit' ) ) : '';
+				return $p ? self::strip_description( (string) $p->get_short_description( 'edit' ) ) : '';
 
 			case 'pf_sous_titre':
 				return (string) get_field( 'sous-titre', $rep_id );
@@ -621,11 +621,19 @@ class Passiflore_Product_Export {
 		return $d ? $d->format( 'd/m/Y' ) : '';
 	}
 
-	/** Même transformation que WC_Product_CSV_Exporter::filter_description_field(). */
-	private static function filter_description( string $text ): string {
-		$text = str_replace( '\n', '\\\\n', $text );
-		$text = str_replace( "\n", '\n', $text );
-		return $text;
+	/**
+	 * Texte brut pour Résumé/Accroche : balises HTML retirées (lecture/transmission,
+	 * pas de réimport — contrairement au natif WC qui échappe les retours à la ligne
+	 * en "\n" littéral pour un réimport fidèle, cf. filter_description_field()).
+	 * Un espace précède chaque balise de bloc avant strip_tags pour ne pas coller
+	 * deux paragraphes l'un à l'autre ; wp_strip_all_tags( …, true ) retire ensuite
+	 * balises + retours à la ligne réels, puis les espaces multiples sont réduits.
+	 */
+	private static function strip_description( string $html ): string {
+		if ( $html === '' ) return '';
+		$html = (string) preg_replace( '/<(p|br|div|li)\b[^>]*>/i', ' ', $html );
+		$text = wp_strip_all_tags( $html, true );
+		return trim( (string) preg_replace( '/\s+/u', ' ', $text ) );
 	}
 
 	/** "classique" pour l'absence de terme, sinon le nom du terme en minuscules (forme de pf_format_suffix()). */
