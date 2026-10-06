@@ -456,6 +456,7 @@ require_once get_stylesheet_directory() . '/inc/account-auth.php';
 require_once get_stylesheet_directory() . '/inc/recommendations.php';
 require_once get_stylesheet_directory() . '/inc/account-hub.php';
 require_once get_stylesheet_directory() . '/inc/shipping.php';
+require_once get_stylesheet_directory() . '/inc/shipping-report.php';
 require_once get_stylesheet_directory() . '/inc/boxtal-perf.php';
 require_once get_stylesheet_directory() . '/inc/numerique-offer.php';
 require_once get_stylesheet_directory() . '/inc/cart-backorder-badge.php';

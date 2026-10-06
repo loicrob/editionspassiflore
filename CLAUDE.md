@@ -473,7 +473,8 @@ kadence-child/
 │   ├── epub-storage.php             — Stockage protégé des ePub (pf_epub_dir/stored_path/ensure_dir/is_protected_path)
 │   ├── class-ebooks.php             — Passiflore_Ebooks — page /mon-compte/livres-numeriques, entitled_downloads(), endpoint ?pf_epub=<id>
 │   ├── account-hub.php              — Accueil du compte : grille de tuiles, nav latérale masquée sur le seul hub
-│   └── product-export.php           — Écran d'export CSV produits refondu : colonnes livre, filtres catalogue, regroupement par œuvre
+│   ├── product-export.php           — Écran d'export CSV produits refondu : colonnes livre, filtres catalogue, regroupement par œuvre
+│   └── shipping-report.php          — Analytique → Frais de port (après Produits) : port par (mode, tarif TTC) sur une période + CSV. Mêmes règles qu'Analytique (wc_order_stats, réglages « Type de date »/« Statuts exclus ») pour que les totaux concordent
 │
 ├── assets/
 │   ├── css/                         — account.css, epub-reader.css, auteur-single.css, auteurs.css, book-single.css, bookshelf.css, cart.css, catalogue.css, checkout.css, events*.css, event-single.css, pageflip.css, reading-list.css, recherche-auteurs.css, recherche-globale.css
